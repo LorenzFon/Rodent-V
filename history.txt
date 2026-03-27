@@ -1,3 +1,7 @@
+0.1.6 (26-03-27)
+
+	[perf] pre-allocating movePicker instances
+
 0.1.5 (26-03-27)
 
 	[feat] replacing unused material with piece counts (also unused yet)

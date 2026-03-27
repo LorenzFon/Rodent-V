@@ -42,6 +42,7 @@ package main
 var (
 	histTable   [12][64]int          // history[piece][toSq]
 	killerMoves [maxPly][2]int       // killerMoves[ply][0..1]
+	moveBuffers [maxPly]MovePicker   // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
 )
 
 // MovePicker holds the state for iterating through moves in priority

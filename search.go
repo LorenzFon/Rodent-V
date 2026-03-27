@@ -162,8 +162,8 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 	// --- Main move loop ---
 	best := -inf
-	var picker MovePicker
-	initMovePicker(p, &picker, ttMove, ply)
+    picker := &moveBuffers[ply]
+	initMovePicker(p, picker, ttMove, ply)
 	var childPv [maxPly]int
 
 	for {
@@ -270,8 +270,8 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		alpha = best
 	}
 
-	var picker MovePicker
-	initQSearch(p, &picker)
+	picker := &moveBuffers[ply]
+	initQSearch(p, picker)
 	var childPv [maxPly]int
 
 	for {
