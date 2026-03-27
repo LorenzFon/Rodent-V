@@ -36,7 +36,13 @@
 
 package main
 
-func main() {
+// init() is guaranteed to run before main()
+func init() {
 	initTables()
+}
+
+func main() {
+	// stuff like reading data from file should go here
+	// to handle errors
 	uciLoop()
 }
