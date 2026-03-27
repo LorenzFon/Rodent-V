@@ -1,0 +1,12 @@
+0.1.0 (26-03-27)
+
+[feat: eval] game phase interpolation 
+
+mg/eg interpolation, modified Pesto tables, mobility, passers (Sungorus values), isolated pawns (Sungorus values)
+
+Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 190.85 +/- 47.50, nElo: 225.29 +/- 45.70
+LOS: 100.00 %, DrawRatio: 27.03 %, PairsRatio: 9.12
+Games: 222, Wins: 151, Losses: 40, Draws: 31, Points: 166.5 (75.00 %)
+Ptnml(0-2): [4, 4, 30, 23, 50], WL/DD Ratio: 14.00
+LLR: 2.90 (100.2%) (-2.25, 2.89) [0.00, 10.00]
