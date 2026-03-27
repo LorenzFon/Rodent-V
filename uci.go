@@ -83,7 +83,7 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V 0.1.3")
+			fmt.Println("id name Rodent V 0.1.4")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
@@ -150,6 +150,10 @@ func uciLoop() {
 				elapsed = 1
 			}
 			fmt.Printf("Nodes: %d  Time: %dms  NPS: %d\n", n, elapsed, n*1000/uint64(elapsed))
+		
+		case "print":
+			PrintBoard(&p);
+
 		}
 	}
 

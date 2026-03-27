@@ -1,20 +1,24 @@
+0.1.4 (26-03-27)
+
+	[test] printing the board
+
 0.1.3 (26-03-27)
 
-[test] nps reporting
+	[test] nps reporting
 
 0.1.2 (26-03-27)
 
-[feat] bitboard shift helpers and pattern of init() and main()
+	[feat] bitboard shift helpers and pattern of init() and main()
 
 0.1.1 (26-03-27)
 
-[perf] removing unused Sungorus piece/square tables (they were no good anyway)
+	[perf] removing unused Sungorus piece/square tables (they were no good anyway)
 
 0.1.0 (26-03-27)
 
-[feat: eval] game phase interpolation 
+	[feat: eval] game phase interpolation 
 
-mg/eg interpolation, modified Pesto tables, mobility, passers (Sungorus values), isolated pawns (Sungorus values)
+	mg/eg interpolation, modified Pesto tables, mobility, passers (Sungorus values), isolated pawns (Sungorus values)
 
 Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
 Elo: 190.85 +/- 47.50, nElo: 225.29 +/- 45.70

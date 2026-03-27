@@ -40,6 +40,8 @@
 
 package main
 
+import "fmt"
+
 // Pos holds the complete, self-consistent state of a chess position.
 // Every field can be derived from the board array alone, but the
 // redundant fields are maintained incrementally for speed.
@@ -233,4 +235,36 @@ func computeZobrist(p *Pos) uint64 {
 		key ^= sideKey
 	}
 	return key
+}
+
+func PrintBoard(p *Pos) {
+	pieceName := []string{
+		"P ", "p ",
+		"N ", "n ",
+		"B ", "b ",
+		"R ", "r ",
+		"Q ", "q ",
+		"K ", "k ",
+		". ",
+	}
+
+	fmt.Println("--------------------------------------------")
+	fmt.Print("  ")
+
+	for sq := 0; sq < 64; sq++ {
+		mappedSq := sq ^ 56
+		fmt.Print(pieceName[p.board[mappedSq]])
+
+		if (sq+1)%8 == 0 {
+			fmt.Printf("  %d\n", 8-sq/8)
+			if sq != 63 {
+				fmt.Print("  ")
+			}
+		}
+	}
+
+	fmt.Println()
+	fmt.Println("  a b c d e f g h")
+	fmt.Println()
+	fmt.Println("--------------------------------------------")
 }
