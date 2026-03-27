@@ -322,6 +322,10 @@ func isRepetition(p *Pos) bool {
 // reportInfo outputs a UCI "info" line for the current iteration.
 // Mate scores are converted to "moves to mate" format.
 func reportInfo(score int, pv []int) {
+	
+	// If we are approaching checkmate for either side, calculate
+	// distance to checkmate; in the normal scenario, switch to
+	// centipawns.
 	scoreType := "mate"
 	if score < -maxEval {
 		score = (-mate - score) / 2
@@ -330,9 +334,20 @@ func reportInfo(score int, pv []int) {
 	} else {
 		scoreType = "cp"
 	}
+
+	// Set elapsed (time used so far), and guard
+	// against division by zero in nps calculation
 	elapsed := time.Now().UnixMilli() - searchStart
-	fmt.Printf("info depth %d time %d nodes %d score %s %d pv %s\n",
-		rootDepth, elapsed, nodes, scoreType, score, pvString(pv))
+	if elapsed <= 0 {
+		elapsed = 1
+	}
+
+	// Calculate nodes per second
+	nps := nodes * 1000 / elapsed
+
+	// Output
+	fmt.Printf("info depth %d time %d nodes %d nps %d score %s %d pv %s\n",
+		rootDepth, elapsed, nodes, nps, scoreType, score, pvString(pv))
 }
 
 // checkTime is called periodically (every 4096 nodes) to see whether
