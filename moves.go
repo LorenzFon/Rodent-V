@@ -93,7 +93,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.key ^= zobPiece[makePiece(opp(side), toType)][to]
 		p.colorBB[opp(side)] ^= squareBit(to)
 		p.typeBB[toType] ^= squareBit(to)
-		p.material[opp(side)] -= pieceValue[toType]
+		p.count[opp(side)][toType] --
 	}
 
 	// --- Special move type handling ---
@@ -127,7 +127,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.key ^= zobPiece[makePiece(opp(side), P)][capSq]
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
-		p.material[opp(side)] -= pieceValue[P]
+		p.count[opp(side)][P] --
 
 	case EP_SET:
 		// Double pawn push: record the en-passant square if an enemy
@@ -146,7 +146,8 @@ func makeMove(p *Pos, move int, u *Undo) {
 		         zobPiece[makePiece(side, fromType)][to]
 		p.typeBB[P] ^= squareBit(to)
 		p.typeBB[fromType] ^= squareBit(to)
-		p.material[side] += pieceValue[fromType] - pieceValue[P]
+		p.count[side][fromType] ++
+		p.count[side][P] --
 	}
 
 	p.side ^= 1
@@ -185,7 +186,7 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.board[to] = makePiece(opp(side), capType)
 		p.colorBB[opp(side)] ^= squareBit(to)
 		p.typeBB[capType] ^= squareBit(to)
-		p.material[opp(side)] += pieceValue[capType]
+		p.count[opp(side)] [capType] ++
 	}
 
 	// --- Reverse special move effects ---
@@ -212,7 +213,7 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.board[capSq] = makePiece(opp(side), P)
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
-		p.material[opp(side)] += pieceValue[P]
+		p.count[opp(side)][P] ++
 
 	case EP_SET:
 		// Nothing extra. epSquare was restored from u above.
@@ -223,7 +224,8 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.board[from] = makePiece(side, P)
 		p.typeBB[P] ^= squareBit(from)
 		p.typeBB[movingType] ^= squareBit(from)
-		p.material[side] += pieceValue[P] - pieceValue[movingType]
+		p.count[opp(side)][P] ++
+		p.count[opp(side)][movingType] --
 	}
 
 	p.side ^= 1

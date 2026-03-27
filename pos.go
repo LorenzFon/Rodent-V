@@ -50,7 +50,7 @@ type Pos struct {
 	typeBB      [6]uint64  // typeBB[t]: bitboard of all pieces of type t
 	board       [64]int    // board[sq]: piece on that square, or NO_PC
 	kingSq      [2]int     // kingSq[c]: square of the king of color c
-	material    [2]int     // material[c]: sum of pieceValue for all pieces of color c
+	count       [2][6]int  // count[c][t] count of pieces of color c and type t
 	side        int        // side to move: White or Black
 	castleRights int       // castling availability: bit0=WK, bit1=WQ, bit2=BK, bit3=BQ
 	epSquare    int        // en-passant target square, or NO_SQ
@@ -129,10 +129,11 @@ func parseFEN(p *Pos, epd string) {
 	// Clear all incremental scores.
 	for c := 0; c < 2; c++ {
 		p.colorBB[c] = 0
-		p.material[c] = 0
 	}
 	for t := 0; t < 6; t++ {
 		p.typeBB[t] = 0
+		p.count[White][t] = 0
+		p.count[Black][t] = 0
 	}
 	p.castleRights = 0
 	p.clock = 0
@@ -165,7 +166,7 @@ func parseFEN(p *Pos, epd string) {
 				if typeOf(pc) == K {
 					p.kingSq[colorOf(pc)] = sq
 				}
-				p.material[colorOf(pc)] += pieceValue[typeOf(pc)]
+				p.count[colorOf(pc)][typeOf(pc)] ++
 				file++
 			}
 			idx++
@@ -266,5 +267,25 @@ func PrintBoard(p *Pos) {
 	fmt.Println()
 	fmt.Println("  a b c d e f g h")
 	fmt.Println()
+
+	fmt.Printf("White counts: P=%d N=%d B=%d R=%d Q=%d K=%d\n",
+		p.count[White][P],
+		p.count[White][N],
+		p.count[White][B],
+		p.count[White][R],
+		p.count[White][Q],
+		p.count[White][K],
+	)
+
+	fmt.Printf("Black counts: P=%d N=%d B=%d R=%d Q=%d K=%d\n",
+		p.count[Black][P],
+		p.count[Black][N],
+		p.count[Black][B],
+		p.count[Black][R],
+		p.count[Black][Q],
+		p.count[Black][K],
+	)
+
+
 	fmt.Println("--------------------------------------------")
 }

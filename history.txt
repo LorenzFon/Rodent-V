@@ -1,3 +1,7 @@
+0.1.5 (26-03-27)
+
+	[feat] replacing unused material with piece counts (also unused yet)
+
 0.1.4 (26-03-27)
 
 	[test] printing the board
