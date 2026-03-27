@@ -9,18 +9,17 @@
 //   COMPONENTS (applied symmetrically for both sides, then differenced)
 //   ------------------------------------------------------------------
 //   1. MATERIAL BALANCE
-//      The most important term.  Maintained incrementally in Pos so
-//      this is just a subtraction.
+//      The most important term. Different values for midgame/endgame,
+//      interpolated according to game phase.
 //
 //   2. MOBILITY
-//      Only computed when material is nearly balanced (within 200 cp),
-//      because in unbalanced positions a material term already dominates.
-//      Bishops x4, Rooks x2, Queens x1. Heavier weights for
-//      pieces whose mobility matters most strategically.
+//      Bigger values for weaker pieces, major pieces gain in the endgame.
 //
 //   3. PIECE-SQUARE TABLES
-//      Geometrical bonuses encouraging centralisation.  Also maintained
-//      incrementally in Pos; again just a subtraction.
+//      Bonuses for occupying good squares, m*luses for occupying bad ones;
+//      skeleton for eval functions. Different values for midgame/endgame,
+//      interpolated according to game phase. Right now we use PeSTo tables,
+//      modified to cater for existence of passed pawn eval.
 //
 //   4. PAWN STRUCTURE
 //      Passed pawns: bonus that grows with rank (closer to promotion).
@@ -28,10 +27,7 @@
 //      adjacent file.
 //
 //   5. KING SAFETY
-//      In the middlegame (opponent has a queen AND material > 1600 cp),
-//      penalise a centralised king.  We negate the PST king bonus
-//      (which rewards centralisation) to push the king toward the
-//      corners where it is safer.
+//      To be ported from Rodent
 //
 
 package main

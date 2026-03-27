@@ -82,7 +82,8 @@ func makeMove(p *Pos, move int, u *Undo) {
 	         zobPiece[makePiece(side, fromType)][to]
 	p.colorBB[side] ^= squareBit(from) | squareBit(to)
 	p.typeBB[fromType] ^= squareBit(from) | squareBit(to)
-	p.pstScore[side] += pstTable[fromType][to] - pstTable[fromType][from]
+
+	// --- Update king square ---
 	if fromType == K {
 		p.kingSq[side] = to
 	}
@@ -93,7 +94,6 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.colorBB[opp(side)] ^= squareBit(to)
 		p.typeBB[toType] ^= squareBit(to)
 		p.material[opp(side)] -= pieceValue[toType]
-		p.pstScore[opp(side)] -= pstTable[toType][to]
 	}
 
 	// --- Special move type handling ---
@@ -119,7 +119,6 @@ func makeMove(p *Pos, move int, u *Undo) {
 		         zobPiece[makePiece(side, R)][rookTo]
 		p.colorBB[side] ^= squareBit(rookFrom) | squareBit(rookTo)
 		p.typeBB[R] ^= squareBit(rookFrom) | squareBit(rookTo)
-		p.pstScore[side] += pstTable[R][rookTo] - pstTable[R][rookFrom]
 
 	case EP_CAP:
 		// The captured pawn sits one square behind "to" (XOR 8 flips rank).
@@ -129,7 +128,6 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
 		p.material[opp(side)] -= pieceValue[P]
-		p.pstScore[opp(side)] -= pstTable[P][capSq]
 
 	case EP_SET:
 		// Double pawn push: record the en-passant square if an enemy
@@ -149,7 +147,6 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.typeBB[P] ^= squareBit(to)
 		p.typeBB[fromType] ^= squareBit(to)
 		p.material[side] += pieceValue[fromType] - pieceValue[P]
-		p.pstScore[side] += pstTable[fromType][to] - pstTable[P][to]
 	}
 
 	p.side ^= 1
@@ -177,7 +174,8 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 	p.board[to]   = NO_PC
 	p.colorBB[side] ^= squareBit(from) | squareBit(to)
 	p.typeBB[movingType] ^= squareBit(from) | squareBit(to)
-	p.pstScore[side] += pstTable[movingType][from] - pstTable[movingType][to]
+
+	// --- Update king square ---
 	if movingType == K {
 		p.kingSq[side] = from
 	}
@@ -188,7 +186,6 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.colorBB[opp(side)] ^= squareBit(to)
 		p.typeBB[capType] ^= squareBit(to)
 		p.material[opp(side)] += pieceValue[capType]
-		p.pstScore[opp(side)] += pstTable[capType][to]
 	}
 
 	// --- Reverse special move effects ---
@@ -209,7 +206,6 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.board[rookFrom] = makePiece(side, R)
 		p.colorBB[side] ^= squareBit(rookFrom) | squareBit(rookTo)
 		p.typeBB[R] ^= squareBit(rookFrom) | squareBit(rookTo)
-		p.pstScore[side] += pstTable[R][rookFrom] - pstTable[R][rookTo]
 
 	case EP_CAP:
 		capSq := to ^ 8
@@ -217,7 +213,6 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
 		p.material[opp(side)] += pieceValue[P]
-		p.pstScore[opp(side)] += pstTable[P][capSq]
 
 	case EP_SET:
 		// Nothing extra. epSquare was restored from u above.
@@ -229,7 +224,6 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.typeBB[P] ^= squareBit(from)
 		p.typeBB[movingType] ^= squareBit(from)
 		p.material[side] += pieceValue[P] - pieceValue[movingType]
-		p.pstScore[side] += pstTable[P][from] - pstTable[movingType][from]
 	}
 
 	p.side ^= 1

@@ -49,7 +49,6 @@ type Pos struct {
 	board       [64]int    // board[sq]: piece on that square, or NO_PC
 	kingSq      [2]int     // kingSq[c]: square of the king of color c
 	material    [2]int     // material[c]: sum of pieceValue for all pieces of color c
-	pstScore    [2]int     // pstScore[c]: sum of pstTable bonuses for all pieces of color c
 	side        int        // side to move: White or Black
 	castleRights int       // castling availability: bit0=WK, bit1=WQ, bit2=BK, bit3=BQ
 	epSquare    int        // en-passant target square, or NO_SQ
@@ -129,7 +128,6 @@ func parseFEN(p *Pos, epd string) {
 	for c := 0; c < 2; c++ {
 		p.colorBB[c] = 0
 		p.material[c] = 0
-		p.pstScore[c] = 0
 	}
 	for t := 0; t < 6; t++ {
 		p.typeBB[t] = 0
@@ -166,7 +164,6 @@ func parseFEN(p *Pos, epd string) {
 					p.kingSq[colorOf(pc)] = sq
 				}
 				p.material[colorOf(pc)] += pieceValue[typeOf(pc)]
-				p.pstScore[colorOf(pc)] += pstTable[typeOf(pc)][sq]
 				file++
 			}
 			idx++

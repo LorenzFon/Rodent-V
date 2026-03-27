@@ -205,7 +205,6 @@ var (
 	kingAtk    [64]uint64
 	passedMask [2][64]uint64
 	adjFileMask [8]uint64
-	pstTable   [6][64]int
 	castleMask [64]int
 )
 
@@ -434,8 +433,6 @@ func initTables() {
 	pMoves := [2][2]int{{15, 17}, {-17, -15}} // pawn attack offsets (0x88)
 	nMoves := [8]int{-33, -31, -18, -14, 14, 18, 31, 33}
 	kMoves := [8]int{-17, -16, -15, -1, 1, 15, 16, 17}
-	// Symmetric centre-bonus curve applied to file and rank separately.
-	line := [8]int{0, 2, 4, 5, 5, 4, 2, 0}
 
 	// --- Line masks ---
 	for i := 0; i < 64; i++ {
@@ -555,20 +552,6 @@ func initTables() {
 		if f < 7 {
 			adjFileMask[f] |= fileABB << uint(f+1)
 		}
-	}
-
-	// --- Piece-square tables ---
-	// Each entry is line[file] + line[rank], scaled by a per-piece factor.
-	// Kings are rewarded for hiding in corners in the middlegame (factor=6),
-	// but that bonus is negated in evaluateKing() when queens are present.
-	for sq := 0; sq < 64; sq++ {
-		centrality := line[fileOf(sq)] + line[rankOf(sq)]
-		pstTable[P][sq] = centrality * 2
-		pstTable[N][sq] = centrality * 4
-		pstTable[B][sq] = centrality * 2
-		pstTable[R][sq] = line[fileOf(sq)]
-		pstTable[Q][sq] = centrality
-		pstTable[K][sq] = centrality * 6
 	}
 
 	// --- Castling-rights strip mask ---

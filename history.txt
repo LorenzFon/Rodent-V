@@ -10,3 +10,7 @@ LOS: 100.00 %, DrawRatio: 27.03 %, PairsRatio: 9.12
 Games: 222, Wins: 151, Losses: 40, Draws: 31, Points: 166.5 (75.00 %)
 Ptnml(0-2): [4, 4, 30, 23, 50], WL/DD Ratio: 14.00
 LLR: 2.90 (100.2%) (-2.25, 2.89) [0.00, 10.00]
+
+0.1.1 (26-03-27)
+
+[perf] removing unused Sungorus piece/square tables (they were no good anyway)
