@@ -93,7 +93,7 @@ func swap(p *Pos, from, to int) int {
 		// X-ray attackers behind it.
 		occ ^= candidates & (^candidates + 1)
 		attackers |= (bishopAttacks(occ, to) & (p.typeBB[B] | p.typeBB[Q])) |
-			(rookAttacks(occ, to) & (p.typeBB[R] | p.typeBB[Q]))
+					(rookAttacks(occ, to) & (p.typeBB[R] | p.typeBB[Q]))
 		attackers &= occ
 
 		side ^= 1

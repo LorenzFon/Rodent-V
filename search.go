@@ -132,6 +132,10 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		return 0
 	}
 
+	// Are we in the pv node?
+	isPv := (beta > alpha + 1)
+	movesTried := 0
+
 	// --- Transposition table probe ---
 	ttMove := 0
 	score  := 0
@@ -142,10 +146,12 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		return evaluate(p)
 	}
 
+	nodeInCheck := p.inCheck()
+
 	// --- Null-move pruning ---
 	// Skip if: depth <= 1 (too shallow to be reliable), the position
 	// is already beyond beta, we are in check, or only pawns remain.
-	if depth > 1 && beta <= evaluate(p) && !p.inCheck() && p.canNullMove() {
+	if depth > 1 && !isPv && !nodeInCheck &&p.canNullMove() && beta <= evaluate(p) {
 		var u Undo
 		makeNullMove(p, &u)
 		var nullPv [maxPly]int
@@ -155,7 +161,6 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			return 0
 		}
 		if score >= beta {
-			storeTT(p.key, 0, score, LOWER, depth, ply)
 			return score
 		}
 	}
@@ -167,7 +172,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	var childPv [maxPly]int
 
 	for {
-		move := picker.nextMove()
+		move, stage := picker.nextMove()
 		if move == 0 {
 			break
 		}
@@ -179,21 +184,35 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			continue
 		}
 
+		movesTried++
+
 		// Extend by one ply for moves that give check.
 		newDepth := depth - 1
 		if p.inCheck() {
 			newDepth++
 		}
 
+		// Late move reduction
+		isReduced := false
+		if stage == StageQuiet && !isPv && depth > 2 && !nodeInCheck && !p.inCheck() && movesTried > 3 {
+
+			score = -search(p, ply+1, -beta, -alpha, newDepth - 1, childPv[:])
+			if score <= alpha {
+				isReduced = true
+			}
+		}
+
 		// Principal Variation Search:
 		// First move: full window.
 		// Subsequent moves: zero-width window first; re-search if it fails high.
-		if best == -inf {
-			score = -search(p, ply+1, -beta, -alpha, newDepth, childPv[:])
-		} else {
-			score = -search(p, ply+1, -alpha-1, -alpha, newDepth, childPv[:])
-			if score > alpha && score < beta {
+		if (!isReduced) {
+			if best == -inf {
 				score = -search(p, ply+1, -beta, -alpha, newDepth, childPv[:])
+			} else {
+				score = -search(p, ply+1, -alpha-1, -alpha, newDepth, childPv[:])
+				if score > alpha && score < beta {
+					score = -search(p, ply+1, -beta, -alpha, newDepth, childPv[:])
+				}
 			}
 		}
 		unmakeMove(p, move, &u)

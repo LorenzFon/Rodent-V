@@ -45,12 +45,26 @@ var (
 	moveBuffers [maxPly]MovePicker   // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
 )
 
+type MoveGenStage int
+
+const (
+	StageTTMove MoveGenStage = iota
+	StageGenCaptures
+	StageGoodCaptures
+	StageKiller1
+	StageKiller2
+	StageGenQuiet
+	StageQuiet
+	StageBadCaptures
+	StageDone
+)
+
 // MovePicker holds the state for iterating through moves in priority
 // order.  The search constructs one per node and calls nextMove()
 // until it returns 0.
 type MovePicker struct {
 	p        *Pos
-	phase    int            // which pipeline stage we are in (0-7)
+	phase    MoveGenStage   // which pipeline stage we are in (0-7)
 	ttMove   int            // the transposition table move hint
 	killer1  int            // first killer move for this ply
 	killer2  int            // second killer move for this ply
@@ -79,94 +93,91 @@ func initMovePicker(p *Pos, m *MovePicker, transMove, ply int) {
 // The goto-based phase loop is the idiomatic way to implement a
 // state machine in Go when each phase may immediately fall through
 // to the next.
-func (m *MovePicker) nextMove() int {
+// nextMove returns the next move to try, in priority order, plus the
+// stage from which it came. When all moves are exhausted, it returns
+// 0 and StageDone.
+func (m *MovePicker) nextMove() (int, MoveGenStage) {
 startPhase:
 	switch m.phase {
-	// --- Phase 0: TT move ---
-	case 0:
+	case StageTTMove:
 		move := m.ttMove
-		m.phase = 1
+		m.phase = StageGenCaptures
 		if move != 0 && isLegal(m.p, move) {
-			return move
+			return move, StageTTMove
 		}
 		goto startPhase
 
-	// --- Phase 1: generate captures and score them ---
-	case 1:
-		m.end      = genCaptures(m.p, m.move[:])
-		m.cur      = 0
+	case StageGenCaptures:
+		m.end = genCaptures(m.p, m.move[:])
+		m.cur = 0
 		m.badCount = 0
 		scoreCaptures(m)
-		m.phase = 2
+		m.phase = StageGoodCaptures
 		goto startPhase
 
-	// --- Phase 2: yield good captures (best first), defer bad ones ---
-	case 2:
+	case StageGoodCaptures:
 		for m.cur < m.end {
 			move := m.pickBest()
 			if move == m.ttMove {
-				continue // already tried
+				continue
 			}
 			if isBadCapture(m.p, move) {
 				m.badCaps[m.badCount] = move
 				m.badCount++
 				continue
 			}
-			return move
+			return move, StageGoodCaptures
 		}
-		m.phase = 3
+		m.phase = StageKiller1
 		goto startPhase
 
-	// --- Phase 3: first killer move ---
-	case 3:
+	case StageKiller1:
 		move := m.killer1
-		m.phase = 4
+		m.phase = StageKiller2
 		if move != 0 && move != m.ttMove &&
 			m.p.board[moveTo(move)] == NO_PC && isLegal(m.p, move) {
-			return move
+			return move, StageKiller1
 		}
 		goto startPhase
 
-	// --- Phase 4: second killer move ---
-	case 4:
+	case StageKiller2:
 		move := m.killer2
-		m.phase = 5
+		m.phase = StageGenQuiet
 		if move != 0 && move != m.ttMove &&
 			m.p.board[moveTo(move)] == NO_PC && isLegal(m.p, move) {
-			return move
+			return move, StageKiller2
 		}
 		goto startPhase
 
-	// --- Phase 5: generate quiet moves and score them ---
-	case 5:
-		m.end  = genQuiet(m.p, m.move[:])
-		m.cur  = 0
+	case StageGenQuiet:
+		m.end = genQuiet(m.p, m.move[:])
+		m.cur = 0
 		scoreQuiet(m)
-		m.phase = 6
+		m.phase = StageQuiet
 		goto startPhase
 
-	// --- Phase 6: yield quiet moves (best history score first) ---
-	case 6:
+	case StageQuiet:
 		for m.cur < m.end {
 			move := m.pickBest()
 			if move == m.ttMove || move == m.killer1 || move == m.killer2 {
-				continue // already tried
+				continue
 			}
-			return move
+			return move, StageQuiet
 		}
 		m.badCur = 0
-		m.phase  = 7
+		m.phase = StageBadCaptures
 		goto startPhase
 
-	// --- Phase 7: bad captures (unavoidable losing exchanges) ---
-	case 7:
+	case StageBadCaptures:
 		if m.badCur < m.badCount {
 			move := m.badCaps[m.badCur]
 			m.badCur++
-			return move
+			return move, StageBadCaptures
 		}
 	}
-	return 0 // all moves exhausted
+
+	m.phase = StageDone
+	return 0, StageDone
 }
 
 // ---- Capture-only picker for quiescence search ----
