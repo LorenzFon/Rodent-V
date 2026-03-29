@@ -108,7 +108,7 @@ func clearTT() {
 //
 // Even when the score cannot be used for an immediate cutoff, the
 // move hint is still returned so the search can try it first.
-func probeTT(key uint64, move *int, score *int, alpha, beta, depth, ply int) bool {
+func probeTT(key uint64, move *int, score *int, flag *int, alpha, beta, depth, ply int) bool {
 	base   := int(key) & ttMask
 	bucket := tt[base : base+4]
 	for i := range bucket {
@@ -119,6 +119,7 @@ func probeTT(key uint64, move *int, score *int, alpha, beta, depth, ply int) boo
 		// Refresh the date so this entry is not considered stale.
 		e.date = int16(ttDate)
 		*move = int(e.move)
+		*flag = int(e.bound)
 
 		if int(e.depth) >= depth {
 			*score = int(e.score)

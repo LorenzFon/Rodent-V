@@ -1,3 +1,9 @@
+0.2.2 (29-03-29)
+	[tweak] don't use zero window transposition table results in pv
+
+0.2.1 (26-03-29)
+	[refactor] moving bad capture test to quiescence search, thus avoiding some bad capture calls
+
 0.2.0 (26-03-28)
 	[feat search] late move reduction (one ply in non-pv nodes)
 

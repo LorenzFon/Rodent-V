@@ -140,9 +140,12 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 	// --- Transposition table probe ---
 	ttMove := 0
+	ttFlag := 0
 	score  := 0
-	if probeTT(p.key, &ttMove, &score, alpha, beta, depth, ply) {
-		return score
+	if probeTT(p.key, &ttMove, &score, &ttFlag, alpha, beta, depth, ply) {
+		if ttFlag == EXACT || !isPv {
+			return score
+		}
 	}
 
 	//Safeguard against hitting max ply limit
@@ -150,6 +153,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		return evaluate(p)
 	}
 
+	// Are we in check in this node?
 	nodeInCheck := p.inCheck()
 
 	// --- Null-move pruning ---
