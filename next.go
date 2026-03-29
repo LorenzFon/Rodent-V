@@ -195,9 +195,7 @@ func initQSearch(p *Pos, m *MovePicker) {
 func (m *MovePicker) nextCapture() int {
 	for m.cur < m.end {
 		move := m.pickBest()
-		if !isBadCapture(m.p, move) {
-			return move
-		}
+		return move
 	}
 	return 0
 }

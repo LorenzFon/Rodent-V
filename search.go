@@ -124,11 +124,13 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		return 0
 	}
 
-	if ply > 0 {
+	isRoot := (ply == 0)
+
+	if !isRoot {
 		pv[0] = 0
 	}
 	// A position repeated from earlier in the game tree is a draw.
-	if isRepetition(p) && ply > 0 {
+	if !isRoot && isRepetition(p) {
 		return 0
 	}
 
@@ -142,6 +144,8 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	if probeTT(p.key, &ttMove, &score, alpha, beta, depth, ply) {
 		return score
 	}
+
+	//Safeguard against hitting max ply limit
 	if ply >= maxPly-1 {
 		return evaluate(p)
 	}
@@ -234,7 +238,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			if score > alpha {
 				alpha = score
 				buildPV(pv, childPv[:], move)
-				if ply == 0 {
+				if isRoot {
 					reportInfo(score, pv)
 				}
 			}
@@ -273,9 +277,13 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	}
 
 	pv[0] = 0
+
+	// Repetition detection
 	if isRepetition(p) {
 		return 0
 	}
+
+	// Safeguard against reaching max ply limit
 	if ply >= maxPly-1 {
 		return evaluate(p)
 	}
@@ -297,6 +305,10 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		move := picker.nextCapture()
 		if move == 0 {
 			break
+		}
+
+		if isBadCapture(p, move) {
+			continue
 		}
 
 		var u Undo
