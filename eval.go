@@ -32,6 +32,55 @@
 
 package main
 
+// --- Bitmaks used in eval only, put into init() to preserve locality ---
+var (
+	passedMask [2][64]uint64
+	adjFileMask [8]uint64
+)
+
+func init() {
+// --- Passed pawn masks ---
+	// passedMask[White][sq]: squares strictly in front of sq on the
+	// same and adjacent files.  A White pawn on sq is "passed" if
+	// none of these squares contain a Black pawn.
+	for sq := 0; sq < 64; sq++ {
+		passedMask[White][sq] = 0
+		for f := fileOf(sq) - 1; f <= fileOf(sq)+1; f++ {
+			if f < 0 || f > 7 {
+				continue
+			}
+			for r := rankOf(sq) + 1; r <= 7; r++ {
+				passedMask[White][sq] |= squareBit(makeSquare(f, r))
+			}
+		}
+	}
+	for sq := 0; sq < 64; sq++ {
+		passedMask[Black][sq] = 0
+		for f := fileOf(sq) - 1; f <= fileOf(sq)+1; f++ {
+			if f < 0 || f > 7 {
+				continue
+			}
+			for r := rankOf(sq) - 1; r >= 0; r-- {
+				passedMask[Black][sq] |= squareBit(makeSquare(f, r))
+			}
+		}
+	}
+
+	// --- Adjacent file masks ---
+	// adjFileMask[f]: bitboard of the two files neighboring file f.
+	// A pawn is isolated if adjFileMask[file] & ownPawns == 0.
+	for f := 0; f < 8; f++ {
+		adjFileMask[f] = 0
+		if f > 0 {
+			adjFileMask[f] |= fileABB << uint(f-1)
+		}
+		if f < 7 {
+			adjFileMask[f] |= fileABB << uint(f+1)
+		}
+	}
+}
+
+// --- Eval params ---
 var pieceValMG = [7]int{ 82, 337, 365, 477, 1025, 0, 0}
 var pieceValEG = [7]int{ 94, 281, 297, 513,  937, 0, 0}
 
@@ -111,6 +160,14 @@ var pstEG = [6][64]int{
     -10, 24, 26, 25, 24, 35, 28,  1,   10, 18, 24, 13, 18, 46, 45, 11,  /*        r5-r6 */
     -12, 19, 16, 16, 15, 40, 25, 12,  -74,-34,-18,-20,-13, 17,  5,-19,
 	},
+}
+
+// passedBonus[color][rank]: centipawn bonus awarded to a passed
+// pawn based on how far it has advanced.  White advances up the
+// board (rank 1 -> 8); Black advances down (rank 8 -> 1).
+var passedBonus = [2][8]int{
+	{0, 25, 30, 35, 40, 45, 50, 0}, // White: rank 1..8
+	{0, 50, 45, 40, 35, 30, 25, 0}, // Black: rank 8..1 (mirrored)
 }
 
 // A struct serving as a scratchpad for evaluation, filled with data

@@ -1,3 +1,6 @@
+0.2.3 (29-03-29)
+	[refactor] moving some masks to eval.go, so that the file will be self-contained
+
 0.2.2 (29-03-29)
 	[tweak] don't use zero window transposition table results in pv
 

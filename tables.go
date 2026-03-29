@@ -203,8 +203,6 @@ var (
 	pawnAtk    [2][64]uint64
 	knightAtk  [64]uint64
 	kingAtk    [64]uint64
-	passedMask [2][64]uint64
-	adjFileMask [8]uint64
 	castleMask [64]int
 )
 
@@ -227,14 +225,6 @@ var (
 // King has value 0 because material balance only matters for the
 // five capturable piece types.
 var pieceValue = [7]int{100, 325, 325, 500, 1000, 0, 0}
-
-// passedBonus[color][rank]: centipawn bonus awarded to a passed
-// pawn based on how far it has advanced.  White advances up the
-// board (rank 1 -> 8); Black advances down (rank 8 -> 1).
-var passedBonus = [2][8]int{
-	{0, 25, 30, 35, 40, 45, 50, 0}, // White: rank 1..8
-	{0, 50, 45, 40, 35, 30, 25, 0}, // Black: rank 8..1 (mirrored)
-}
 
 // ================================================================
 // BIT MANIPULATION HELPERS
@@ -411,18 +401,12 @@ func nextRand() uint64 {
 //   The "blocker" position within the line is stored in k: for ranks
 //   and diagonals it's the file; for files it's the rank.
 //
-//   PIECE-SQUARE TABLES
-//   -------------------
-//   Bonuses encourage pieces toward the centre.  "line" is a
-//   symmetric 8-element curve (0,2,4,5,5,4,2,0) peaking at e/d files.
-//   The bonus for a square is line[file] + line[rank], scaled per piece.
-//
 //   CASTLE RIGHTS MASK
 //   ------------------
 //   castleMask[sq] starts at 15 (all four rights intact).  The four
 //   corner and king squares have bits cleared so that any move from
 //   or to those squares automatically strips the relevant rights via
-//   a bitwise AND.
+//   a bitwise AND
 //
 
 func initTables() {
@@ -511,46 +495,6 @@ func initTables() {
 			if offBoard(x) == 0 {
 				kingAtk[sq] |= squareBit(from0x88(x))
 			}
-		}
-	}
-
-	// --- Passed pawn masks ---
-	// passedMask[White][sq]: squares strictly in front of sq on the
-	// same and adjacent files.  A White pawn on sq is "passed" if
-	// none of these squares contain a Black pawn.
-	for sq := 0; sq < 64; sq++ {
-		passedMask[White][sq] = 0
-		for f := fileOf(sq) - 1; f <= fileOf(sq)+1; f++ {
-			if f < 0 || f > 7 {
-				continue
-			}
-			for r := rankOf(sq) + 1; r <= 7; r++ {
-				passedMask[White][sq] |= squareBit(makeSquare(f, r))
-			}
-		}
-	}
-	for sq := 0; sq < 64; sq++ {
-		passedMask[Black][sq] = 0
-		for f := fileOf(sq) - 1; f <= fileOf(sq)+1; f++ {
-			if f < 0 || f > 7 {
-				continue
-			}
-			for r := rankOf(sq) - 1; r >= 0; r-- {
-				passedMask[Black][sq] |= squareBit(makeSquare(f, r))
-			}
-		}
-	}
-
-	// --- Adjacent file masks ---
-	// adjFileMask[f]: bitboard of the two files neighboring file f.
-	// A pawn is isolated if adjFileMask[file] & ownPawns == 0.
-	for f := 0; f < 8; f++ {
-		adjFileMask[f] = 0
-		if f > 0 {
-			adjFileMask[f] |= fileABB << uint(f-1)
-		}
-		if f < 7 {
-			adjFileMask[f] |= fileABB << uint(f+1)
 		}
 	}
 
