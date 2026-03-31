@@ -1,3 +1,6 @@
+0.2.4 (26-04-01)
+	[feat] draw detection: 50-move rule and insufficient material
+
 0.2.3 (29-03-29)
 	[refactor] moving some masks to eval.go, so that the file will be self-contained
 

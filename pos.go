@@ -108,6 +108,25 @@ func (p *Pos) canNullMove() bool {
 	return p.colorBB[p.side]&^(p.typeBB[P]|p.typeBB[K]) != 0
 }
 
+// isInsufficientMaterial returns true when neither side has enough
+// material to force checkmate by any sequence of legal moves.
+// Covered cases:
+//   K vs K
+//   K+B vs K  (either side has the bishop)
+//   K+N vs K  (either side has the knight)
+//
+// Two-minor configurations (K+B vs K+B, K+N vs K+N, etc.) are intentionally
+// excluded — with one minor per side there are corner-checkmate edge cases
+// where a draw cannot be safely claimed.
+func (p *Pos) isInsufficientMaterial() bool {
+	if p.typeBB[P]|p.typeBB[R]|p.typeBB[Q] != 0 {
+		return false
+	}
+	minors := p.count[White][N] + p.count[White][B] +
+		p.count[Black][N] + p.count[Black][B]
+	return minors <= 1
+}
+
 // ================================================================
 // FEN / EPD PARSER
 // ================================================================
@@ -207,6 +226,21 @@ func parseFEN(p *Pos, epd string) {
 		} else {
 			p.epSquare = NO_SQ
 		}
+	}
+
+	// --- Halfmove clock (field 5 of full FEN, optional) ---
+	// Skip to the next space-separated token if present.
+	for idx < len(epd) && epd[idx] != ' ' {
+		idx++
+	}
+	if idx < len(epd) {
+		idx++ // skip space
+		clock := 0
+		for idx < len(epd) && epd[idx] >= '0' && epd[idx] <= '9' {
+			clock = clock*10 + int(epd[idx]-'0')
+			idx++
+		}
+		p.clock = clock
 	}
 
 	p.key = computeZobrist(p)
