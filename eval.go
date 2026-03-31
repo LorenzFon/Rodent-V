@@ -32,14 +32,14 @@
 
 package main
 
-// --- Bitmaks used in eval only, put into init() to preserve locality ---
+// --- Bitmasks used in eval only, put into init() to preserve locality ---
 var (
 	passedMask [2][64]uint64
 	adjFileMask [8]uint64
 )
 
 func init() {
-// --- Passed pawn masks ---
+	// --- Passed pawn masks ---
 	// passedMask[White][sq]: squares strictly in front of sq on the
 	// same and adjacent files.  A White pawn on sq is "passed" if
 	// none of these squares contain a Black pawn.
@@ -81,8 +81,8 @@ func init() {
 }
 
 // --- Eval params ---
-var pieceValMG = [7]int{ 82, 337, 365, 477, 1025, 0, 0}
-var pieceValEG = [7]int{ 94, 281, 297, 513,  937, 0, 0}
+var pieceValMG = [7]int{82, 337, 365, 477, 1025, 0, 0}
+var pieceValEG = [7]int{94, 281, 297, 513, 937, 0, 0}
 
 var pstMG = [6][64]int{
 	P: [64]int{

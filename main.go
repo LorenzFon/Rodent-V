@@ -1,10 +1,11 @@
 // ================================================================
-//                  S U N G O R U S   1 . 4
+//                       R O D E N T   V
 // ================================================================
 //
-//   A Go port of Sungorus 1.4 by Pablo Vazquez (2013).
+//   A Go chess engine by Naman Thanki and Pawel Koziol.
+//   Based on Sungorus 1.4 by Pablo Vazquez (2013).
 //
-//   Go port author : Naman Thanki
+//   Authors        : Naman Thanki, Pawel Koziol
 //   Date           : 2026
 //
 //   Every file is a short lesson in chess engine design. Follow the
@@ -12,7 +13,7 @@
 //   board representation to UCI output.
 //
 //   Protocol: Universal Chess Interface (UCI)
-//   Build:    go build -o sungorus .
+//   Build:    go build -o rodent-v .
 //
 // ================================================================
 //

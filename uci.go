@@ -150,9 +150,9 @@ func uciLoop() {
 				elapsed = 1
 			}
 			fmt.Printf("Nodes: %d  Time: %dms  NPS: %d\n", n, elapsed, n*1000/uint64(elapsed))
-		
+
 		case "print":
-			PrintBoard(&p);
+			PrintBoard(&p)
 
 		}
 	}

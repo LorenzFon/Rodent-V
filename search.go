@@ -141,14 +141,14 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// --- Transposition table probe ---
 	ttMove := 0
 	ttFlag := 0
-	score  := 0
+	score := 0
 	if probeTT(p.key, &ttMove, &score, &ttFlag, alpha, beta, depth, ply) {
 		if ttFlag == EXACT || !isPv {
 			return score
 		}
 	}
 
-	//Safeguard against hitting max ply limit
+	// Safeguard against hitting max ply limit
 	if ply >= maxPly-1 {
 		return evaluate(p)
 	}
@@ -159,7 +159,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// --- Null-move pruning ---
 	// Skip if: depth <= 1 (too shallow to be reliable), the position
 	// is already beyond beta, we are in check, or only pawns remain.
-	if depth > 1 && !isPv && !nodeInCheck &&p.canNullMove() && beta <= evaluate(p) {
+	if depth > 1 && !isPv && !nodeInCheck && p.canNullMove() && beta <= evaluate(p) {
 		var u Undo
 		makeNullMove(p, &u)
 		var nullPv [maxPly]int
@@ -175,7 +175,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 	// --- Main move loop ---
 	best := -inf
-    picker := &moveBuffers[ply]
+	picker := &moveBuffers[ply]
 	initMovePicker(p, picker, ttMove, ply)
 	var childPv [maxPly]int
 
@@ -204,7 +204,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		isReduced := false
 		if stage == StageQuiet && !isPv && depth > 2 && !nodeInCheck && !p.inCheck() && movesTried > 3 {
 
-			score = -search(p, ply+1, -beta, -alpha, newDepth - 1, childPv[:])
+			score = -search(p, ply+1, -beta, -alpha, newDepth-1, childPv[:])
 			if score <= alpha {
 				isReduced = true
 			}
@@ -213,7 +213,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		// Principal Variation Search:
 		// First move: full window.
 		// Subsequent moves: zero-width window first; re-search if it fails high.
-		if (!isReduced) {
+		if !isReduced {
 			if best == -inf {
 				score = -search(p, ply+1, -beta, -alpha, newDepth, childPv[:])
 			} else {
@@ -357,7 +357,6 @@ func isRepetition(p *Pos) bool {
 // reportInfo outputs a UCI "info" line for the current iteration.
 // Mate scores are converted to "moves to mate" format.
 func reportInfo(score int, pv []int) {
-	
 	// If we are approaching checkmate for either side, calculate
 	// distance to checkmate; in the normal scenario, switch to
 	// centipawns.

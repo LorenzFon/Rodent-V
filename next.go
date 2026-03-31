@@ -87,15 +87,13 @@ func initMovePicker(p *Pos, m *MovePicker, transMove, ply int) {
 	m.killer2 = killerMoves[ply][1]
 }
 
-// nextMove returns the next move to try, in priority order, or 0
-// when all moves have been exhausted.
+// nextMove returns the next move to try, in priority order, plus the
+// stage from which it came. When all moves are exhausted, it returns
+// (0, StageDone).
 //
 // The goto-based phase loop is the idiomatic way to implement a
 // state machine in Go when each phase may immediately fall through
 // to the next.
-// nextMove returns the next move to try, in priority order, plus the
-// stage from which it came. When all moves are exhausted, it returns
-// 0 and StageDone.
 func (m *MovePicker) nextMove() (int, MoveGenStage) {
 startPhase:
 	switch m.phase {
