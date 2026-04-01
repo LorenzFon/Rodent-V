@@ -53,6 +53,16 @@
 //   return the static eval immediately without searching further.
 //   Applied only at non-PV nodes, when not in check, at shallow depth.
 //
+//   LATE MOVE PRUNING (LMP)
+//   -----------------------
+//   At shallow depths (depth < 4) on non-PV nodes, quiet moves beyond
+//   the first 4*depth+1 are skipped entirely rather than just reduced.
+//   quietTried tracks only quiet moves so the threshold is independent
+//   of how many captures were searched first.  Moves that give check
+//   are exempt: a quiet check can be the only defensive resource or
+//   the only way out of a mating attack.  LMP is also skipped when the
+//   node itself is in check, since evasions must be fully searched.
+//
 //   LATE MOVE REDUCTIONS (LMR)
 //   --------------------------
 //   Moves tried late in the list (after the killer and good captures)
@@ -217,7 +227,12 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	nodeInCheck := p.inCheck()
 
 	// Cache the static evaluation; shared by RFP and null-move pruning below.
-	staticEval := evaluate(p)
+	// Skipped when in check: both consumers already bail on nodeInCheck, so
+	// the call would be wasted work.
+	staticEval := 0
+	if !nodeInCheck {
+		staticEval = evaluate(p)
+	}
 
 	// --- Reverse futility pruning ---
 	// If the static eval beats beta by a depth-scaled margin, the position
@@ -255,6 +270,8 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	initMovePicker(p, picker, ttMove, ply)
 	var childPv [maxPly]int
 
+	quietTried := 0
+
 	for {
 		move, stage := picker.nextMove()
 		if move == 0 {
@@ -269,16 +286,29 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		}
 
 		movesTried++
+		givesCheck := p.inCheck()
 
 		// Extend by one ply for moves that give check.
 		newDepth := depth - 1
-		if p.inCheck() {
+		if givesCheck {
 			newDepth++
+		}
+
+		// Late move pruning: skip quiet moves beyond the threshold.
+		// Moves that give check are exempt — they may be the only defence
+		// or the only escape from a mating attack.
+		if stage == StageQuiet && !isPv && !nodeInCheck && depth < 4 &&
+			quietTried > 4*depth+1 && !givesCheck {
+			unmakeMove(p, move, &u)
+			continue
+		}
+		if stage == StageQuiet {
+			quietTried++
 		}
 
 		// Late move reduction
 		isReduced := false
-		if stage == StageQuiet && depth > 2 && !nodeInCheck && !p.inCheck() && movesTried > 3 {
+		if stage == StageQuiet && depth > 2 && !nodeInCheck && !givesCheck && movesTried > 3 {
 			reduction := lmr[min(depth, 63)][min(movesTried, 63)]
 			if reduction > 0 {
 				if !isPv {
