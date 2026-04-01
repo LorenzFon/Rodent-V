@@ -45,6 +45,14 @@
 //   the horizon effect where the engine stops just before a piece is
 //   taken.
 //
+//   REVERSE FUTILITY PRUNING (RFP)
+//   --------------------------------
+//   Also called "static null-move pruning".  If the static evaluation
+//   already exceeds beta by a depth-scaled margin, the position is so
+//   good that even a pessimistic adjustment won't fall below beta.  We
+//   return the static eval immediately without searching further.
+//   Applied only at non-PV nodes, when not in check, at shallow depth.
+//
 //   LATE MOVE REDUCTIONS (LMR)
 //   --------------------------
 //   Moves tried late in the list (after the killer and good captures)
@@ -73,13 +81,13 @@ import (
 
 // Global search state.
 var (
-	timeLimit       int64  // allocated move time in ms (-1 = unlimited)
-	pondering       bool   // true while in ponder mode (ignore clock)
-	rootDepth       int    // current iterative deepening depth
-	nodes           int64  // total nodes searched (search-goroutine only; no atomic needed)
-	abortFlag       int32  // set to 1 atomically to stop the search
-	searchStart     int64  // Unix ms at the start of think()
-	rootHistLen     int    // p.histLen at the moment think() began; used by repetition detection
+	timeLimit   int64 // allocated move time in ms (-1 = unlimited)
+	pondering   bool  // true while in ponder mode (ignore clock)
+	rootDepth   int   // current iterative deepening depth
+	nodes       int64 // total nodes searched (search-goroutine only; no atomic needed)
+	abortFlag   int32 // set to 1 atomically to stop the search
+	searchStart int64 // Unix ms at the start of think()
+	rootHistLen int   // p.histLen at the moment think() began; used by repetition detection
 )
 
 // lmr[depth][moveIndex] holds the ply reduction for a quiet move tried
@@ -152,12 +160,13 @@ func think(p *Pos, maxDepth int) {
 // search is the recursive alpha-beta negamax function.
 //
 // Parameters:
-//   p: current position
-//   ply: distance from the root (0 = root)
-//   alpha: lower bound on the score we need to improve our line
-//   beta: upper bound; a score >= beta causes a cutoff
-//   depth: remaining plies to search
-//   pv: principal variation output buffer
+//
+//	p: current position
+//	ply: distance from the root (0 = root)
+//	alpha: lower bound on the score we need to improve our line
+//	beta: upper bound; a score >= beta causes a cutoff
+//	depth: remaining plies to search
+//	pv: principal variation output buffer
 //
 // Returns the score for the side to move (negamax convention).
 func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
@@ -186,7 +195,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	}
 
 	// Are we in the pv node?
-	isPv := (beta > alpha + 1)
+	isPv := (beta > alpha+1)
 	movesTried := 0
 
 	// --- Transposition table probe ---
@@ -207,10 +216,24 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// Are we in check in this node?
 	nodeInCheck := p.inCheck()
 
+	// Cache the static evaluation; shared by RFP and null-move pruning below.
+	staticEval := evaluate(p)
+
+	// --- Reverse futility pruning ---
+	// If the static eval beats beta by a depth-scaled margin, the position
+	// is already so good that a full search is unlikely to fall below beta.
+	// The mate guard prevents pruning when beta is a mate score, where the
+	// static eval is unreliable.  We return the margin-adjusted value rather
+	// than the raw static eval to avoid inflating the returned score.
+	if !isPv && !nodeInCheck && depth <= 7 && beta < mate-maxPly &&
+		staticEval-rfpMargin*depth >= beta {
+		return staticEval - rfpMargin*depth
+	}
+
 	// --- Null-move pruning ---
 	// Skip if: depth <= 1 (too shallow to be reliable), the position
 	// is already beyond beta, we are in check, or only pawns remain.
-	if depth > 1 && !isPv && !nodeInCheck && p.canNullMove() && beta <= evaluate(p) {
+	if depth > 1 && !isPv && !nodeInCheck && p.canNullMove() && beta <= staticEval {
 		var u Undo
 		makeNullMove(p, &u)
 		var nullPv [maxPly]int
@@ -416,13 +439,13 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 //
 // Two rules apply depending on where the prior occurrence lives:
 //
-//   In-tree (keyHist index >= rootHistLen): the position was created during
-//   the current search. One prior occurrence is enough to return draw — the
-//   opponent can always force the third occurrence on the real board.
+//	In-tree (keyHist index >= rootHistLen): the position was created during
+//	the current search. One prior occurrence is enough to return draw — the
+//	opponent can always force the third occurrence on the real board.
 //
-//   In-history (keyHist index < rootHistLen): the position existed before the
-//   search started. Strict threefold requires two prior occurrences (three
-//   total) before we can claim a forced draw.
+//	In-history (keyHist index < rootHistLen): the position existed before the
+//	search started. Strict threefold requires two prior occurrences (three
+//	total) before we can claim a forced draw.
 //
 // We step back in increments of 2 (same side to move) and stop at the
 // 50-move clock boundary, since repetitions cannot cross an irreversible move.

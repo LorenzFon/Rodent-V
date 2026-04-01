@@ -119,6 +119,7 @@ const (
 	inf      = 32767 // larger than any real score; used as +/-inf
 	mate     = 32000 // base value of checkmate score
 	maxEval  = 29999 // largest returned by evaluate(); mate scores exceed this
+	rfpMargin = 100  // centipawns per depth for reverse futility pruning
 )
 
 // startFEN is the standard opening position in FEN notation.
