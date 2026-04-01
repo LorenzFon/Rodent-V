@@ -175,20 +175,20 @@ var passedBonus = [2][8]int{
 // Indexed P=0..Q=4; pawns and kings are handled separately.
 var kingAttackerWeight = [6]int{0, 2, 2, 3, 5, 0}
 
-// A struct serving as a scratchpad for evaluation, filled with data
-// gathered in the process.
-type EvalData struct {
-	phase     int
-	mgScore   [2]int
-	egScore   [2]int
-	kingRing  [2]uint64 // 8 squares surrounding each king
-	attackWt  [2]int    // weighted attacker pressure on enemy king ring
-	attackCnt [2]int    // total squares attacked in enemy king ring
-}
-
 // evaluate returns the static score for the current position from the
 // perspective of the side to move.  Positive = better for the mover.
 func evaluate(p *Pos) int {
+	return eval_internal(p, false)
+}
+
+// eval_trace describes engine's evaluation
+func eval_trace(p *Pos) int {
+	return eval_internal(p, true)
+}
+
+// eval_internal returns the static score for the current position from the
+// perspective of the side to move.  Positive = better for the mover.
+func eval_internal(p *Pos, shouldReport bool) int {
 	var e EvalData // Golang-specific: it will be initialized as all zeroes
 
 	// King rings must be set before evaluatePieces so that attack
@@ -204,8 +204,8 @@ func evaluate(p *Pos) int {
 	evaluateKing(p, &e, Black)
 
 	// Interpolate between game phases
-	mg := e.mgScore[White] - e.mgScore[Black]
-	eg := e.egScore[White] - e.egScore[Black]
+    mg := e.sumMg(White) - e.sumMg(Black)
+    eg := e.sumEg(White) - e.sumEg(Black)
 	if e.phase > 24 {
 		e.phase = 24
 	}
@@ -218,6 +218,10 @@ func evaluate(p *Pos) int {
 		score = -maxEval
 	} else if score > maxEval {
 		score = maxEval
+	}
+
+	if shouldReport {
+		e.PrintEvalDetails(p)
 	}
 
 	// Return score from the perspective of the side to move.
@@ -237,11 +241,11 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 	pieces := p.pieceBB(side, N)
 	for pieces != 0 {
 		sq := lsb(pieces)
-		add(e, side, pieceValMG[N], pieceValEG[N])
+		add(e, side, EvalMaterial, pieceValMG[N], pieceValEG[N])
 		addPST(e, side, N, sq)
 		atks := knightAtk[sq]
 		mob := popCount(atks&^p.colorBB[side]) - 4
-		add(e, side, 3*mob, 3*mob)
+		add(e, side, EvalMobility, 3*mob, 3*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
 			e.attackWt[side] += kingAttackerWeight[N]
 			e.attackCnt[side] += popCount(ringAtks)
@@ -260,11 +264,11 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 	pieces = p.pieceBB(side, B)
 	for pieces != 0 {
 		sq := lsb(pieces)
-		add(e, side, pieceValMG[B], pieceValEG[B])
+		add(e, side, EvalMaterial, pieceValMG[B], pieceValEG[B])
 		addPST(e, side, B, sq)
 		atks := bishopAttacks(occForBishop, sq)
 		mob := popCount(atks) - 6
-		add(e, side, 5*mob, 4*mob)
+		add(e, side, EvalMobility, 5*mob, 4*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
 			e.attackWt[side] += kingAttackerWeight[B]
 			e.attackCnt[side] += popCount(ringAtks)
@@ -276,11 +280,11 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 	pieces = p.pieceBB(side, R)
 	for pieces != 0 {
 		sq := lsb(pieces)
-		add(e, side, pieceValMG[R], pieceValEG[R])
+		add(e, side, EvalMaterial, pieceValMG[R], pieceValEG[R])
 		addPST(e, side, R, sq)
 		atks := rookAttacks(occForRook, sq)
 		mob := popCount(atks) - 7
-		add(e, side, 3*mob, 2*mob)
+		add(e, side, EvalMobility, 3*mob, 2*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
 			e.attackWt[side] += kingAttackerWeight[R]
 			e.attackCnt[side] += popCount(ringAtks)
@@ -292,11 +296,11 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 	pieces = p.pieceBB(side, Q)
 	for pieces != 0 {
 		sq := lsb(pieces)
-		add(e, side, pieceValMG[Q], pieceValEG[Q])
+		add(e, side, EvalMaterial, pieceValMG[Q], pieceValEG[Q])
 		addPST(e, side, Q, sq)
 		atks := queenAttacks(occForQueen, sq)
 		mob := popCount(atks) - 14
-		add(e, side, 2*mob, 2*mob)
+		add(e, side, EvalMobility, 2*mob, 2*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
 			e.attackWt[side] += kingAttackerWeight[Q]
 			e.attackCnt[side] += popCount(ringAtks)
@@ -321,16 +325,16 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 
 	for pieces != 0 {
 		sq := lsb(pieces)
-		add(e, side, pieceValMG[P], pieceValEG[P])
+		add(e, side, EvalMaterial, pieceValMG[P], pieceValEG[P])
 		addPST(e, side, P, sq)
 
 		// Passed pawn: no enemy pawns in front on same or adjacent files.
 		if passedMask[side][sq]&p.pieceBB(opp(side), P) == 0 {
-			add(e, side, passedBonus[side][rankOf(sq)], passedBonus[side][rankOf(sq)])
+			add(e, side, EvalPassers, passedBonus[side][rankOf(sq)], passedBonus[side][rankOf(sq)])
 		}
 		// Isolated pawn: no friendly pawns on adjacent files.
 		if adjFileMask[fileOf(sq)]&p.pieceBB(side, P) == 0 {
-			add(e, side, -20, -20)
+			add(e, side, EvalPawns, -20, -20)
 		}
 		pieces &= pieces - 1
 	}
@@ -396,7 +400,7 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 
 	// Pawn shield only matters in the middlegame.
 	shieldMG := pawnShieldMG(p, side)
-	add(e, side, shieldMG, 0)
+	add(e, side, EvalSafety, shieldMG, 0)
 
 	// King-attack danger: pressure accumulated by the *enemy* on our
 	// king ring.  We only trigger this when at least two distinct pieces
@@ -419,7 +423,7 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 
 		// Apply mostly to MG; small residual in EG so the eval is not
 		// completely blind to king safety once queens are traded off.
-		add(e, side, -danger, -danger/4)
+		add(e, side, EvalSafety, -danger, -danger/4)
 	}
 }
 
@@ -429,16 +433,16 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 // addPST adds the piece-square table score for a piece on sq.
 func addPST(e *EvalData, side, piece, sq int) {
 	if side == White {
-		add(e, side, pstMG[piece][sq], pstEG[piece][sq])
+		add(e, side, EvalPst, pstMG[piece][sq], pstEG[piece][sq])
 		return
 	}
 
 	msq := sq ^ 56
-	add(e, side, pstMG[piece][msq], pstEG[piece][msq])
+	add(e, side, EvalPst, pstMG[piece][msq], pstEG[piece][msq])
 }
 
 // add adds MG/EG scores for one side to EvalData.
-func add(e *EvalData, side, mg, eg int) {
-	e.mgScore[side] += mg
-	e.egScore[side] += eg
+func add(e *EvalData, side int, component EvalComponent, mg, eg int) {
+	e.mgScore[side] [component] += mg
+	e.egScore[side] [component] += eg
 }
