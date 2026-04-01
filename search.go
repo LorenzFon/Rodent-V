@@ -63,6 +63,15 @@
 //   the only way out of a mating attack.  LMP is also skipped when the
 //   node itself is in check, since evasions must be fully searched.
 //
+//   INTERNAL ITERATIVE REDUCTION (IIR)
+//   ------------------------------------
+//   When no TT move is available, move ordering will be poor and a
+//   full-depth search is likely wasteful.  We reduce depth by one ply
+//   instead.  The shallower search populates the TT; the next iterative-
+//   deepening iteration will find the hint and search at full depth with
+//   good ordering.  Applied at depth >= 4; skipped in check since
+//   evasions must always be searched at full depth.
+//
 //   LATE MOVE REDUCTIONS (LMR)
 //   --------------------------
 //   Moves tried late in the list (after the killer and good captures)
@@ -260,6 +269,14 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		if score >= beta {
 			return score
 		}
+	}
+
+	// --- Internal iterative reduction ---
+	// Without a TT move the move picker has no good hint; search one
+	// ply shallower so the cost of poor ordering is contained.
+	// Skipped in check: evasions must be searched at full depth.
+	if ttMove == 0 && depth >= 4 && !nodeInCheck {
+		depth--
 	}
 
 	var bestMove int
