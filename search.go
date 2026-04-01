@@ -57,6 +57,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"sync/atomic"
 	"time"
 )
@@ -71,6 +72,37 @@ var (
 	searchStart     int64  // Unix ms at the start of think()
 	rootHistLen     int    // p.histLen at the moment think() began; used by repetition detection
 )
+
+// Table of late move reductions
+var lmr [64][64]int
+
+// init() is guaranteed to run before anything else
+func init() {
+	initLMR()
+}
+
+func initLMR() {
+	for d := 0; d < 64; d++ {
+		for m := 0; m < 64; m++ {
+			if d < 3 || m < 4 {
+				lmr[d][m] = 0
+				continue
+			}
+
+			r := math.Log(float64(d)) * math.Log(float64(m)) / 1.8
+			ri := int(r + 0.5) // round to nearest
+
+			if ri < 1 {
+				ri = 1
+			} else if ri > 5 {
+				ri = 5
+			}
+
+			lmr[d][m] = ri
+		}
+	}
+}
+
 
 // think is the top-level search entry point called from the UCI loop.
 // It performs iterative deepening from depth 1 to maxDepth, outputting
@@ -181,8 +213,10 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		}
 	}
 
+	var bestMove int;
+
 	// --- Main move loop ---
-	best := -inf
+	bestScore := -inf
 	picker := &moveBuffers[ply]
 	initMovePicker(p, picker, ttMove, ply)
 	var childPv [maxPly]int
@@ -210,11 +244,21 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 		// Late move reduction
 		isReduced := false
-		if stage == StageQuiet && !isPv && depth > 2 && !nodeInCheck && !p.inCheck() && movesTried > 3 {
+		if stage == StageQuiet && depth > 2 && !nodeInCheck && !p.inCheck() && movesTried > 3 {
 
-			score = -search(p, ply+1, -beta, -alpha, newDepth-1, childPv[:])
-			if score <= alpha {
-				isReduced = true
+			reduction := lmr[min(depth, 63)][min(movesTried, 63)]
+
+			if (reduction > 0) {
+				if (!isPv) {
+					reduction++
+				}
+				if (reduction > newDepth-1) {
+					reduction = newDepth - 1
+				}
+				score = -search(p, ply+1, -alpha-1, -alpha, newDepth-reduction, childPv[:])
+				if score <= alpha {
+					isReduced = true
+				}
 			}
 		}
 
@@ -222,7 +266,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		// First move: full window.
 		// Subsequent moves: zero-width window first; re-search if it fails high.
 		if !isReduced {
-			if best == -inf {
+			if bestScore == -inf {
 				score = -search(p, ply+1, -beta, -alpha, newDepth, childPv[:])
 			} else {
 				score = -search(p, ply+1, -alpha-1, -alpha, newDepth, childPv[:])
@@ -245,10 +289,11 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			return score
 		}
 
-		if score > best {
-			best = score
+		if score > bestScore {
+			bestScore = score
 			if score > alpha {
 				alpha = score
+				bestMove = move
 				buildPV(pv, childPv[:], move)
 				if isRoot {
 					reportInfo(score, pv)
@@ -258,7 +303,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	}
 
 	// --- Handle terminal nodes ---
-	if best == -inf {
+	if bestScore == -inf {
 		if p.inCheck() {
 			return -mate + ply // checkmate: prefer shorter mates
 		}
@@ -272,13 +317,13 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	}
 
 	// Store the result in the TT with the appropriate bound type.
-	if pv[0] != 0 {
-		updateHistory(p, pv[0], depth, ply)
-		storeTT(p.key, pv[0], best, EXACT, depth, ply)
+	if bestMove != 0 {
+		updateHistory(p, bestMove, depth, ply)
+		storeTT(p.key, bestMove, bestScore, EXACT, depth, ply)
 	} else {
-		storeTT(p.key, 0, best, UPPER, depth, ply)
+		storeTT(p.key, 0, bestScore, UPPER, depth, ply)
 	}
-	return best
+	return bestScore
 }
 
 // quiesce searches only captures until the position is quiet, then
