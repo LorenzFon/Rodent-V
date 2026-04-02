@@ -90,6 +90,16 @@ var pieceValEG = [7]int{94, 281, 297, 513, 937, 0, 0}
 const bishopPairMG = 20
 const bishopPairEG = 60
 
+// Rook on open/semi-open file bonuses.
+// Open file (no pawns at all): bigger bonus since the rook has full
+// penetration potential.  Semi-open (no own pawn, enemy pawn present):
+// smaller bonus; the rook pressures the enemy pawn but is partly blocked.
+// EG values are near-zero: open files drive MG tactics, not endgame play.
+const rookOpenFileMG = 30
+const rookOpenFileEG = 3
+const rookSemiOpenFileMG = 20
+const rookSemiOpenFileEG = -1
+
 var pstMG = [6][64]int{
 	P: {
 		0, 0, 0, 0, 0, 0, 0, 0, -35, -6, -25, -22, -15, 18, 25, -26, /* pawn   r1-r2 */
@@ -297,6 +307,16 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
 			e.attackWt[side] += kingAttackerWeight[R]
 			e.attackCnt[side] += popCount(ringAtks)
+		}
+		// Open / semi-open file bonus.
+		fileMask := fileABB << uint(fileOf(sq))
+		ownPawnsOnFile := fileMask & p.pieceBB(side, P)
+		if ownPawnsOnFile == 0 {
+			if fileMask&p.pieceBB(opp(side), P) == 0 {
+				add(e, side, EvalOther, rookOpenFileMG, rookOpenFileEG)
+			} else {
+				add(e, side, EvalOther, rookSemiOpenFileMG, rookSemiOpenFileEG)
+			}
 		}
 		e.phase += 2
 		pieces &= pieces - 1
