@@ -25,9 +25,14 @@
 //
 //   HISTORY HEURISTIC
 //   -----------------
-//   histTable[piece][toSq] accumulates the search depth each time a
-//   quiet move causes a beta cutoff.  Moves that are frequently good
-//   in many different positions get high scores and are tried earlier.
+//   histTable[fromSq][toSq] stores a score for each (origin, destination)
+//   square pair.  On a beta cutoff the cutoff move receives a depth*depth
+//   bonus; every other quiet move tried in that node receives the same
+//   value as a malus (penalty).  Values are kept in [-maxHist, +maxHist]
+//   via a gravity formula so recent signal gradually displaces old signal.
+//   Indexing by from/to squares (4096 entries) rather than by piece type
+//   (768 entries) gives finer resolution: moves with the same destination
+//   but different origin squares get independent entries.
 //
 //   KILLER HEURISTIC
 //   -----------------
@@ -38,9 +43,14 @@
 
 package main
 
+// maxHist caps the history table values so old signal can be displaced
+// by newer, deeper results.  The gravity update formula keeps every
+// entry in the range [-maxHist, +maxHist].
+const maxHist = 16384
+
 // Global heuristic tables, reset before each new search.
 var (
-	histTable   [12][64]int          // history[piece][toSq]
+	histTable   [64][64]int          // history[fromSq][toSq]
 	killerMoves [maxPly][2]int       // killerMoves[ply][0..1]
 	moveBuffers [maxPly]MovePicker   // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
 )
@@ -210,7 +220,7 @@ func scoreCaptures(m *MovePicker) {
 // scoreQuiet assigns history heuristic scores to quiet moves.
 func scoreQuiet(m *MovePicker) {
 	for i := 0; i < m.end; i++ {
-		m.value[i] = histTable[m.p.board[moveFrom(m.move[i])]][moveTo(m.move[i])]
+		m.value[i] = histTable[moveFrom(m.move[i])][moveTo(m.move[i])]
 	}
 }
 
@@ -274,7 +284,7 @@ func mvvLva(p *Pos, move int) int {
 // so that scores from a different root position do not contaminate
 // the ordering.
 func clearHistory() {
-	for i := 0; i < 12; i++ {
+	for i := 0; i < 64; i++ {
 		for j := 0; j < 64; j++ {
 			histTable[i][j] = 0
 		}
@@ -285,16 +295,54 @@ func clearHistory() {
 	}
 }
 
-// updateHistory records that a quiet move caused a beta cutoff.
-// The depth bonus rewards moves that were good at deeper searches.
-// Killers store the two most recent cutoff moves at this ply, with
-// the newest always in slot 0.
-func updateHistory(p *Pos, move, depth, ply int) {
+// histBonus returns the raw bonus/malus value for a history update at
+// the given depth.  Using depth*depth keeps shallow updates small and
+// rewards deeper cutoffs more.
+func histBonus(depth int) int {
+	return depth * depth
+}
+
+// histUpdate applies a signed delta to a history entry using the gravity
+// formula: entry += delta - entry*|delta|/maxHist.  This keeps the value
+// inside [-maxHist, +maxHist] and lets recent signal gradually displace
+// old signal instead of accumulating without bound.
+func histUpdate(entry *int, delta int) {
+	abs := delta
+	if abs < 0 {
+		abs = -abs
+	}
+	*entry += delta - (*entry)*abs/maxHist
+}
+
+// updateHistory records that a quiet move caused a beta cutoff, and
+// penalises all quiet moves that were tried before it (quietsTried).
+// The bonus rewards the cutoff move; the malus makes failed quiets
+// less likely to be tried early in future sibling nodes.
+// Killers store the two most recent cutoff moves at this ply.
+func updateHistory(p *Pos, move, depth, ply int, quietsTried []int) {
 	// Only update for quiet moves (not captures, promotions, or EP).
 	if p.board[moveTo(move)] != NO_PC || isProm(move) || moveType(move) == EP_CAP {
 		return
 	}
-	histTable[p.board[moveFrom(move)]][moveTo(move)] += depth
+
+	bonus := histBonus(depth)
+
+	// Reward the cutoff move.
+	histUpdate(&histTable[moveFrom(move)][moveTo(move)], bonus)
+
+	// Penalise all quiets that were searched but did not cut off.
+	malus := -bonus
+	for _, tried := range quietsTried {
+		if tried == move {
+			continue
+		}
+		if p.board[moveTo(tried)] != NO_PC || isProm(tried) || moveType(tried) == EP_CAP {
+			continue
+		}
+		histUpdate(&histTable[moveFrom(tried)][moveTo(tried)], malus)
+	}
+
+	// Update killers.
 	if move != killerMoves[ply][0] {
 		killerMoves[ply][1] = killerMoves[ply][0]
 		killerMoves[ply][0] = move
