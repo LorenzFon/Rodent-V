@@ -84,6 +84,12 @@ func init() {
 var pieceValMG = [7]int{82, 337, 365, 477, 1025, 0, 0}
 var pieceValEG = [7]int{94, 281, 297, 513, 937, 0, 0}
 
+// bishopPairMG/EG: bonus for owning both bishops.
+// The EG value is higher because open boards in the endgame
+// let the bishop pair dominate knight+bishop or two knights.
+const bishopPairMG = 20
+const bishopPairEG = 60
+
 var pstMG = [6][64]int{
 	P: {
 		0, 0, 0, 0, 0, 0, 0, 0, -35, -6, -25, -22, -15, 18, 25, -26, /* pawn   r1-r2 */
@@ -262,6 +268,9 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 	occForQueen := occ ^ (p.pieceBB(side, B) | p.pieceBB(side, R))
 
 	pieces = p.pieceBB(side, B)
+	if popCount(pieces) >= 2 {
+		add(e, side, EvalOther, bishopPairMG, bishopPairEG)
+	}
 	for pieces != 0 {
 		sq := lsb(pieces)
 		add(e, side, EvalMaterial, pieceValMG[B], pieceValEG[B])
