@@ -139,3 +139,59 @@ func (e *EvalData) PrintEvalDetails(p *Pos) {
 	fmt.Printf("From side-to-move point of view: %d cp\n", stmBlend)
 	fmt.Println()
 }
+// PrintThreatDebug prints the full attack map state and per-piece threats
+// for a position, to verify the threat system is correct.
+func PrintThreatDebug(p *Pos) {
+	var e EvalData
+	e.kingRing[White] = kingAtk[p.kingSq[White]]
+	e.kingRing[Black] = kingAtk[p.kingSq[Black]]
+	evaluatePieces(p, &e, White)
+	evaluatePieces(p, &e, Black)
+	evaluatePawns(p, &e, White)
+	evaluatePawns(p, &e, Black)
+	evaluateKing(p, &e, White)
+	evaluateKing(p, &e, Black)
+
+	pieceNames := [6]string{"P", "N", "B", "R", "Q", "K"}
+	sideNames  := [2]string{"White", "Black"}
+
+	for _, side := range []int{White, Black} {
+		fmt.Printf("\n=== %s attack maps ===\n", sideNames[side])
+		fmt.Printf("attacked (all):\n")
+		PrintBitboard(e.attacked[side])
+		fmt.Printf("attackedBy2 (doubly attacked):\n")
+		PrintBitboard(e.attackedBy2[side])
+		for pt := P; pt <= K; pt++ {
+			if e.attackedBy[side][pt] != 0 {
+				fmt.Printf("attackedBy[%s][%s]:\n", sideNames[side], pieceNames[pt])
+				PrintBitboard(e.attackedBy[side][pt])
+			}
+		}
+	}
+
+	for _, side := range []int{White, Black} {
+		enemy := opp(side)
+		defendedBB := e.attackedBy2[enemy] |
+			e.attackedBy[enemy][P] |
+			(e.attacked[enemy] &^ e.attackedBy2[side])
+
+		fmt.Printf("\n=== %s threats ===\n", sideNames[side])
+		fmt.Printf("enemy defendedBB:\n")
+		PrintBitboard(defendedBB)
+
+		enemyPieces := p.colorBB[enemy]
+		for _, attacker := range []int{P, N, B, R, Q, K} {
+			threats := e.attackedBy[side][attacker] & enemyPieces
+			if attacker == Q {
+				threats &^= p.pieceBB(enemy, K)
+			}
+			if attacker == K {
+				threats &^= defendedBB
+			}
+			if threats != 0 {
+				fmt.Printf("%s threats by %s:\n", sideNames[side], pieceNames[attacker])
+				PrintBitboard(threats)
+			}
+		}
+	}
+}
