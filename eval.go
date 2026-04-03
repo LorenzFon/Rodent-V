@@ -204,13 +204,35 @@ var pstEG = [6][64]int{
 	},
 }
 
-// passedBonus[color][rank]: centipawn bonus awarded to a passed
-// pawn based on how far it has advanced.  White advances up the
-// board (rank 1 -> 8); Black advances down (rank 8 -> 1).
-var passedBonus = [2][8]int{
-	{0, 25, 30, 35, 40, 45, 50, 0}, // White: rank 1..8
-	{0, 50, 45, 40, 35, 30, 25, 0}, // Black: rank 8..1 (mirrored)
+// passedBonusMG / passedBonusEG: bonus for a passed pawn indexed by
+// [blocked][relativeRank].  relativeRank is 0 at own back rank and 7
+// at the promotion square, so it is the same for White and Black.
+//
+// The curve is exponential: ranks 0-2 contribute nothing (pawn too far
+// away to matter immediately).  Rank 3+ grows quickly.
+// "blocked" = a piece stands on the push square; the pawn can't advance
+// so its value is reduced significantly.
+var passedBonusMG = [2][8]int{
+	0: {0, 0, 0, -5, 10, 25, 90, 0},  // free: push square empty
+	1: {0, 0, 0, -8, -5, 12, 45, 0},  // blocked: push square occupied
 }
+var passedBonusEG = [2][8]int{
+	0: {0, 0, 0, 10, 30, 100, 165, 0}, // free
+	1: {0, 0, 0, -10, -8, 35, 60, 0},  // blocked
+}
+
+// ourPasserProximityMG/EG: bonus when our king is close to the passer's
+// push square, indexed by Chebyshev distance (0 = same square, 7 = far corner).
+// A king escorting its passer is a major endgame advantage.
+var ourPasserProximityMG = [8]int{60, 80, 28, -8, 0, 4, 16, 4}
+var ourPasserProximityEG = [8]int{108, 78, 68, 58, 28, 18, 8, 14}
+
+// theirPasserProximityMG/EG: bonus indexed by Chebyshev distance between
+// the enemy king and the passer's push square.  Convention matches Sirius:
+// a positive value at large distance means the enemy king is far away (good
+// for us); a negative value at distance 0 means the enemy king blocks (bad).
+var theirPasserProximityMG = [8]int{-62, 0, 24, 20, 10, 12, 18, 16}
+var theirPasserProximityEG = [8]int{16, 0, 0, 24, 58, 74, 78, 64}
 
 // kingAttackerWeight[pieceType]: how dangerous is each piece type
 // when it attacks squares near the enemy king.
@@ -393,9 +415,57 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[P], pieceValEG[P])
 		addPST(e, side, P, sq)
 
+		// pushSq: the square directly in front of this pawn.
+		// Pawns can't legally sit on the promotion rank, but guard anyway.
+		pushSq := sq + 8
+		if side == Black {
+			pushSq = sq - 8
+		}
+
 		// Passed pawn: no enemy pawns in front on same or adjacent files.
 		if passedMask[side][sq]&p.pieceBB(opp(side), P) == 0 {
-			add(e, side, EvalPassers, passedBonus[side][rankOf(sq)], passedBonus[side][rankOf(sq)])
+			// Relative rank: 0 = own back rank, 7 = promotion square.
+			var relRank int
+			if side == White {
+				relRank = rankOf(sq)
+			} else {
+				relRank = 7 - rankOf(sq)
+			}
+
+			// Blocked: any piece standing on the push square.
+			// pushSq is valid for all legal pawn squares (rank 1..6 for White,
+			// rank 6..1 for Black), but guard against the promotion edge just in case.
+			blocked := 0
+			if pushSq >= 0 && pushSq < 64 && p.board[pushSq] != NO_PC {
+				blocked = 1
+			}
+			add(e, side, EvalPassers, passedBonusMG[blocked][relRank], passedBonusEG[blocked][relRank])
+
+			// King proximity: meaningful only from rank 3+.
+			// Our king wants to escort; enemy king wants to block.
+			if relRank >= 3 && pushSq >= 0 && pushSq < 64 {
+				ourDist := chebyshev(p.kingSq[side], pushSq)
+				theirDist := chebyshev(p.kingSq[opp(side)], pushSq)
+				add(e, side, EvalPassers, ourPasserProximityMG[ourDist], ourPasserProximityEG[ourDist])
+				add(e, side, EvalPassers, theirPasserProximityMG[theirDist], theirPasserProximityEG[theirDist])
+
+				// Slider behind: enemy rook or queen behind the passer on
+				// the same file controls the promotion path.
+				fileMask := fileABB << uint(fileOf(sq))
+				var behindMask uint64
+				if side == White {
+					// squares below sq on the same file
+					behindMask = fileMask & (squareBit(sq) - 1)
+				} else {
+					// squares above sq on the same file
+					// squareBit(sq+1)-1 masks bits 0..sq, so complement gives sq+1..63
+					behindMask = fileMask &^ (squareBit(sq+1) - 1)
+				}
+				enemySliders := p.pieceBB(opp(side), R) | p.pieceBB(opp(side), Q)
+				if behindMask&enemySliders != 0 {
+					add(e, side, EvalPassers, -25, -45)
+				}
+			}
 		}
 		// Isolated pawn: no friendly pawns on adjacent files.
 		if adjFileMask[fileOf(sq)]&p.pieceBB(side, P) == 0 {
@@ -407,7 +477,6 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 		// The penalty is indexed by distance-to-edge so central files (where
 		// the doubled pawn blocks the most pawn breaks) are hurt the most in MG,
 		// while edge files are punished more in EG (they can rarely promote).
-		var pushSq int
 		if side == White {
 			pushSq = sq + 8
 		} else {

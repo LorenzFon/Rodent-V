@@ -260,6 +260,16 @@ func fileOf(sq int) int        { return sq & 7 }
 func rankOf(sq int) int        { return sq >> 3 }
 func makeSquare(f, r int) int  { return (r << 3) | f }
 
+// chebyshev returns the Chebyshev (king-move) distance between two squares.
+func chebyshev(a, b int) int {
+	df := fileOf(a) - fileOf(b)
+	dr := rankOf(a) - rankOf(b)
+	if df < 0 { df = -df }
+	if dr < 0 { dr = -dr }
+	if df > dr { return df }
+	return dr
+}
+
 func opp(color int) int        { return color ^ 1 }
 
 func lsb(bb uint64) int        { return bits.TrailingZeros64(bb) }
