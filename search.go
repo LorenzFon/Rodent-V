@@ -43,7 +43,9 @@
 //   enter quiesce(), which searches all captures until the position
 //   is "quiet" (no captures remain or all are bad).  This prevents
 //   the horizon effect where the engine stops just before a piece is
-//   taken.
+//   taken.  When entered while in check, stand-pat is illegal and the
+//   full move pipeline is used so quiet evasions are included; no
+//   legal move means checkmate.
 //
 //   REVERSE FUTILITY PRUNING (RFP)
 //   --------------------------------
@@ -288,6 +290,10 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	var childPv [maxPly]int
 
 	quietTried := 0
+	// quietsMade tracks quiet moves that were fully searched without causing
+	// a beta cutoff.  On a cutoff we apply a malus to all of them.
+	var quietsMade [maxMoves]int
+	quietsMadeCount := 0
 
 	for {
 		move, stage := picker.nextMove()
@@ -361,11 +367,20 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		}
 
 		// Beta cutoff: this move is "too good"; the opponent won't allow
-		// reaching this position, so we can stop searching.
+		// reaching this position, so we can stop searching.  Apply a malus
+		// to every quiet that was searched before this one — they failed to
+		// cut off and should be tried later in future sibling nodes.
 		if score >= beta {
-			updateHistory(p, move, depth, ply)
+			updateHistory(p, move, depth, ply, quietsMade[:quietsMadeCount])
 			storeTT(p.key, move, score, LOWER, depth, ply)
 			return score
+		}
+
+		// Record this quiet as searched-but-failed so we can penalise it
+		// if a later move causes a cutoff.
+		if stage == StageQuiet && quietsMadeCount < maxMoves {
+			quietsMade[quietsMadeCount] = move
+			quietsMadeCount++
 		}
 
 		if score > bestScore {
@@ -397,7 +412,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 	// Store the result in the TT with the appropriate bound type.
 	if bestMove != 0 {
-		updateHistory(p, bestMove, depth, ply)
+		updateHistory(p, bestMove, depth, ply, nil)
 		storeTT(p.key, bestMove, bestScore, EXACT, depth, ply)
 	} else {
 		storeTT(p.key, 0, bestScore, UPPER, depth, ply)
@@ -405,12 +420,15 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	return bestScore
 }
 
-// quiesce searches only captures until the position is quiet, then
-// returns the static evaluation.  This prevents the "horizon effect"
-// where the engine ignores an imminent capture at the leaf.
+// quiesce searches captures (and, when in check, all moves) until the
+// position is quiet, then returns the static evaluation.  This prevents
+// the "horizon effect" where the engine ignores an imminent capture at
+// the leaf.
 //
-// The "stand-pat" score is evaluate(). If it already exceeds beta,
-// we assume we can stand pat (decline all captures) and cut off.
+// When the side to move is in check we cannot stand pat — an evasion
+// must be found.  We fall through to the full move pipeline so that
+// quiet evasions are included.  If no legal move exists we return a
+// checkmate score.  Outside of check the standard stand-pat applies.
 func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	nodes++
 	checkTime()
@@ -433,27 +451,43 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		return evaluate(p)
 	}
 
-	// Stand-pat evaluation: if we're already beating beta, stop.
-	best := evaluate(p)
-	if best >= beta {
-		return best
-	}
-	if best > alpha {
-		alpha = best
-	}
+	inCheck := p.inCheck()
 
 	picker := &moveBuffers[ply]
-	initQSearch(p, picker)
 	var childPv [maxPly]int
 
-	for {
-		move := picker.nextCapture()
-		if move == 0 {
-			break
+	// Stand-pat: outside of check we may decline all captures.
+	// In check we must find an evasion, so stand-pat is illegal.
+	best := -inf
+	if !inCheck {
+		best = evaluate(p)
+		if best >= beta {
+			return best
 		}
+		if best > alpha {
+			alpha = best
+		}
+		initQSearch(p, picker)
+	} else {
+		initMovePicker(p, picker, 0, ply)
+	}
 
-		if isBadCapture(p, move) {
-			continue
+	movesTried := 0
+	for {
+		var move int
+		if inCheck {
+			move, _ = picker.nextMove()
+			if move == 0 {
+				break
+			}
+		} else {
+			move = picker.nextCapture()
+			if move == 0 {
+				break
+			}
+			if isBadCapture(p, move) {
+				continue
+			}
 		}
 
 		var u Undo
@@ -462,6 +496,7 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 			unmakeMove(p, move, &u)
 			continue
 		}
+		movesTried++
 		score := -quiesce(p, ply+1, -beta, -alpha, childPv[:])
 		unmakeMove(p, move, &u)
 
@@ -479,6 +514,12 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 			}
 		}
 	}
+
+	// In check with no legal evasion: checkmate.
+	if inCheck && movesTried == 0 {
+		return -mate + ply
+	}
+
 	return best
 }
 
