@@ -213,8 +213,8 @@ var pstEG = [6][64]int{
 // "blocked" = a piece stands on the push square; the pawn can't advance
 // so its value is reduced significantly.
 var passedBonusMG = [2][8]int{
-	0: {0, 0, 0, -5, 10, 25, 90, 0},  // free: push square empty
-	1: {0, 0, 0, -8, -5, 12, 45, 0},  // blocked: push square occupied
+	0: {0, 0, 0, -5, 10, 25, 90, 0}, // free: push square empty
+	1: {0, 0, 0, -8, -5, 12, 45, 0}, // blocked: push square occupied
 }
 var passedBonusEG = [2][8]int{
 	0: {0, 0, 0, 10, 30, 100, 165, 0}, // free
@@ -271,8 +271,8 @@ func eval_internal(p *Pos, shouldReport bool) int {
 	evaluateThreats(p, &e, Black)
 
 	// Interpolate between game phases
-    mg := e.sumMg(White) - e.sumMg(Black)
-    eg := e.sumEg(White) - e.sumEg(Black)
+	mg := e.sumMg(White) - e.sumMg(Black)
+	eg := e.sumEg(White) - e.sumEg(Black)
 	if e.phase > 24 {
 		e.phase = 24
 	}
@@ -338,7 +338,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[B], pieceValEG[B])
 		addPST(e, side, B, sq)
 		atks := bishopAttacks(occForBishop, sq)
-		e.addAttacks(side, B, atks)
+		e.addAttacks(side, B, bishopAttacks(occ, sq))
 		mob := popCount(atks) - 6
 		add(e, side, EvalMobility, 5*mob, 4*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -356,7 +356,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 	minors := p.pieceBB(side, N) | p.pieceBB(side, B)
 	undeveloped := popCount(minors & minorHomeBB[side])
 	if undeveloped > 0 {
-		add(e, side, EvalOther, -(undeveloped*undeveloped*devPenaltyScale), 0)
+		add(e, side, EvalOther, -(undeveloped * undeveloped * devPenaltyScale), 0)
 	}
 
 	pieces = p.pieceBB(side, R)
@@ -365,7 +365,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[R], pieceValEG[R])
 		addPST(e, side, R, sq)
 		atks := rookAttacks(occForRook, sq)
-		e.addAttacks(side, R, atks)
+		e.addAttacks(side, R, rookAttacks(occ, sq))
 		mob := popCount(atks) - 7
 		add(e, side, EvalMobility, 3*mob, 2*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -392,7 +392,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[Q], pieceValEG[Q])
 		addPST(e, side, Q, sq)
 		atks := queenAttacks(occForQueen, sq)
-		e.addAttacks(side, Q, atks)
+		e.addAttacks(side, Q, queenAttacks(occ, sq))
 		mob := popCount(atks) - 14
 		add(e, side, EvalMobility, 2*mob, 2*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -742,7 +742,7 @@ func evaluateThreats(p *Pos, e *EvalData, side int) {
 	if side == White {
 		pushThreatBB = ((safePushes << 7) &^ fileHBB) | ((safePushes << 9) &^ fileABB)
 	} else {
-		pushThreatBB = ((safePushes >> 7) &^ fileABB) | ((safePushes >> 9) &^ fileHBB)
+		pushThreatBB = ((safePushes >> 7) &^ fileHBB) | ((safePushes >> 9) &^ fileABB)
 	}
 	cnt := popCount(pushThreatBB & nonPawnEnemies)
 	add(e, side, EvalThreats, cnt*pushThreatMG, cnt*pushThreatEG)
@@ -764,6 +764,6 @@ func addPST(e *EvalData, side, piece, sq int) {
 
 // add adds MG/EG scores for one side to EvalData.
 func add(e *EvalData, side int, component EvalComponent, mg, eg int) {
-	e.mgScore[side] [component] += mg
-	e.egScore[side] [component] += eg
+	e.mgScore[side][component] += mg
+	e.egScore[side][component] += eg
 }
