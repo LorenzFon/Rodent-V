@@ -11,6 +11,7 @@ const (
 	EvalSafety
 	EvalPawns
 	EvalPassers
+	EvalThreats
 	EvalOther
 	EvalComponentN
 )
@@ -22,19 +23,39 @@ var evalComponentName = [EvalComponentN]string{
 	EvalSafety:   "Safety",
 	EvalPawns:    "Pawns",
 	EvalPassers:  "Passers",
+	EvalThreats:  "Threats",
 	EvalOther:    "Other",
 }
 
 
-// A struct serving as a scratchpad for evaluation, filled with data
-// gathered in the process.
+// EvalData is the scratchpad built during evaluation.
+// Attack maps are filled incrementally by evaluatePieces / evaluatePawns /
+// evaluateKing, then consumed by evaluateThreats.
 type EvalData struct {
 	phase   int
 	mgScore [2][EvalComponentN]int
 	egScore [2][EvalComponentN]int
-    kingRing  [2]uint64 // 8 squares surrounding each king
+
+	// King-safety data (filled during piece eval).
+	kingRing  [2]uint64 // 8 squares surrounding each king
 	attackWt  [2]int    // weighted attacker pressure on enemy king ring
 	attackCnt [2]int    // total squares attacked in enemy king ring
+
+	// Per-piece-type attack bitboards, used by threat eval.
+	// attackedBy[side][pieceType]: union of all attacks by pieces of that type.
+	// attackedBy2[side]: squares attacked by 2+ friendly pieces.
+	// attacked[side]:    union of all friendly attacks (all piece types).
+	attackedBy  [2][6]uint64
+	attackedBy2 [2]uint64
+	attacked    [2]uint64
+}
+
+// addAttacks registers an attack bitboard for (side, pieceType) and
+// updates the doubly-attacked and all-attacks maps.
+func (e *EvalData) addAttacks(side, pieceType int, atks uint64) {
+	e.attackedBy2[side] |= e.attacked[side] & atks
+	e.attacked[side] |= atks
+	e.attackedBy[side][pieceType] |= atks
 }
 
 func (e *EvalData) sumMg(side int) int {
