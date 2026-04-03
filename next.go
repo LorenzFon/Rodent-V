@@ -224,23 +224,20 @@ func scoreQuiet(m *MovePicker) {
 	}
 }
 
-// pickBest does one rightward scan to bubble the highest-valued entry
-// to position cur, then returns and advances cur.  This is selection
-// sort for one element: O(n) per call, O(n^2) total, acceptable for
-// small move lists.
+// pickBest finds the highest-valued entry in move[cur..end], swaps it
+// into position cur, advances cur, and returns the move.  One swap per
+// call instead of the bubble approach's up to n-1 swaps.
 func (m *MovePicker) pickBest() int {
-	// Pre-slice so the compiler can prove i and i-1 are always in-bounds,
-	// eliminating the bounds checks on all four array accesses per iteration.
-	v  := m.value[m.cur : m.end]
-	mv := m.move[m.cur : m.end]
-	for i := len(v) - 1; i > 0; i-- {
-		if v[i] > v[i-1] {
-			v[i], v[i-1]   = v[i-1], v[i]
-			mv[i], mv[i-1] = mv[i-1], mv[i]
+	best := m.cur
+	for i := m.cur + 1; i < m.end; i++ {
+		if m.value[i] > m.value[best] {
+			best = i
 		}
 	}
+	m.value[m.cur], m.value[best] = m.value[best], m.value[m.cur]
+	m.move[m.cur], m.move[best]   = m.move[best], m.move[m.cur]
 	m.cur++
-	return mv[0]
+	return m.move[m.cur-1]
 }
 
 // isBadCapture returns true if a capture loses material after the
