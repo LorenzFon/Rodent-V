@@ -157,6 +157,9 @@ func uciLoop() {
 		case "eval":
 			eval_trace(&p)
 
+		case "threats":
+			PrintThreatDebug(&p)
+
 		}
 	}
 

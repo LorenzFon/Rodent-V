@@ -213,8 +213,8 @@ var pstEG = [6][64]int{
 // "blocked" = a piece stands on the push square; the pawn can't advance
 // so its value is reduced significantly.
 var passedBonusMG = [2][8]int{
-	0: {0, 0, 0, -5, 10, 25, 90, 0},  // free: push square empty
-	1: {0, 0, 0, -8, -5, 12, 45, 0},  // blocked: push square occupied
+	0: {0, 0, 0, -5, 10, 25, 90, 0}, // free: push square empty
+	1: {0, 0, 0, -8, -5, 12, 45, 0}, // blocked: push square occupied
 }
 var passedBonusEG = [2][8]int{
 	0: {0, 0, 0, 10, 30, 100, 165, 0}, // free
@@ -266,10 +266,13 @@ func eval_internal(p *Pos, shouldReport bool) int {
 	evaluatePawns(p, &e, Black)
 	evaluateKing(p, &e, White)
 	evaluateKing(p, &e, Black)
+	// Threats use the fully-built attack maps from all evaluators above.
+	evaluateThreats(p, &e, White)
+	evaluateThreats(p, &e, Black)
 
 	// Interpolate between game phases
-    mg := e.sumMg(White) - e.sumMg(Black)
-    eg := e.sumEg(White) - e.sumEg(Black)
+	mg := e.sumMg(White) - e.sumMg(Black)
+	eg := e.sumEg(White) - e.sumEg(Black)
 	if e.phase > 24 {
 		e.phase = 24
 	}
@@ -308,6 +311,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[N], pieceValEG[N])
 		addPST(e, side, N, sq)
 		atks := knightAtk[sq]
+		e.addAttacks(side, N, atks)
 		mob := popCount(atks&^p.colorBB[side]) - 4
 		add(e, side, EvalMobility, 3*mob, 3*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -334,6 +338,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[B], pieceValEG[B])
 		addPST(e, side, B, sq)
 		atks := bishopAttacks(occForBishop, sq)
+		e.addAttacks(side, B, bishopAttacks(occ, sq))
 		mob := popCount(atks) - 6
 		add(e, side, EvalMobility, 5*mob, 4*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -351,7 +356,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 	minors := p.pieceBB(side, N) | p.pieceBB(side, B)
 	undeveloped := popCount(minors & minorHomeBB[side])
 	if undeveloped > 0 {
-		add(e, side, EvalOther, -(undeveloped*undeveloped*devPenaltyScale), 0)
+		add(e, side, EvalOther, -(undeveloped * undeveloped * devPenaltyScale), 0)
 	}
 
 	pieces = p.pieceBB(side, R)
@@ -360,6 +365,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[R], pieceValEG[R])
 		addPST(e, side, R, sq)
 		atks := rookAttacks(occForRook, sq)
+		e.addAttacks(side, R, rookAttacks(occ, sq))
 		mob := popCount(atks) - 7
 		add(e, side, EvalMobility, 3*mob, 2*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -386,6 +392,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[Q], pieceValEG[Q])
 		addPST(e, side, Q, sq)
 		atks := queenAttacks(occForQueen, sq)
+		e.addAttacks(side, Q, queenAttacks(occ, sq))
 		mob := popCount(atks) - 14
 		add(e, side, EvalMobility, 2*mob, 2*mob)
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -414,6 +421,7 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 		sq := lsb(pieces)
 		add(e, side, EvalMaterial, pieceValMG[P], pieceValEG[P])
 		addPST(e, side, P, sq)
+		e.addAttacks(side, P, pawnAtk[side][sq])
 
 		// pushSq: the square directly in front of this pawn.
 		// Pawns can't legally sit on the promotion rank, but guard anyway.
@@ -553,6 +561,7 @@ func pawnShieldMG(p *Pos, side int) int {
 func evaluateKing(p *Pos, e *EvalData, side int) {
 	sq := p.kingSq[side]
 	addPST(e, side, K, sq)
+	e.addAttacks(side, K, kingAtk[sq])
 
 	// Pawn shield only matters in the middlegame.
 	shieldMG := pawnShieldMG(p, side)
@@ -583,6 +592,162 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 	}
 }
 
+// ---- Threat evaluation ----
+//
+// Threat scores reward the side whose pieces attack undefended or
+// poorly-defended enemy pieces.  The bonus depends on:
+//   - what piece type is doing the attacking
+//   - what piece type is being attacked (victim)
+//   - whether the victim is defended (index 0=hanging, 1=defended)
+//
+// Pawn and king threats do not use the defended flag: a pawn threat is
+// always serious because capturing is free; a king threat is only
+// rewarded when the victim is undefended (handled in the code).
+//
+// Push threats: a pawn one step away from attacking an enemy non-pawn.
+// Only counted when the push square is safe (not controlled by an enemy pawn).
+
+// threatByPawnMG/EG[victimType] — P..Q (K is never threatened by a pawn).
+var threatByPawnMG = [6]int{-7, 73, 65, 72, 56, 0}
+var threatByPawnEG = [6]int{-19, 41, 72, 50, 24, 0}
+
+// threatByKnightMG/EG[defended][victimType] — 0=hanging, 1=defended.
+var threatByKnightMG = [2][6]int{
+	{5, 12, 50, 86, 41, 0},
+	{-8, 9, 38, 71, 50, 0},
+}
+var threatByKnightEG = [2][6]int{
+	{37, 85, 33, 13, 8, 0},
+	{11, 79, 29, 45, 46, 0},
+}
+
+// threatByBishopMG/EG[defended][victimType].
+var threatByBishopMG = [2][6]int{
+	{3, 36, 12, 58, 61, 0},
+	{-5, 20, 4, 56, 63, 0},
+}
+var threatByBishopEG = [2][6]int{
+	{34, 44, 102, 35, 53, 0},
+	{4, 21, 76, 60, 74, 0},
+}
+
+// threatByRookMG/EG[defended][victimType].
+var threatByRookMG = [2][6]int{
+	{-3, 35, 45, -12, 67, 0},
+	{-10, 8, 19, 1, 54, 0},
+}
+var threatByRookEG = [2][6]int{
+	{50, 52, 49, 50, -10, 0},
+	{10, 15, 4, 22, 85, 0},
+}
+
+// threatByQueenMG/EG[defended][victimType].
+var threatByQueenMG = [2][6]int{
+	{8, 25, 18, 16, -2, 0},
+	{-5, 2, -9, -7, -19, 0},
+}
+var threatByQueenEG = [2][6]int{
+	{21, 30, 65, 12, -17, 0},
+	{16, 8, 37, 7, 1, 0},
+}
+
+// threatByKingMG/EG[victimType] — king only attacks undefended squares.
+var threatByKingMG = [6]int{39, 33, 99, 83, 0, 0}
+var threatByKingEG = [6]int{18, 38, 33, 8, 0, 0}
+
+// pushThreatMG/EG: per non-pawn enemy piece attacked by a safe pawn push.
+const pushThreatMG = 13
+const pushThreatEG = 17
+
+// evaluateThreats scores the positional pressure exerted by (side)'s pieces
+// on the enemy.  Must be called after all attack maps are fully built.
+func evaluateThreats(p *Pos, e *EvalData, side int) {
+	enemy := opp(side)
+	enemyPieces := p.colorBB[enemy]
+
+	// defendedBB: squares the enemy double-covers, or covers with a pawn,
+	// or covers without us also double-covering.  Hitting a piece on a
+	// defended square is less valuable than hitting a hanging piece.
+	defendedBB := e.attackedBy2[enemy] |
+		e.attackedBy[enemy][P] |
+		(e.attacked[enemy] &^ e.attackedBy2[side])
+
+	// Pawn threats: any enemy piece attacked by our pawns.
+	pawnThreats := e.attackedBy[side][P] & enemyPieces
+	for bb := pawnThreats; bb != 0; {
+		sq := lsb(bb)
+		bb &= bb - 1
+		victim := p.typeAt(sq)
+		add(e, side, EvalThreats, threatByPawnMG[victim], threatByPawnEG[victim])
+	}
+
+	// Minor/major piece threats with defended flag.
+	for _, attacker := range []int{N, B, R, Q} {
+		var mgTable, egTable *[2][6]int
+		switch attacker {
+		case N:
+			mgTable, egTable = &threatByKnightMG, &threatByKnightEG
+		case B:
+			mgTable, egTable = &threatByBishopMG, &threatByBishopEG
+		case R:
+			mgTable, egTable = &threatByRookMG, &threatByRookEG
+		case Q:
+			mgTable, egTable = &threatByQueenMG, &threatByQueenEG
+		}
+		threats := e.attackedBy[side][attacker] & enemyPieces
+		if attacker == Q {
+			threats &^= p.pieceBB(enemy, K) // queen doesn't threaten king
+		}
+		for bb := threats; bb != 0; {
+			sq := lsb(bb)
+			bb &= bb - 1
+			victim := p.typeAt(sq)
+			defended := 0
+			if defendedBB&squareBit(sq) != 0 {
+				defended = 1
+			}
+			add(e, side, EvalThreats, mgTable[defended][victim], egTable[defended][victim])
+		}
+	}
+
+	// King threats: king attacks undefended enemy pieces.
+	kingThreats := e.attackedBy[side][K] & enemyPieces &^ defendedBB
+	for bb := kingThreats; bb != 0; {
+		sq := lsb(bb)
+		bb &= bb - 1
+		victim := p.typeAt(sq)
+		add(e, side, EvalThreats, threatByKingMG[victim], threatByKingEG[victim])
+	}
+
+	// Push threats: safe pawn advances that would attack an enemy non-pawn.
+	// Safe = the push square is not controlled by an enemy pawn.
+	occ := p.occupied()
+	ownPawns := p.pieceBB(side, P)
+	nonPawnEnemies := enemyPieces &^ p.pieceBB(enemy, P)
+	enemyPawnAtks := e.attackedBy[enemy][P]
+	var pushes uint64
+	if side == White {
+		pushes = (ownPawns << 8) &^ occ
+		// Double push from rank 2.
+		pushes |= ((pushes & rank3BB) << 8) &^ occ
+	} else {
+		pushes = (ownPawns >> 8) &^ occ
+		// Double push from rank 7 (relative).
+		pushes |= ((pushes & rank6BB) >> 8) &^ occ
+	}
+	// Only safe pushes: not controlled by an enemy pawn.
+	safePushes := pushes &^ enemyPawnAtks
+	// Count safe pushes that would attack a non-pawn enemy.
+	var pushThreatBB uint64
+	if side == White {
+		pushThreatBB = ((safePushes << 7) &^ fileHBB) | ((safePushes << 9) &^ fileABB)
+	} else {
+		pushThreatBB = ((safePushes >> 7) &^ fileHBB) | ((safePushes >> 9) &^ fileABB)
+	}
+	cnt := popCount(pushThreatBB & nonPawnEnemies)
+	add(e, side, EvalThreats, cnt*pushThreatMG, cnt*pushThreatEG)
+}
+
 // TODO: initialize pst tables in a separate file and
 // do not handle White and Black separately in addPST
 
@@ -599,6 +764,6 @@ func addPST(e *EvalData, side, piece, sq int) {
 
 // add adds MG/EG scores for one side to EvalData.
 func add(e *EvalData, side int, component EvalComponent, mg, eg int) {
-	e.mgScore[side] [component] += mg
-	e.egScore[side] [component] += eg
+	e.mgScore[side][component] += mg
+	e.egScore[side][component] += eg
 }
