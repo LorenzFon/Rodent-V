@@ -116,6 +116,16 @@ var minorHomeBB = [2]uint64{
 // 4 undeveloped: -80 cp   (opening disaster)
 const devPenaltyScale = 5
 
+// doubledPawnMG / doubledPawnEG: penalty for the rear pawn of a doubled
+// pair, indexed by distance-to-edge (0=a/h file, 1=b/g, 2=c/f, 3=d/e).
+// The penalty is applied only when the doubled pawn cannot immediately
+// capture an enemy pawn (if it can capture, the structure is likely to be
+// resolved tactically so the positional penalty is inappropriate).
+// Values are mostly EG-heavy: doubled pawns become most dangerous as the
+// position simplifies, since they cannot create a passed pawn by themselves.
+var doubledPawnMG = [4]int{0, 3, -6, -14}
+var doubledPawnEG = [4]int{-48, -38, -28, -10}
+
 var pstMG = [6][64]int{
 	P: {
 		0, 0, 0, 0, 0, 0, 0, 0, -35, -6, -25, -22, -15, 18, 25, -26, /* pawn   r1-r2 */
@@ -390,6 +400,28 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 		// Isolated pawn: no friendly pawns on adjacent files.
 		if adjFileMask[fileOf(sq)]&p.pieceBB(side, P) == 0 {
 			add(e, side, EvalPawns, -20, -20)
+		}
+		// Doubled pawn: a friendly pawn stands directly ahead on the same file.
+		// We only penalise when the pawn cannot immediately capture an enemy
+		// pawn — if it can, the doubled structure is likely resolved tactically.
+		// The penalty is indexed by distance-to-edge so central files (where
+		// the doubled pawn blocks the most pawn breaks) are hurt the most in MG,
+		// while edge files are punished more in EG (they can rarely promote).
+		var pushSq int
+		if side == White {
+			pushSq = sq + 8
+		} else {
+			pushSq = sq - 8
+		}
+		if pushSq >= 0 && pushSq < 64 && p.pieceBB(side, P)&squareBit(pushSq) != 0 {
+			// Only penalise if the doubled pawn has no immediate captures.
+			if pawnAtk[side][sq]&p.pieceBB(opp(side), P) == 0 {
+				fileIdx := fileOf(sq)
+				if fileIdx > 3 {
+					fileIdx = 7 - fileIdx
+				}
+				add(e, side, EvalPawns, doubledPawnMG[fileIdx], doubledPawnEG[fileIdx])
+			}
 		}
 		pieces &= pieces - 1
 	}
