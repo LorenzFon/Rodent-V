@@ -282,7 +282,7 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 	}
 
 	if movetime >= 0 {
-		return movetime - 10, maxDepth // subtract I/O safety margin
+		return movetime - 50, maxDepth // subtract I/O safety margin
 	}
 
 	var myTime, myInc int64
@@ -311,7 +311,7 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 	if alloc > myTime {
 		alloc = myTime
 	}
-	alloc -= 10 // I/O safety margin
+	alloc -= 50 // I/O safety margin
 	if alloc < 0 {
 		alloc = 0
 	}

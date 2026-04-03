@@ -172,6 +172,20 @@ func think(p *Pos, maxDepth int) {
 	score := 0
 
 	for rootDepth = 1; rootDepth <= maxDepth; rootDepth++ {
+		// Before starting a new depth, do an unthrottled time check.
+		// Two stopping criteria (either is sufficient):
+		//   1. Hard limit: elapsed >= timeLimit (don't start if already over).
+		//   2. Half-budget rule: elapsed >= timeLimit/2. The next depth
+		//      typically takes longer than all prior depths combined, so
+		//      starting it when half the budget is gone almost always busts
+		//      the limit. This is the key guard against time forfeits.
+		if rootDepth > 1 && !pondering && timeLimit >= 0 {
+			elapsed := time.Now().UnixMilli() - searchStart
+			if elapsed >= timeLimit || elapsed >= timeLimit/2 {
+				break
+			}
+		}
+
 		var iterScore int
 
 		if rootDepth < 5 {
@@ -257,6 +271,12 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	}
 	// Insufficient material (applies at all plies including root).
 	if p.isInsufficientMaterial() {
+		return 0
+	}
+	// Re-check abort after draw detection: the throttled checkTime() above
+	// may not have fired yet, but time could have expired while we were
+	// deep in a chain of fast draw-returning nodes.
+	if atomic.LoadInt32(&abortFlag) != 0 {
 		return 0
 	}
 
@@ -490,6 +510,9 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	if p.clock >= 100 || p.isInsufficientMaterial() {
 		return 0
 	}
+	if atomic.LoadInt32(&abortFlag) != 0 {
+		return 0
+	}
 
 	// Safeguard against reaching max ply limit
 	if ply >= maxPly-1 {
@@ -638,7 +661,7 @@ func reportInfo(score int, pv []int) {
 // search unwinds cleanly.  Skipped during depth-1 searches (the
 // engine must always return at least one move) and when pondering.
 func checkTime() {
-	if nodes&4095 != 0 || rootDepth == 1 {
+	if nodes&1023 != 0 || rootDepth == 1 {
 		return
 	}
 	if !pondering && timeLimit >= 0 {
