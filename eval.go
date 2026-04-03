@@ -100,6 +100,22 @@ const rookOpenFileEG = 3
 const rookSemiOpenFileMG = 20
 const rookSemiOpenFileEG = -1
 
+// minorHomeBB[side]: bitboard of the four squares where knights and bishops
+// start the game.  A minor still on one of these squares counts as undeveloped.
+// White: b1=1, c1=2, f1=5, g1=6   Black: b8=57, c8=58, f8=61, g8=62
+var minorHomeBB = [2]uint64{
+	White: (1 << 1) | (1 << 2) | (1 << 5) | (1 << 6),
+	Black: (1 << 57) | (1 << 58) | (1 << 61) | (1 << 62),
+}
+
+// devPenaltyScale: multiplier for the quadratic undevelopment penalty.
+// penalty = undeveloped^2 * devPenaltyScale  (MG only)
+// 1 undeveloped:  -5 cp   (barely noticeable)
+// 2 undeveloped: -20 cp   (a tempo behind)
+// 3 undeveloped: -45 cp   (serious lag)
+// 4 undeveloped: -80 cp   (opening disaster)
+const devPenaltyScale = 5
+
 var pstMG = [6][64]int{
 	P: {
 		0, 0, 0, 0, 0, 0, 0, 0, -35, -6, -25, -22, -15, 18, 25, -26, /* pawn   r1-r2 */
@@ -294,6 +310,16 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		}
 		e.phase += 1
 		pieces &= pieces - 1
+	}
+
+	// Quadratic undevelopment penalty: each minor still on its home square
+	// compounds the punishment.  Two pieces at home is 4× worse than one,
+	// four at home is 16× worse — reflecting how a crowded back rank
+	// prevents castling and limits all piece coordination.
+	minors := p.pieceBB(side, N) | p.pieceBB(side, B)
+	undeveloped := popCount(minors & minorHomeBB[side])
+	if undeveloped > 0 {
+		add(e, side, EvalOther, -(undeveloped*undeveloped*devPenaltyScale), 0)
 	}
 
 	pieces = p.pieceBB(side, R)
