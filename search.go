@@ -15,13 +15,17 @@
 //   with the full window is needed.  In practice, most branches fail
 //   the zero-width search immediately, saving significant time.
 //
-//   ITERATIVE DEEPENING
-//   --------------------
+//   ITERATIVE DEEPENING + ASPIRATION WINDOWS
+//   ------------------------------------------
 //   We don't search directly to the maximum depth.  Instead we start
 //   at depth 1 and deepen one ply at a time.  Each shallower search
 //   populates the TT with good move hints that guide the deeper
 //   search.  It also lets us output progress and stop cleanly when
-//   time expires.
+//   time expires.  From depth 4 onward each iteration is searched
+//   inside a narrow aspiration window centred on the previous score;
+//   on a fail-low or fail-high the window doubles and the search is
+//   retried.  This generates many more cutoffs at the root without
+//   risking correctness.
 //
 //   NULL-MOVE PRUNING
 //   -----------------
@@ -149,6 +153,13 @@ func initLMRTable() {
 // think is the top-level search entry point called from the UCI loop.
 // It performs iterative deepening from depth 1 to maxDepth, outputting
 // UCI info lines and finally "bestmove" when done or time expires.
+//
+// From depth 5 onward each iteration is searched inside an aspiration window
+// centred on the previous score.  The initial delta scales with the score
+// magnitude so volatile (unbalanced) positions get a wider starting window.
+// On fail-low beta is first collapsed to the midpoint before alpha widens,
+// avoiding a needlessly large high-side window.  The delta grows by 50% on
+// each failure (smoother than doubling) until the window opens fully.
 func think(p *Pos, maxDepth int) {
 	clearHistory()
 	ttDate = (ttDate + 1) & 255
@@ -158,11 +169,45 @@ func think(p *Pos, maxDepth int) {
 	rootHistLen = p.histLen
 
 	var pv [maxPly]int
+	score := 0
+
 	for rootDepth = 1; rootDepth <= maxDepth; rootDepth++ {
-		search(p, 0, -inf, inf, rootDepth, pv[:])
+		var iterScore int
+
+		if rootDepth < 5 {
+			// Aspiration windows are unreliable at shallow depths.
+			iterScore = search(p, 0, -inf, inf, rootDepth, pv[:])
+		} else {
+			// Score-adaptive initial delta: balanced positions get a tight
+			// window; large scores widen it to reduce retry churn.
+			delta := 25 + score*score/16384
+			alpha := max(-inf, score-delta)
+			beta  := min(inf,  score+delta)
+
+			for {
+				iterScore = search(p, 0, alpha, beta, rootDepth, pv[:])
+				if atomic.LoadInt32(&abortFlag) != 0 {
+					break
+				}
+				if iterScore <= alpha {
+					// Fail low: collapse beta to the midpoint before widening
+					// alpha so the high side doesn't grow unnecessarily.
+					beta  = (alpha + beta) / 2
+					alpha = max(-inf, alpha-delta)
+				} else if iterScore >= beta {
+					// Fail high: widen the window above and retry.
+					beta = min(inf, beta+delta)
+				} else {
+					break // score is inside the window
+				}
+				delta += delta / 2 // proportional widening (×1.5)
+			}
+		}
+
 		if atomic.LoadInt32(&abortFlag) != 0 {
 			break
 		}
+		score = iterScore
 	}
 
 	if pv[0] != 0 {
