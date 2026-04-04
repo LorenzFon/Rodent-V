@@ -25,13 +25,12 @@
 - [x] Doubled pawns
 - [ ] Backward pawns
 - [x] King pawn shield
+- [ ] Rook on 7th rank
 
 ---
 
 ## Milestone: Tuning round 1
 
-A minimal port of the Texel tuner — not for full-blown tuning, but for
-initial assessment of eval term additions.
 - [x] minimal tuner to assess new eval terms
 - [x] Texel tuner with batches
 - [x] tune pst
@@ -45,11 +44,11 @@ initial assessment of eval term additions.
 
 ## Milestone: Easy Search Improvements
 
-- [ ] Reverse futility pruning (RFP)
-- [ ] Late move pruning (LMP)
-- [ ] Table-driven LMR
-- [ ] Razoring
-- [ ] SEE fast-path: `isBadCapture` short-circuits for obviously good captures
+- [x] Reverse futility pruning (RFP)
+- [x] Late move pruning (LMP)
+- [x] Table-driven LMR
+- [x] Razoring
+- [x] SEE fast-path: `isBadCapture` short-circuits for obviously good captures
       (attacker value ≤ victim value, BxN) before running full SEE
 
 ---
@@ -83,6 +82,7 @@ initial assessment of eval term additions.
 - [ ] refutaton history
 - [ ] continuation history if does not fail
 - [ ] correction history if does not fail
+- [ ] multi-threading (lazy SMP)
 
 ---
 
@@ -98,6 +98,26 @@ initial assessment of eval term additions.
 - [ ] Direct checking moves generator
 - [ ] Discovered checks generator
 - [ ] (possibly) out of check move generator
+
+## Milestone: advanced eval params
+
+- [ ] Outposts
+- [ ] Pawn in front of a minor piece
+- [ ] Drawish endgames
+- [ ] Material imbalances
+- [ ] Phalanx pawns
+- [ ] Defended pawns
+
+## Milestone: user-facing functionalities
+
+- [ ] Weakening
+- [ ] Personalities presets
+- [ ] A tool to tune personalities without too many technical options
+
+## Milestone: beyond standard eval
+
+- [ ] Piece/square tables depending on central pawn structure
+- [ ] two-loop pawn pairs evaluation
 
 ## Longer term
 
