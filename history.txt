@@ -1,3 +1,77 @@
+26-04-03
+	feat: threat evaluation
+
+Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 24.71 +/- 14.39, nElo: 32.43 +/- 18.81
+LOS: 99.96 %, DrawRatio: 35.88 %, PairsRatio: 1.37
+Games: 1310, Wins: 475, Losses: 382, Draws: 453, Points: 701.5 (53.55 %)
+Ptnml(0-2): [45, 132, 235, 171, 72], WL/DD Ratio: 2.13
+LLR: 2.95 (100.1%) (-2.94, 2.94) [0.00, 10.00]
+
+26-04-03
+	[feat] enhance pawn evaluation with proximity bonuses and Chebyshev distance calculation
+
+26-04-03
+	[feat] doubled pawns
+
+26-04-03
+	[fix] time management
+
+26-04-03
+	[feat] aspiration windows
+
+Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 29.32 +/- 15.11, nElo: 42.55 +/- 21.82
+LOS: 99.99 %, DrawRatio: 39.63 %, PairsRatio: 1.56
+Games: 974, Wins: 340, Losses: 258, Draws: 376, Points: 528.0 (54.21 %)
+Ptnml(0-2): [21, 94, 193, 140, 39], WL/DD Ratio: 1.72
+LLR: 2.97 (101.0%) (-2.94, 2.94) [0.00, 10.00]
+
+26-04-03
+	[feat] rook on open/half open file
+
+Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 24.74 +/- 14.21, nElo: 33.09 +/- 18.93
+LOS: 99.97 %, DrawRatio: 37.09 %, PairsRatio: 1.39
+Games: 1294, Wins: 448, Losses: 356, Draws: 490, Points: 693.0 (53.55 %)
+Ptnml(0-2): [42, 128, 240, 170, 67], WL/DD Ratio: 1.50
+LLR: 2.98 (101.2%) (-2.94, 2.94) [0.00, 10.00]
+
+26-04-02
+	[feat] enhance history heuristic with depth-based bonuses and malus for quiet moves
+
+Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 12.77 +/- 9.34, nElo: 17.03 +/- 12.45
+LOS: 99.63 %, DrawRatio: 36.21 %, PairsRatio: 1.13
+Games: 2994, Wins: 989, Losses: 879, Draws: 1126, Points: 1552.0 (51.84 %)
+Ptnml(0-2): [97, 351, 542, 359, 148], WL/DD Ratio: 1.61
+LLR: 2.98 (101.4%) (-2.94, 2.94) [0.00, 10.00]
+
+26-04-02
+	[feat] quadratic undevelopement penalty
+
+26-04-02
+	[feat] inernal iterative reduction
+
+26-04-02
+	[feat] late move pruning
+
+26-04-02
+	[feat] reverse futility pruning
+
+26-04-02
+	[tweak] Chal's LMR (+37 Elo)
+
+Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 37.81 +/- 17.99, nElo: 53.14 +/- 25.07
+LOS: 100.00 %, DrawRatio: 38.75 %, PairsRatio: 1.63
+Games: 738, Wins: 268, Losses: 188, Draws: 282, Points: 409.0 (55.42 %)
+Ptnml(0-2): [14, 72, 143, 100, 40], WL/DD Ratio: 1.60
+LLR: 2.90 (100.2%) (-2.25, 2.89) [0.00, 10.00]
+
+26-04-01
+	[feat] Naman's king safety
+
 0.2.4 (26-04-01)
 	[feat] draw detection: 50-move rule and insufficient material
 
