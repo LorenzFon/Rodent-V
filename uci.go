@@ -99,6 +99,7 @@ func uciLoop() {
 		case "ucinewgame":
 			stopSearch()
 			clearTT()
+			clearHistory()
 			parseFEN(&p, startFEN)
 
 		case "position":

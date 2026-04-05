@@ -50,9 +50,9 @@ const maxHist = 16384
 
 // Global heuristic tables, reset before each new search.
 var (
-	histTable   [64][64]int          // history[fromSq][toSq]
-	killerMoves [maxPly][2]int       // killerMoves[ply][0..1]
-	moveBuffers [maxPly]MovePicker   // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
+	histTable   [2][64][64]int     // history[side][fromSq][toSq]
+	killerMoves [maxPly][2]int     // killerMoves[ply][0..1]
+	moveBuffers [maxPly]MovePicker // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
 )
 
 type MoveGenStage int
@@ -74,25 +74,25 @@ const (
 // until it returns 0.
 type MovePicker struct {
 	p        *Pos
-	phase    MoveGenStage   // which pipeline stage we are in (0-7)
-	ttMove   int            // the transposition table move hint
-	killer1  int            // first killer move for this ply
-	killer2  int            // second killer move for this ply
-	cur      int            // next index to yield from move[]
-	end      int            // one-past-last valid index in move[]
-	move     [maxMoves]int  // move buffer (reused for captures then quiets)
-	value    [maxMoves]int  // ordering score for each move in move[]
-	badCount int            // number of bad captures saved in badCaps[]
-	badCur   int            // next index to yield from badCaps[]
-	badCaps  [maxMoves]int  // bad captures deferred to phase 7
+	phase    MoveGenStage  // which pipeline stage we are in (0-7)
+	ttMove   int           // the transposition table move hint
+	killer1  int           // first killer move for this ply
+	killer2  int           // second killer move for this ply
+	cur      int           // next index to yield from move[]
+	end      int           // one-past-last valid index in move[]
+	move     [maxMoves]int // move buffer (reused for captures then quiets)
+	value    [maxMoves]int // ordering score for each move in move[]
+	badCount int           // number of bad captures saved in badCaps[]
+	badCur   int           // next index to yield from badCaps[]
+	badCaps  [maxMoves]int // bad captures deferred to phase 7
 }
 
 // initMovePicker initialises the picker for a new node.
 // transMove is the move hint from the TT (0 if none).
 func initMovePicker(p *Pos, m *MovePicker, transMove, ply int) {
-	m.p       = p
-	m.phase   = 0
-	m.ttMove  = transMove
+	m.p = p
+	m.phase = 0
+	m.ttMove = transMove
 	m.killer1 = killerMoves[ply][0]
 	m.killer2 = killerMoves[ply][1]
 }
@@ -193,7 +193,7 @@ startPhase:
 // initQSearch prepares m to iterate only over captures, for use in
 // quiesce().  Bad captures are skipped entirely.
 func initQSearch(p *Pos, m *MovePicker) {
-	m.p   = p
+	m.p = p
 	m.end = genCaptures(p, m.move[:])
 	scoreCaptures(m)
 	m.cur = 0
@@ -219,8 +219,9 @@ func scoreCaptures(m *MovePicker) {
 
 // scoreQuiet assigns history heuristic scores to quiet moves.
 func scoreQuiet(m *MovePicker) {
+	side := m.p.side
 	for i := 0; i < m.end; i++ {
-		m.value[i] = histTable[moveFrom(m.move[i])][moveTo(m.move[i])]
+		m.value[i] = histTable[side][moveFrom(m.move[i])][moveTo(m.move[i])]
 	}
 }
 
@@ -235,7 +236,7 @@ func (m *MovePicker) pickBest() int {
 		}
 	}
 	m.value[m.cur], m.value[best] = m.value[best], m.value[m.cur]
-	m.move[m.cur], m.move[best]   = m.move[best], m.move[m.cur]
+	m.move[m.cur], m.move[best] = m.move[best], m.move[m.cur]
 	m.cur++
 	return m.move[m.cur-1]
 }
@@ -246,7 +247,7 @@ func (m *MovePicker) pickBest() int {
 // equal).
 func isBadCapture(p *Pos, move int) bool {
 	from := moveFrom(move)
-	to   := moveTo(move)
+	to := moveTo(move)
 	// If the victim is at least as valuable as the attacker, the
 	// capture is at least equal, so it can't be "bad."
 	if pieceValue[p.typeAt(to)] >= pieceValue[p.typeAt(from)] {
@@ -281,9 +282,11 @@ func mvvLva(p *Pos, move int) int {
 // so that scores from a different root position do not contaminate
 // the ordering.
 func clearHistory() {
-	for i := 0; i < 64; i++ {
-		for j := 0; j < 64; j++ {
-			histTable[i][j] = 0
+	for s := 0; s < 2; s++ {
+		for i := 0; i < 64; i++ {
+			for j := 0; j < 64; j++ {
+				histTable[s][i][j] = 0
+			}
 		}
 	}
 	for i := 0; i < maxPly; i++ {
@@ -292,11 +295,12 @@ func clearHistory() {
 	}
 }
 
-// histBonus returns the raw bonus/malus value for a history update at
-// the given depth.  Using depth*depth keeps shallow updates small and
-// rewards deeper cutoffs more.
+// histBonus returns the bonus/malus value for a history update at the
+// given depth.  depth*depth + 64*depth grows fast enough to matter
+// against maxHist=16384, with the cap preventing any single cutoff
+// from dominating accumulated signal.
 func histBonus(depth int) int {
-	return depth * depth
+	return min(depth*depth+64*depth, maxHist/4)
 }
 
 // histUpdate applies a signed delta to a history entry using the gravity
@@ -311,21 +315,22 @@ func histUpdate(entry *int, delta int) {
 	*entry += delta - (*entry)*abs/maxHist
 }
 
+// isQuiet returns true if move is a quiet move (no capture, no promotion, no EP).
+func isQuiet(p *Pos, move int) bool {
+	return p.board[moveTo(move)] == NO_PC && !isProm(move) && moveType(move) != EP_CAP
+}
+
 // updateHistory records that a quiet move caused a beta cutoff, and
 // penalises all quiet moves that were tried before it (quietsTried).
 // The bonus rewards the cutoff move; the malus makes failed quiets
 // less likely to be tried early in future sibling nodes.
 // Killers store the two most recent cutoff moves at this ply.
 func updateHistory(p *Pos, move, depth, ply int, quietsTried []int) {
-	// Only update for quiet moves (not captures, promotions, or EP).
-	if p.board[moveTo(move)] != NO_PC || isProm(move) || moveType(move) == EP_CAP {
-		return
-	}
-
 	bonus := histBonus(depth)
 
 	// Reward the cutoff move.
-	histUpdate(&histTable[moveFrom(move)][moveTo(move)], bonus)
+	side := p.side
+	histUpdate(&histTable[side][moveFrom(move)][moveTo(move)], bonus)
 
 	// Penalise all quiets that were searched but did not cut off.
 	malus := -bonus
@@ -333,10 +338,7 @@ func updateHistory(p *Pos, move, depth, ply int, quietsTried []int) {
 		if tried == move {
 			continue
 		}
-		if p.board[moveTo(tried)] != NO_PC || isProm(tried) || moveType(tried) == EP_CAP {
-			continue
-		}
-		histUpdate(&histTable[moveFrom(tried)][moveTo(tried)], malus)
+		histUpdate(&histTable[side][moveFrom(tried)][moveTo(tried)], malus)
 	}
 
 	// Update killers.

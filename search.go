@@ -161,7 +161,6 @@ func initLMRTable() {
 // avoiding a needlessly large high-side window.  The delta grows by 50% on
 // each failure (smoother than doubling) until the window opens fully.
 func think(p *Pos, maxDepth int) {
-	clearHistory()
 	ttDate = (ttDate + 1) & 255
 	nodes = 0
 	atomic.StoreInt32(&abortFlag, 0)
@@ -436,7 +435,9 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		// to every quiet that was searched before this one — they failed to
 		// cut off and should be tried later in future sibling nodes.
 		if score >= beta {
-			updateHistory(p, move, depth, ply, quietsMade[:quietsMadeCount])
+			if isQuiet(p, move) {
+				updateHistory(p, move, depth, ply, quietsMade[:quietsMadeCount])
+			}
 			storeTT(p.key, move, score, LOWER, depth, ply)
 			return score
 		}
@@ -477,7 +478,9 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 	// Store the result in the TT with the appropriate bound type.
 	if bestMove != 0 {
-		updateHistory(p, bestMove, depth, ply, nil)
+		if isQuiet(p, bestMove) {
+			updateHistory(p, bestMove, depth, ply, nil)
+		}
 		storeTT(p.key, bestMove, bestScore, EXACT, depth, ply)
 	} else {
 		storeTT(p.key, 0, bestScore, UPPER, depth, ply)
