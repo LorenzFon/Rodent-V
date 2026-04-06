@@ -61,7 +61,7 @@ func (e *EvalData) addAttacks(side, pieceType int, atks uint64) {
 func (e *EvalData) sumMg(side int) int {
 	sum := 0
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
-		sum += e.mgScore[side][c]
+		sum += e.mgScore[side][c] * optionValues[c] / 100
 	}
 	return sum
 }
@@ -69,7 +69,7 @@ func (e *EvalData) sumMg(side int) int {
 func (e *EvalData) sumEg(side int) int {
 	sum := 0
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
-		sum += e.egScore[side][c]
+		sum += e.egScore[side][c] * optionValues[c] / 100
 	}
 	return sum
 }
