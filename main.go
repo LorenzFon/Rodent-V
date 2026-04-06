@@ -37,6 +37,8 @@
 
 package main
 
+import "fmt"
+
 // init() is guaranteed to run before main()
 func init() {
 	initTables()
@@ -46,4 +48,27 @@ func main() {
 	// stuff like reading data from file should go here
 	// to handle errors
 	uciLoop()
+}
+
+// pst debug functions, TODO: move them somewhere
+func printPSToffsets(pst *[6][64]int) {
+	fmt.Printf("offsets to move into material:\n")
+
+	for piece := 0; piece < 6; piece++ {
+		sum := 0
+		for sq := 0; sq < 64; sq++ {
+			sum += pst[piece][sq]
+		}
+
+		avg := float64(sum) / 64.0
+		fmt.Printf("%s: sum = %d, avg = %.3f, material correction ~= %+d\n",
+			pstLabels[piece], sum, avg, roundFloat(avg))
+	}
+}
+
+func roundFloat(x float64) int {
+	if x >= 0 {
+		return int(x + 0.5)
+	}
+	return int(x - 0.5)
 }
