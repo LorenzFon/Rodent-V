@@ -83,10 +83,11 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V 0.2.6")
+			fmt.Println("id name Rodent V 0.2.7")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
+			printUciOptions()
 			fmt.Println("uciok")
 
 		case "isready":
@@ -99,7 +100,6 @@ func uciLoop() {
 		case "ucinewgame":
 			stopSearch()
 			clearTT()
-			clearHistory()
 			parseFEN(&p, startFEN)
 
 		case "position":
@@ -176,31 +176,51 @@ func uciLoop() {
 //   Hash: resize the transposition table (in megabytes).
 //   Clear Hash: zero the transposition table.
 func parseSetOption(tokens []string) {
-	name  := ""
+	name := ""
 	value := ""
-	i     := 0
-	if i < len(tokens) && tokens[i] == "name" {
+	i := 0
+
+	if i < len(tokens) && strings.EqualFold(tokens[i], "name") {
 		i++
 	}
-	for i < len(tokens) && tokens[i] != "value" {
+	for i < len(tokens) && !strings.EqualFold(tokens[i], "value") {
 		if name != "" {
 			name += " "
 		}
 		name += tokens[i]
 		i++
 	}
-	if i < len(tokens) && tokens[i] == "value" {
+	if i < len(tokens) && strings.EqualFold(tokens[i], "value") {
 		i++
 		value = strings.Join(tokens[i:], " ")
 	}
 
-	switch name {
-	case "Hash":
+	switch {
+	case strings.EqualFold(name, "Hash"):
 		if mb, err := strconv.Atoi(value); err == nil {
 			allocTT(mb)
 		}
-	case "Clear Hash":
+		return
+
+	case strings.EqualFold(name, "Clear Hash"):
 		clearTT()
+		return
+	}
+
+	// Eval component options, e.g. "Material", "material", "MATERIAL"
+	for c := EvalComponent(0); c < EvalComponentN; c++ {
+		if strings.EqualFold(name, evalComponentName[c]) {
+			if v, err := strconv.Atoi(value); err == nil {
+				if v < 0 {
+					v = 0
+				}
+				if v > 500 {
+					v = 500
+				}
+				optionValues[c] = v
+			}
+			return
+		}
 	}
 }
 
