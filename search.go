@@ -264,19 +264,10 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	if !isRoot {
 		pv[0] = 0
 		// A position repeated from earlier in the game tree is a draw.
-		if isRepetition(p) {
+		if isRepetition(p) || p.isInsufficientMaterial() {
+			checkTime() // sets abort flag - helps in case of many draws in a row
 			return 0
 		}
-	}
-	// Insufficient material (applies at all plies including root).
-	if p.isInsufficientMaterial() {
-		return 0
-	}
-	// Re-check abort after draw detection: the throttled checkTime() above
-	// may not have fired yet, but time could have expired while we were
-	// deep in a chain of fast draw-returning nodes.
-	if atomic.LoadInt32(&abortFlag) != 0 {
-		return 0
 	}
 
 	// Are we in the pv node?
