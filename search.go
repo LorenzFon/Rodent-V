@@ -14,6 +14,8 @@
 //   first.  If that search fails high (score > alpha), a re-search
 //   with the full window is needed.  In practice, most branches fail
 //   the zero-width search immediately, saving significant time.
+//   The re-search is triggered whenever score > alpha, with no upper
+//   beta guard.
 //
 //   ITERATIVE DEEPENING + ASPIRATION WINDOWS
 //   ------------------------------------------
@@ -195,7 +197,7 @@ func think(p *Pos, maxDepth int) {
 			// window; large scores widen it to reduce retry churn.
 			delta := 25 + score*score/16384
 			alpha := max(-inf, score-delta)
-			beta  := min(inf,  score+delta)
+			beta := min(inf, score+delta)
 
 			for {
 				iterScore = search(p, 0, alpha, beta, rootDepth, pv[:])
@@ -205,7 +207,7 @@ func think(p *Pos, maxDepth int) {
 				if iterScore <= alpha {
 					// Fail low: collapse beta to the midpoint before widening
 					// alpha so the high side doesn't grow unnecessarily.
-					beta  = (alpha + beta) / 2
+					beta = (alpha + beta) / 2
 					alpha = max(-inf, alpha-delta)
 				} else if iterScore >= beta {
 					// Fail high: widen the window above and retry.
@@ -363,7 +365,6 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			continue
 		}
 
-		movesTried++
 		givesCheck := p.inCheck()
 
 		// Extend by one ply for moves that give check.
@@ -386,7 +387,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 		// Late move reduction
 		isReduced := false
-		if stage == StageQuiet && depth > 2 && !nodeInCheck && !givesCheck && movesTried > 3 {
+		if stage == StageQuiet && depth > 2 && !nodeInCheck && !givesCheck && movesTried >= 3 {
 			reduction := lmr[min(depth, 63)][min(movesTried, 63)]
 			if reduction > 0 {
 				if !isPv {
@@ -404,18 +405,20 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 		// Principal Variation Search:
 		// First move: full window.
-		// Subsequent moves: zero-width window first; re-search if it fails high.
+		// Subsequent moves: zero-width window first; re-search with full window
+		// only if the ZW fails high AND we are at a PV node.
 		if !isReduced {
-			if bestScore == -inf {
+			if movesTried == 0 {
 				score = -search(p, ply+1, -beta, -alpha, newDepth, childPv[:])
 			} else {
 				score = -search(p, ply+1, -alpha-1, -alpha, newDepth, childPv[:])
-				if score > alpha && score < beta {
+				if score > alpha && isPv {
 					score = -search(p, ply+1, -beta, -alpha, newDepth, childPv[:])
 				}
 			}
 		}
 		unmakeMove(p, move, &u)
+		movesTried++
 
 		if atomic.LoadInt32(&abortFlag) != 0 {
 			return 0

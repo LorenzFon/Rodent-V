@@ -14,7 +14,7 @@
 - [x] Strict PV node separation in hashing
 - [x] Late Move Reduction (one-ply, non-PV nodes)
 - [x] Full draw detection (50-move rule, insufficient material)
-- [ ] Modern PVS (no beta condition)
+- [x] Modern PVS (no beta condition)
 - [x] History heuristic improvements (like in Chal)
 
 ---
