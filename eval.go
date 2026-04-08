@@ -262,6 +262,28 @@ var pstEG = [6][64]int{
 	},
 }
 
+var phalanxMG = [64]int{
+           0,    0,    0,    0,    0,    0,    0,    0,
+           6,    5,    8,    2,    6,    7,    6,    2,
+          -5,    2,    2,    5,    4,   -1,   -5,   -8,
+          -1,    9,    2,   11,   10,    3,    8,    5,
+          10,   14,   12,   18,   20,   24,   12,   16,
+          24,   25,   23,   16,   18,   24,   25,   24,
+          25,   17,    7,   17,   22,   24,    1,    0,
+           0,    0,    0,    0,    0,    0,    0,    0,
+}
+
+var phalanxEG = [64]int{
+           0,    0,    0,    0,    0,    0,    0,    0,
+          -9,   -5,    0,    3,    4,   -3,   -4,  -14,
+         -12,    0,    4,    4,    0,    1,   -3,   -6,
+          -5,    5,    9,   10,   10,    8,    2,   -8,
+          12,   12,   14,   19,   22,   23,   13,    0,
+          25,   25,   25,   21,   20,   25,   25,   25,
+          25,   25,   25,   25,   25,   25,    0,    1,
+           0,    0,    0,    0,    0,    0,    0,    0,
+}
+
 // passedBonusMG / passedBonusEG: bonus for a passed pawn indexed by
 // [blocked][relativeRank].  relativeRank is 0 at own back rank and 7
 // at the promotion square, so it is the same for White and Black.
@@ -484,6 +506,13 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[P], pieceValEG[P])
 		addPST(e, side, P, sq)
 		e.addAttacks(side, P, pawnAtk[side][sq])
+
+				// phalanx
+
+		b := squareBit(sq);
+		if ShiftSides(b) & p.pieceBB(side, P) > 0 {
+			addPhalanx(e, side, sq);
+		}
 
 		// pushSq: the square directly in front of this pawn.
 		// Pawns can't legally sit on the promotion rank, but guard anyway.
@@ -808,6 +837,16 @@ func evaluateThreats(p *Pos, e *EvalData, side int) {
 	}
 	cnt := popCount(pushThreatBB & nonPawnEnemies)
 	add(e, side, EvalThreats, cnt*pushThreatMG, cnt*pushThreatEG)
+}
+
+func addPhalanx(e *EvalData, side, sq int) {
+	if side == White {
+		add(e, side, EvalPawns, phalanxMG[sq], phalanxEG[sq])
+		return
+	}
+
+	msq := sq ^ 56
+	add(e, side, EvalPst, phalanxMG[msq], phalanxEG[msq])
 }
 
 // TODO: initialize pst tables in a separate file and
