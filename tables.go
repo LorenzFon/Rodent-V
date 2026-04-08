@@ -114,17 +114,15 @@ const (
 
 // Search and engine limits.
 const (
-	maxPly            = 64       // maximum search depth
-	maxMoves          = 256      // maximum legal moves in any position
-	inf               = 32767    // larger than any real score; used as +/-inf
-	mate              = 32000    // base value of checkmate score
-	maxEval           = 29999    // largest returned by evaluate(); mate scores exceed this
-	rfpMargin         = 100      // centipawns per depth for reverse futility pruning (not improving)
-	rfpImpMargin      = 60       // centipawns per depth for reverse futility pruning (improving)
-	noEval            = -inf - 1 // sentinel: no static eval stored for this ply (in check)
-	razorMargin       = 300      // centipawns per depth for razoring
-	histPruneMaxDepth = 7        // max depth for history pruning
-	histPruneMargin   = 1743     // per-depth history score threshold for pruning
+	maxPly       = 64       // maximum search depth
+	maxMoves     = 256      // maximum legal moves in any position
+	inf          = 32767    // larger than any real score; used as +/-inf
+	mate         = 32000    // base value of checkmate score
+	maxEval      = 29999    // largest returned by evaluate(); mate scores exceed this
+	rfpMargin    = 100      // centipawns per depth for reverse futility pruning (not improving)
+	rfpImpMargin = 60       // centipawns per depth for reverse futility pruning (improving)
+	noEval       = -inf - 1 // sentinel: no static eval stored for this ply (in check)
+	razorMargin  = 300      // centipawns per depth for razoring
 )
 
 // startFEN is the standard opening position in FEN notation.
