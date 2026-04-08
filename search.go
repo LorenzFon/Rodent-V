@@ -273,6 +273,17 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		}
 	}
 
+	// --- Mate distance pruning ---
+	// Tighten the window based on the best/worst mate reachable from this ply.
+	// If we already have a proven mate, skip searching slower mates.
+	if !isRoot {
+		alpha = max(alpha, -mate+ply)
+		beta = min(beta, mate-ply-1)
+		if alpha >= beta {
+			return alpha
+		}
+	}
+
 	// Are we in the pv node?
 	isPv := (beta > alpha+1)
 	movesTried := 0
