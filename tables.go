@@ -122,6 +122,7 @@ const (
 	rfpMargin    = 100      // centipawns per depth for reverse futility pruning (not improving)
 	rfpImpMargin = 60       // centipawns per depth for reverse futility pruning (improving)
 	noEval       = -inf - 1 // sentinel: no static eval stored for this ply (in check)
+	razorMargin  = 300      // centipawns per depth for razoring
 )
 
 // startFEN is the standard opening position in FEN notation.
