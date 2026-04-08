@@ -410,6 +410,18 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			newDepth++
 		}
 
+		// History pruning: quiets are sorted by history score, so if this
+		// quiet scores below the threshold all remaining quiets will too.
+		// Break the loop rather than continue.
+		if stage == StageQuiet && !isPv && !nodeInCheck &&
+			depth <= histPruneMaxDepth && !givesCheck {
+			histScore := histTable[p.side][moveFrom(move)][moveTo(move)]
+			if histScore < -histPruneMargin*depth {
+				unmakeMove(p, move, &u)
+				break
+			}
+		}
+
 		// Late move pruning: skip quiet moves beyond the threshold.
 		// Moves that give check are exempt — they may be the only defence
 		// or the only escape from a mating attack.
