@@ -14,36 +14,60 @@ const (
 
 // Shift helpers. White moves north, i.e. toward higher ranks.
 
-func ShiftNorth(b uint64) uint64 { return b << 8 }
-func ShiftSouth(b uint64) uint64 { return b >> 8 }
-func ShiftWest(b uint64) uint64  { return (b & excludeA) >> 1 }
-func ShiftEast(b uint64) uint64  { return (b & excludeH) << 1 }
-func ShiftNW(b uint64) uint64    { return (b & excludeA) << 7 }
-func ShiftNE(b uint64) uint64    { return (b & excludeH) << 9 }
-func ShiftSW(b uint64) uint64    { return (b & excludeA) >> 9 }
-func ShiftSE(b uint64) uint64    { return (b & excludeH) >> 7 }
+func shiftNorth(b uint64) uint64 { return b << 8 }
+func shiftSouth(b uint64) uint64 { return b >> 8 }
+func shiftWest(b uint64) uint64  { return (b & excludeA) >> 1 }
+func shiftEast(b uint64) uint64  { return (b & excludeH) << 1 }
+func shiftNW(b uint64) uint64    { return (b & excludeA) << 7 }
+func shiftNE(b uint64) uint64    { return (b & excludeH) << 9 }
+func shiftSW(b uint64) uint64    { return (b & excludeA) >> 9 }
+func shiftSE(b uint64) uint64    { return (b & excludeH) >> 7 }
 
 // Side-dependent forward shift.
-func ShiftForward(b uint64, side int) uint64 {
+func shiftForward(b uint64, side int) uint64 {
 	if side == White {
-		return ShiftNorth(b)
+		return shiftNorth(b)
 	}
-	return ShiftSouth(b)
+	return shiftSouth(b)
 }
 
 // Shift to both sides.
-func ShiftSides(b uint64) uint64 {
-	return ShiftWest(b) | ShiftEast(b)
+func shiftSides(b uint64) uint64 {
+	return shiftWest(b) | shiftEast(b)
 }
 
 // White pawn attacks.
-func ShiftWPAttacks(b uint64) uint64 {
-	return ShiftNE(b) | ShiftNW(b)
+func shiftWPAttacks(b uint64) uint64 {
+	return shiftNE(b) | shiftNW(b)
 }
 
 // Black pawn attacks.
-func ShiftBPAttacks(b uint64) uint64 {
-	return ShiftSE(b) | ShiftSW(b)
+func shiftBPAttacks(b uint64) uint64 {
+	return shiftSE(b) | shiftSW(b)
+}
+
+// White pawn double attacks.
+func doubleWPAttacks(b uint64) uint64 {
+	return shiftNE(b) & shiftNW(b)
+}
+
+// Black pawn double attacks.
+func doubleBPAttacks(b uint64) uint64 {
+	return shiftSE(b) & shiftSW(b)
+}
+
+func fillNorth(b uint64) uint64 {
+	b |= b << 8
+	b |= b << 16
+	b |= b << 32
+	return b
+}
+
+func fillSouth(b uint64) uint64 {
+	b |= b >> 8
+	b |= b >> 16
+	b |= b >> 32
+	return b
 }
 
 func PrintBitboard(bb uint64) {
