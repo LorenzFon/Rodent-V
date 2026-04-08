@@ -338,6 +338,18 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		return staticEval - rfpDepthMargin*depth
 	}
 
+	// --- Razoring ---
+	// If static eval is far below alpha at shallow depth, the position is
+	// unlikely to improve enough with quiet moves. Drop into qsearch; if
+	// qsearch also fails low, return immediately without searching further.
+	if !isPv && !nodeInCheck && depth <= 3 &&
+		staticEval <= alpha-razorMargin*depth {
+		s := quiesce(p, ply, alpha, beta, pv)
+		if s <= alpha {
+			return s
+		}
+	}
+
 	// --- Null-move pruning ---
 	// Skip if: depth <= 1 (too shallow to be reliable), the position
 	// is already beyond beta, we are in check, or only pawns remain.
