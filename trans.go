@@ -109,7 +109,7 @@ func clearTT() {
 // Even when the score cannot be used for an immediate cutoff, the
 // move hint is still returned so the search can try it first.
 func probeTT(key uint64, move *int, score *int, flag *int, alpha, beta, depth, ply int) bool {
-	base   := int(key) & ttMask
+	base := int(key) & ttMask
 	bucket := tt[base : base+4]
 	for i := range bucket {
 		e := &bucket[i]
@@ -129,8 +129,12 @@ func probeTT(key uint64, move *int, score *int, flag *int, alpha, beta, depth, p
 			} else if *score > maxEval {
 				*score -= ply
 			}
-			// Use the score only if it can produce a cutoff.
-			if (int(e.bound)&UPPER != 0 && *score <= alpha) ||
+			// Use the score if it can produce a cutoff:
+			//   EXACT: always usable.
+			//   LOWER: score is a lower bound; usable when it already beats beta.
+			//   UPPER: score is an upper bound; usable when it already fails alpha.
+			if int(e.bound) == EXACT ||
+				(int(e.bound)&UPPER != 0 && *score <= alpha) ||
 				(int(e.bound)&LOWER != 0 && *score >= beta) {
 				return true
 			}
@@ -152,10 +156,10 @@ func storeTT(key uint64, move, score, bound, depth, ply int) {
 		score += ply
 	}
 
-	base    := int(key) & ttMask
-	bucket  := tt[base : base+4]
+	base := int(key) & ttMask
+	bucket := tt[base : base+4]
 	var replace *Entry
-	oldest  := -1
+	oldest := -1
 
 	for i := range bucket {
 		e := &bucket[i]
@@ -170,7 +174,7 @@ func storeTT(key uint64, move, score, bound, depth, ply int) {
 		// Age score: prefer to replace stale, shallow entries.
 		age := ((ttDate-int(e.date))&255)*256 + (255 - int(e.depth))
 		if age > oldest {
-			oldest  = age
+			oldest = age
 			replace = e
 		}
 	}
@@ -178,9 +182,9 @@ func storeTT(key uint64, move, score, bound, depth, ply int) {
 		replace = &bucket[0]
 	}
 
-	replace.key   = key
-	replace.date  = int16(ttDate)
-	replace.move  = int16(move)
+	replace.key = key
+	replace.date = int16(ttDate)
+	replace.move = int16(move)
 	replace.score = int16(score)
 	replace.bound = uint8(bound)
 	replace.depth = uint8(depth)
