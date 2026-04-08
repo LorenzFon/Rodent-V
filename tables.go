@@ -109,17 +109,19 @@ const (
 	A6, B6, C6, D6, E6, F6, G6, H6 = 40, 41, 42, 43, 44, 45, 46, 47
 	A7, B7, C7, D7, E7, F7, G7, H7 = 48, 49, 50, 51, 52, 53, 54, 55
 	A8, B8, C8, D8, E8, F8, G8, H8 = 56, 57, 58, 59, 60, 61, 62, 63
-	NO_SQ                           = 64 // sentinel for "no square"
+	NO_SQ                          = 64 // sentinel for "no square"
 )
 
 // Search and engine limits.
 const (
-	maxPly   = 64    // maximum search depth
-	maxMoves = 256   // maximum legal moves in any position
-	inf      = 32767 // larger than any real score; used as +/-inf
-	mate     = 32000 // base value of checkmate score
-	maxEval  = 29999 // largest returned by evaluate(); mate scores exceed this
-	rfpMargin = 100  // centipawns per depth for reverse futility pruning
+	maxPly       = 64       // maximum search depth
+	maxMoves     = 256      // maximum legal moves in any position
+	inf          = 32767    // larger than any real score; used as +/-inf
+	mate         = 32000    // base value of checkmate score
+	maxEval      = 29999    // largest returned by evaluate(); mate scores exceed this
+	rfpMargin    = 100      // centipawns per depth for reverse futility pruning (not improving)
+	rfpImpMargin = 60       // centipawns per depth for reverse futility pruning (improving)
+	noEval       = -inf - 1 // sentinel: no static eval stored for this ply (in check)
 )
 
 // startFEN is the standard opening position in FEN notation.
@@ -252,28 +254,34 @@ var pieceValue = [7]int{100, 325, 325, 500, 1000, 0, 0}
 
 func squareBit(sq int) uint64 { return uint64(1) << uint(sq) }
 
-func colorOf(piece int) int    { return piece & 1 }
-func typeOf(piece int) int     { return piece >> 1 }
-func makePiece(c, t int) int   { return (t << 1) | c }
+func colorOf(piece int) int  { return piece & 1 }
+func typeOf(piece int) int   { return piece >> 1 }
+func makePiece(c, t int) int { return (t << 1) | c }
 
-func fileOf(sq int) int        { return sq & 7 }
-func rankOf(sq int) int        { return sq >> 3 }
-func makeSquare(f, r int) int  { return (r << 3) | f }
+func fileOf(sq int) int       { return sq & 7 }
+func rankOf(sq int) int       { return sq >> 3 }
+func makeSquare(f, r int) int { return (r << 3) | f }
 
 // chebyshev returns the Chebyshev (king-move) distance between two squares.
 func chebyshev(a, b int) int {
 	df := fileOf(a) - fileOf(b)
 	dr := rankOf(a) - rankOf(b)
-	if df < 0 { df = -df }
-	if dr < 0 { dr = -dr }
-	if df > dr { return df }
+	if df < 0 {
+		df = -df
+	}
+	if dr < 0 {
+		dr = -dr
+	}
+	if df > dr {
+		return df
+	}
 	return dr
 }
 
-func opp(color int) int        { return color ^ 1 }
+func opp(color int) int { return color ^ 1 }
 
-func lsb(bb uint64) int        { return bits.TrailingZeros64(bb) }
-func popCount(bb uint64) int   { return bits.OnesCount64(bb) }
+func lsb(bb uint64) int      { return bits.TrailingZeros64(bb) }
+func popCount(bb uint64) int { return bits.OnesCount64(bb) }
 
 func abs(x int) int {
 	if x < 0 {
@@ -305,11 +313,11 @@ func maxOf(a, b int) int {
 //   (N_PROM=4 -> N=1, B_PROM=5 -> B=2, R_PROM=6 -> R=3, Q_PROM=7 -> Q=4).
 //
 
-func moveFrom(m int) int    { return m & 63 }
-func moveTo(m int) int      { return (m >> 6) & 63 }
-func moveType(m int) int    { return m >> 12 }
-func isProm(m int) bool     { return m&0x4000 != 0 }
-func promType(m int) int    { return (m >> 12) - 3 }
+func moveFrom(m int) int { return m & 63 }
+func moveTo(m int) int   { return (m >> 6) & 63 }
+func moveType(m int) int { return m >> 12 }
+func isProm(m int) bool  { return m&0x4000 != 0 }
+func promType(m int) int { return (m >> 12) - 3 }
 
 // ================================================================
 // 0x88 BOARD MAPPING
@@ -424,7 +432,7 @@ func initTables() {
 	// Direction vectors in 0x88 space.
 	// dirs[0] = rank (+/-1), dirs[1] = file (+/-16),
 	// dirs[2] = diagonal (+/-17), dirs[3] = anti-diagonal (+/-15).
-	dirs   := [4][2]int{{1, -1}, {16, -16}, {17, -17}, {15, -15}}
+	dirs := [4][2]int{{1, -1}, {16, -16}, {17, -17}, {15, -15}}
 	pMoves := [2][2]int{{15, 17}, {-17, -15}} // pawn attack offsets (0x88)
 	nMoves := [8]int{-33, -31, -18, -14, 14, 18, 31, 33}
 	kMoves := [8]int{-17, -16, -15, -1, 1, 15, 16, 17}

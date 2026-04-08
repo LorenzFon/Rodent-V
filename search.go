@@ -108,13 +108,14 @@ import (
 
 // Global search state.
 var (
-	timeLimit   int64 // allocated move time in ms (-1 = unlimited)
-	pondering   bool  // true while in ponder mode (ignore clock)
-	rootDepth   int   // current iterative deepening depth
-	nodes       int64 // total nodes searched (search-goroutine only; no atomic needed)
-	abortFlag   int32 // set to 1 atomically to stop the search
-	searchStart int64 // Unix ms at the start of think()
-	rootHistLen int   // p.histLen at the moment think() began; used by repetition detection
+	timeLimit   int64       // allocated move time in ms (-1 = unlimited)
+	pondering   bool        // true while in ponder mode (ignore clock)
+	rootDepth   int         // current iterative deepening depth
+	nodes       int64       // total nodes searched (search-goroutine only; no atomic needed)
+	abortFlag   int32       // set to 1 atomically to stop the search
+	searchStart int64       // Unix ms at the start of think()
+	rootHistLen int         // p.histLen at the moment think() began; used by repetition detection
+	evalStack   [maxPly]int // static eval at each ply; noEval sentinel when in check
 )
 
 // lmr[depth][moveIndex] holds the ply reduction for a quiet move tried
@@ -281,7 +282,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	ttFlag := 0
 	score := 0
 	if probeTT(p.key, &ttMove, &score, &ttFlag, alpha, beta, depth, ply) {
-		if ttFlag == EXACT || !isPv {
+		if !isPv {
 			return score
 		}
 	}
@@ -294,12 +295,29 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// Are we in check in this node?
 	nodeInCheck := p.inCheck()
 
-	// Cache the static evaluation; shared by RFP and null-move pruning below.
-	// Skipped when in check: both consumers already bail on nodeInCheck, so
-	// the call would be wasted work.
+	// Cache the static evaluation; shared by RFP, improving, and null-move pruning.
+	// Store in evalStack for the improving heuristic (ply-2 comparison).
+	// When in check we store a sentinel so the improving check below works correctly.
 	staticEval := 0
 	if !nodeInCheck {
 		staticEval = evaluate(p)
+		evalStack[ply] = staticEval
+	} else {
+		evalStack[ply] = noEval
+	}
+
+	// --- Improving heuristic ---
+	// "Improving" means our static eval is better than it was two plies ago
+	// (our previous turn). When improving we use tighter pruning margins —
+	// the position is trending up so we are less likely to collapse below beta.
+	// Default to true when no prior eval is available (early plies, post-check).
+	improving := true
+	if nodeInCheck {
+		improving = false
+	} else if ply >= 2 && evalStack[ply-2] != noEval {
+		improving = staticEval > evalStack[ply-2]
+	} else if ply >= 4 && evalStack[ply-4] != noEval {
+		improving = staticEval > evalStack[ply-4]
 	}
 
 	// --- Reverse futility pruning ---
@@ -308,9 +326,16 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// The mate guard prevents pruning when beta is a mate score, where the
 	// static eval is unreliable.  We return the margin-adjusted value rather
 	// than the raw static eval to avoid inflating the returned score.
+
+	// Use a tighter margin when improving (position is gaining ground).
+	// Wider margin when not improving avoids over-pruning a deteriorating line.
+	rfpDepthMargin := rfpMargin
+	if improving {
+		rfpDepthMargin = rfpImpMargin
+	}
 	if !isPv && !nodeInCheck && depth <= 7 && beta < mate-maxPly &&
-		staticEval-rfpMargin*depth >= beta {
-		return staticEval - rfpMargin*depth
+		staticEval-rfpDepthMargin*depth >= beta {
+		return staticEval - rfpDepthMargin*depth
 	}
 
 	// --- Null-move pruning ---
@@ -376,8 +401,14 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		// Late move pruning: skip quiet moves beyond the threshold.
 		// Moves that give check are exempt — they may be the only defence
 		// or the only escape from a mating attack.
+		// When improving we allow more moves (position is trending up, so
+		// later moves are more likely to be relevant).
+		lmpThreshold := 4*depth + 1
+		if improving {
+			lmpThreshold = 6*depth + 1
+		}
 		if stage == StageQuiet && !isPv && !nodeInCheck && depth < 4 &&
-			quietTried > 4*depth+1 && !givesCheck {
+			quietTried > lmpThreshold && !givesCheck {
 			unmakeMove(p, move, &u)
 			continue
 		}
@@ -387,10 +418,14 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 		// Late move reduction
 		isReduced := false
-		if stage == StageQuiet && depth > 2 && !nodeInCheck && !givesCheck && movesTried >= 3 {
+		if stage == StageQuiet && depth > 2 && !nodeInCheck && !givesCheck && movesTried >= 4 {
 			reduction := lmr[min(depth, 63)][min(movesTried, 63)]
 			if reduction > 0 {
 				if !isPv {
+					reduction++
+				}
+				// Not improving: position is trending down, reduce more aggressively.
+				if !improving {
 					reduction++
 				}
 				if reduction > newDepth-1 {
