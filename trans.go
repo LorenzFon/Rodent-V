@@ -108,7 +108,7 @@ func clearTT() {
 //
 // Even when the score cannot be used for an immediate cutoff, the
 // move hint is still returned so the search can try it first.
-func probeTT(key uint64, move *int, score *int, flag *int, alpha, beta, depth, ply int) bool {
+func probeTT(key uint64, move *int, score *int, flag *int, ttDepth *int, alpha, beta, depth, ply int) bool {
 	base := int(key) & ttMask
 	bucket := tt[base : base+4]
 	for i := range bucket {
@@ -120,15 +120,18 @@ func probeTT(key uint64, move *int, score *int, flag *int, alpha, beta, depth, p
 		e.date = int16(ttDate)
 		*move = int(e.move)
 		*flag = int(e.bound)
+		*ttDepth = int(e.depth)
+
+		// Always decode the score on a key match so callers (e.g. singular
+		// extensions) can use it even when depth is insufficient for a cutoff.
+		*score = int(e.score)
+		if *score < -maxEval {
+			*score += ply
+		} else if *score > maxEval {
+			*score -= ply
+		}
 
 		if int(e.depth) >= depth {
-			*score = int(e.score)
-			// Adjust mate scores back to ply-relative form.
-			if *score < -maxEval {
-				*score += ply
-			} else if *score > maxEval {
-				*score -= ply
-			}
 			// Use the score if it can produce a cutoff:
 			//   EXACT: always usable.
 			//   LOWER: score is a lower bound; usable when it already beats beta.

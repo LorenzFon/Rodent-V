@@ -108,18 +108,19 @@ import (
 
 // Global search state.
 var (
-	timeLimit   int64        // allocated move time in ms (-1 = unlimited)
-	pondering   bool         // true while in ponder mode (ignore clock)
-	rootDepth   int          // current iterative deepening depth
-	nodes       int64        // total nodes searched (search-goroutine only; no atomic needed)
-	abortFlag   int32        // set to 1 atomically to stop the search
-	searchStart int64        // Unix ms at the start of think()
-	rootHistLen int          // p.histLen at the moment think() began; used by repetition detection
-	evalStack   [maxPly]int  // static eval at each ply; noEval sentinel when in check
-	contSide    [maxPly]int  // side that made the move at this ply (for cont hist)
-	contPiece   [maxPly]int  // piece type (0-5) that moved at this ply
-	contTo      [maxPly]int  // destination square at this ply
-	contValid   [maxPly]bool // false for null moves and unvisited plies
+	timeLimit    int64        // allocated move time in ms (-1 = unlimited)
+	pondering    bool         // true while in ponder mode (ignore clock)
+	rootDepth    int          // current iterative deepening depth
+	nodes        int64        // total nodes searched (search-goroutine only; no atomic needed)
+	abortFlag    int32        // set to 1 atomically to stop the search
+	searchStart  int64        // Unix ms at the start of think()
+	rootHistLen  int          // p.histLen at the moment think() began; used by repetition detection
+	evalStack    [maxPly]int  // static eval at each ply; noEval sentinel when in check
+	contSide     [maxPly]int  // side that made the move at this ply (for cont hist)
+	contPiece    [maxPly]int  // piece type (0-5) that moved at this ply
+	contTo       [maxPly]int  // destination square at this ply
+	contValid    [maxPly]bool // false for null moves and unvisited plies
+	excludedMove [maxPly]int  // move excluded during singular extension search (0 = none)
 )
 
 // lmr[depth][moveIndex] holds the ply reduction for a quiet move tried
@@ -296,12 +297,14 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// --- Transposition table probe ---
 	ttMove := 0
 	ttFlag := 0
+	ttDepth := 0
 	score := 0
-	if probeTT(p.key, &ttMove, &score, &ttFlag, alpha, beta, depth, ply) {
-		if !isPv {
+	if probeTT(p.key, &ttMove, &score, &ttFlag, &ttDepth, alpha, beta, depth, ply) {
+		if !isPv && excludedMove[ply] == 0 {
 			return score
 		}
 	}
+	ttScore := score // save TT score before NMP/LMR overwrites the score variable
 
 	// Safeguard against hitting max ply limit
 	if ply >= maxPly-1 {
@@ -350,6 +353,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		rfpDepthMargin = rfpImpMargin
 	}
 	if !isPv && !nodeInCheck && depth <= 7 && beta < mate-maxPly &&
+		excludedMove[ply] == 0 &&
 		staticEval-rfpDepthMargin*depth >= beta {
 		return staticEval - rfpDepthMargin*depth
 	}
@@ -359,6 +363,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// unlikely to improve enough with quiet moves. Drop into qsearch; if
 	// qsearch also fails low, return immediately without searching further.
 	if !isPv && !nodeInCheck && depth <= 3 &&
+		excludedMove[ply] == 0 &&
 		staticEval <= alpha-razorMargin*depth {
 		s := quiesce(p, ply, alpha, beta, pv)
 		if s <= alpha {
@@ -369,7 +374,8 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// --- Null-move pruning ---
 	// Skip if: depth <= 1 (too shallow to be reliable), the position
 	// is already beyond beta, we are in check, or only pawns remain.
-	if depth > 1 && !isPv && !nodeInCheck && p.canNullMove() && beta <= staticEval {
+	if depth > 1 && !isPv && !nodeInCheck && p.canNullMove() && beta <= staticEval &&
+		excludedMove[ply] == 0 {
 		contValid[ply] = false // null move: no valid piece context for cont hist
 		var u Undo
 		makeNullMove(p, &u)
@@ -412,6 +418,39 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			break
 		}
 
+		// Skip the move excluded during a singular extension search.
+		if move == excludedMove[ply] {
+			continue
+		}
+
+		// --- Singular extension ---
+		// When the TT move is reliable and deep enough, check if it's the
+		// only good move by searching without it at reduced depth. If all
+		// other moves fail below a margin, extend this move by +1 ply.
+		// Negative extension: if the position isn't singular AND the TT
+		// score already beats beta, reduce aggressively (multi-cut signal).
+		extension := 0
+		if move == ttMove &&
+			excludedMove[ply] == 0 &&
+			depth >= 8 &&
+			ttDepth >= depth-3 &&
+			ttFlag != UPPER &&
+			abs(ttScore) < mate-maxPly {
+			sBeta := ttScore - 6*depth
+			// The SE sub-search calls search(p, ply, ...) which reinitialises
+			// moveBuffers[ply], destroying the main loop's picker state.
+			// Save and restore the picker around the sub-search.
+			savedPicker := *picker
+			excludedMove[ply] = move
+			var sePv [maxPly]int
+			sScore := search(p, ply, sBeta-1, sBeta, (depth-1)/2, sePv[:])
+			excludedMove[ply] = 0
+			*picker = savedPicker
+			if sScore < sBeta {
+				extension = 1
+			}
+		}
+
 		// Capture piece type before makeMove — after the call the square
 		// may hold a promoted piece rather than the original pawn.
 		movedPiece := p.typeAt(moveFrom(move))
@@ -433,8 +472,8 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 		givesCheck := p.inCheck()
 
-		// Extend by one ply for moves that give check.
-		newDepth := depth - 1
+		// Extend by one ply for moves that give check, plus singular extension.
+		newDepth := depth - 1 + extension
 		if givesCheck {
 			newDepth++
 		}
@@ -508,7 +547,9 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			if isQuiet(p, move) {
 				updateHistory(p, move, depth, ply, quietsMade[:quietsMadeCount])
 			}
-			storeTT(p.key, move, score, LOWER, depth, ply)
+			if excludedMove[ply] == 0 {
+				storeTT(p.key, move, score, LOWER, depth, ply)
+			}
 			return score
 		}
 
@@ -534,6 +575,11 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 
 	// --- Handle terminal nodes ---
 	if bestScore == -inf {
+		// In a singular extension sub-search the excluded move may have been
+		// the only legal move; that's not checkmate or stalemate, just failure.
+		if excludedMove[ply] != 0 {
+			return alpha
+		}
 		if p.inCheck() {
 			return -mate + ply // checkmate: prefer shorter mates
 		}
@@ -547,13 +593,17 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	}
 
 	// Store the result in the TT with the appropriate bound type.
-	if bestMove != 0 {
-		if isQuiet(p, bestMove) {
-			updateHistory(p, bestMove, depth, ply, nil)
+	// Skip during singular extension sub-searches: their partial results
+	// (with one move excluded) must not corrupt the main TT entries.
+	if excludedMove[ply] == 0 {
+		if bestMove != 0 {
+			if isQuiet(p, bestMove) {
+				updateHistory(p, bestMove, depth, ply, nil)
+			}
+			storeTT(p.key, bestMove, bestScore, EXACT, depth, ply)
+		} else {
+			storeTT(p.key, 0, bestScore, UPPER, depth, ply)
 		}
-		storeTT(p.key, bestMove, bestScore, EXACT, depth, ply)
-	} else {
-		storeTT(p.key, 0, bestScore, UPPER, depth, ply)
 	}
 	return bestScore
 }
