@@ -108,14 +108,18 @@ import (
 
 // Global search state.
 var (
-	timeLimit   int64       // allocated move time in ms (-1 = unlimited)
-	pondering   bool        // true while in ponder mode (ignore clock)
-	rootDepth   int         // current iterative deepening depth
-	nodes       int64       // total nodes searched (search-goroutine only; no atomic needed)
-	abortFlag   int32       // set to 1 atomically to stop the search
-	searchStart int64       // Unix ms at the start of think()
-	rootHistLen int         // p.histLen at the moment think() began; used by repetition detection
-	evalStack   [maxPly]int // static eval at each ply; noEval sentinel when in check
+	timeLimit   int64        // allocated move time in ms (-1 = unlimited)
+	pondering   bool         // true while in ponder mode (ignore clock)
+	rootDepth   int          // current iterative deepening depth
+	nodes       int64        // total nodes searched (search-goroutine only; no atomic needed)
+	abortFlag   int32        // set to 1 atomically to stop the search
+	searchStart int64        // Unix ms at the start of think()
+	rootHistLen int          // p.histLen at the moment think() began; used by repetition detection
+	evalStack   [maxPly]int  // static eval at each ply; noEval sentinel when in check
+	contSide    [maxPly]int  // side that made the move at this ply (for cont hist)
+	contPiece   [maxPly]int  // piece type (0-5) that moved at this ply
+	contTo      [maxPly]int  // destination square at this ply
+	contValid   [maxPly]bool // false for null moves and unvisited plies
 )
 
 // lmr[depth][moveIndex] holds the ply reduction for a quiet move tried
@@ -169,6 +173,7 @@ func think(p *Pos, maxDepth int) {
 	atomic.StoreInt32(&abortFlag, 0)
 	searchStart = time.Now().UnixMilli()
 	rootHistLen = p.histLen
+	contValid = [maxPly]bool{} // reset cont hist context; stale entries from prev search must not be used
 
 	var pv [maxPly]int
 	score := 0
@@ -365,6 +370,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// Skip if: depth <= 1 (too shallow to be reliable), the position
 	// is already beyond beta, we are in check, or only pawns remain.
 	if depth > 1 && !isPv && !nodeInCheck && p.canNullMove() && beta <= staticEval {
+		contValid[ply] = false // null move: no valid piece context for cont hist
 		var u Undo
 		makeNullMove(p, &u)
 		var nullPv [maxPly]int
@@ -406,12 +412,24 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			break
 		}
 
+		// Capture piece type before makeMove — after the call the square
+		// may hold a promoted piece rather than the original pawn.
+		movedPiece := p.typeAt(moveFrom(move))
+
 		var u Undo
 		makeMove(p, move, &u)
 		if p.selfInCheck() { // move left our king in check: illegal
 			unmakeMove(p, move, &u)
 			continue
 		}
+
+		// Record this move in the cont hist context stack so child nodes
+		// can look it up as their "1-ply back" context.
+		// p.side has flipped after makeMove, so the mover was p.side^1.
+		contSide[ply] = p.side ^ 1
+		contPiece[ply] = movedPiece
+		contTo[ply] = moveTo(move)
+		contValid[ply] = true
 
 		givesCheck := p.inCheck()
 

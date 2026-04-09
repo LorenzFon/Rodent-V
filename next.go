@@ -50,9 +50,10 @@ const maxHist = 16384
 
 // Global heuristic tables, reset before each new search.
 var (
-	histTable   [2][64][64]int     // history[side][fromSq][toSq]
-	killerMoves [maxPly][2]int     // killerMoves[ply][0..1]
-	moveBuffers [maxPly]MovePicker // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
+	histTable    [2][64][64]int          // history[side][fromSq][toSq]
+	contHistMain [2][6][64][2][6][64]int // continuation history[prevSide][prevPieceType][prevTo][side][pieceType][to]
+	killerMoves  [maxPly][2]int          // killerMoves[ply][0..1]
+	moveBuffers  [maxPly]MovePicker      // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
 )
 
 type MoveGenStage int
@@ -78,6 +79,7 @@ type MovePicker struct {
 	ttMove   int           // the transposition table move hint
 	killer1  int           // first killer move for this ply
 	killer2  int           // second killer move for this ply
+	ply      int           // search ply, for continuation history lookup
 	cur      int           // next index to yield from move[]
 	end      int           // one-past-last valid index in move[]
 	move     [maxMoves]int // move buffer (reused for captures then quiets)
@@ -95,6 +97,7 @@ func initMovePicker(p *Pos, m *MovePicker, transMove, ply int) {
 	m.ttMove = transMove
 	m.killer1 = killerMoves[ply][0]
 	m.killer2 = killerMoves[ply][1]
+	m.ply = ply
 }
 
 // nextMove returns the next move to try, in priority order, plus the
@@ -217,11 +220,24 @@ func scoreCaptures(m *MovePicker) {
 	}
 }
 
-// scoreQuiet assigns history heuristic scores to quiet moves.
+// scoreQuiet assigns history heuristic scores to quiet moves,
+// including 1-ply and 2-ply continuation history.
 func scoreQuiet(m *MovePicker) {
 	side := m.p.side
+	ply := m.ply
 	for i := 0; i < m.end; i++ {
-		m.value[i] = histTable[side][moveFrom(m.move[i])][moveTo(m.move[i])]
+		mv := m.move[i]
+		from := moveFrom(mv)
+		to := moveTo(mv)
+		pt := m.p.typeAt(from) // piece type (0-5)
+		score := histTable[side][from][to]
+		if ply >= 1 && contValid[ply-1] {
+			score += contHistMain[contSide[ply-1]][contPiece[ply-1]][contTo[ply-1]][side][pt][to]
+		}
+		if ply >= 2 && contValid[ply-2] {
+			score += contHistMain[contSide[ply-2]][contPiece[ply-2]][contTo[ply-2]][side][pt][to]
+		}
+		m.value[i] = score
 	}
 }
 
@@ -282,17 +298,9 @@ func mvvLva(p *Pos, move int) int {
 // so that scores from a different root position do not contaminate
 // the ordering.
 func clearHistory() {
-	for s := 0; s < 2; s++ {
-		for i := 0; i < 64; i++ {
-			for j := 0; j < 64; j++ {
-				histTable[s][i][j] = 0
-			}
-		}
-	}
-	for i := 0; i < maxPly; i++ {
-		killerMoves[i][0] = 0
-		killerMoves[i][1] = 0
-	}
+	histTable = [2][64][64]int{}
+	contHistMain = [2][6][64][2][6][64]int{}
+	killerMoves = [maxPly][2]int{}
 }
 
 // histBonus returns the bonus/malus value for a history update at the
@@ -327,18 +335,32 @@ func isQuiet(p *Pos, move int) bool {
 // Killers store the two most recent cutoff moves at this ply.
 func updateHistory(p *Pos, move, depth, ply int, quietsTried []int) {
 	bonus := histBonus(depth)
+	malus := -bonus
+	side := p.side
+
+	// Helper: update cont hist entries for a move at 1-ply and 2-ply back.
+	updateCont := func(mv, delta int) {
+		pt := p.typeAt(moveFrom(mv))
+		to := moveTo(mv)
+		if ply >= 1 && contValid[ply-1] {
+			histUpdate(&contHistMain[contSide[ply-1]][contPiece[ply-1]][contTo[ply-1]][side][pt][to], delta)
+		}
+		if ply >= 2 && contValid[ply-2] {
+			histUpdate(&contHistMain[contSide[ply-2]][contPiece[ply-2]][contTo[ply-2]][side][pt][to], delta)
+		}
+	}
 
 	// Reward the cutoff move.
-	side := p.side
 	histUpdate(&histTable[side][moveFrom(move)][moveTo(move)], bonus)
+	updateCont(move, bonus)
 
 	// Penalise all quiets that were searched but did not cut off.
-	malus := -bonus
 	for _, tried := range quietsTried {
 		if tried == move {
 			continue
 		}
 		histUpdate(&histTable[side][moveFrom(tried)][moveTo(tried)], malus)
+		updateCont(tried, malus)
 	}
 
 	// Update killers.

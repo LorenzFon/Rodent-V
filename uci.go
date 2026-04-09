@@ -100,6 +100,8 @@ func uciLoop() {
 		case "ucinewgame":
 			stopSearch()
 			clearTT()
+			clearHistory()
+			contValid = [maxPly]bool{}
 			parseFEN(&p, startFEN)
 
 		case "position":
