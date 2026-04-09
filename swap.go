@@ -61,7 +61,7 @@ func swap(p *Pos, from, to int) int {
 	// capturing piece which is no longer on the board.
 	attackers := attacksTo(p, to)
 	attackers |= (bishopAttacks(occ, to) & (p.typeBB[B] | p.typeBB[Q])) |
-		(rookAttacks(occ, to) & (p.typeBB[R] | p.typeBB[Q]))
+				 (rookAttacks(occ, to) & (p.typeBB[R] | p.typeBB[Q]))
 	attackers &= occ
 
 	side := opp(p.side) // opponent moves first (they recapture)
@@ -92,8 +92,16 @@ func swap(p *Pos, from, to int) int {
 		// Remove one attacker (the LSB of candidates) and reveal any
 		// X-ray attackers behind it.
 		occ ^= candidates & (^candidates + 1)
-		attackers |= (bishopAttacks(occ, to) & (p.typeBB[B] | p.typeBB[Q])) |
-					(rookAttacks(occ, to) & (p.typeBB[R] | p.typeBB[Q]))
+
+		// Regenerate attacks along the ray vacated by removed attacker
+		if (attType == P || attType == B || attType == Q) {
+			attackers |= (bishopAttacks(occ, to) & (p.typeBB[B] | p.typeBB[Q]))
+		}
+
+		if (attType == R || attType == Q) {
+			attackers |= (rookAttacks(occ, to) & (p.typeBB[R] | p.typeBB[Q]))
+		}
+
 		attackers &= occ
 
 		side ^= 1
