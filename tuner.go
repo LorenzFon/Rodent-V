@@ -12,6 +12,9 @@ import (
 
 var kConst = 1.335
 
+// All epds, regardless of score 
+var epdLines[]string
+
 // Full loaded datasets.
 var allEpd10 []string
 var allEpd01 []string
@@ -55,6 +58,10 @@ func loadTunerFile() {
 			fmt.Printf("%d positions loaded\n", readCnt)
 		}
 
+		// all epd array
+		epdLines = append(epdLines, line)
+
+		// per-score arrays
 		switch {
 		case strings.Contains(line, "1/2-1/2"):
 			allEpd05 = append(allEpd05, line)
@@ -173,7 +180,7 @@ func texelFit() float64 {
 		iteration++
 		parseFEN(&p, epd10[i])
 
-		score := evaluate(&p)
+		score := eval_internal(&p, false)
 		if p.side == Black {
 			score = -score
 		}
@@ -188,7 +195,7 @@ func texelFit() float64 {
 		iteration++
 		parseFEN(&p, epd01[i])
 
-		score := evaluate(&p)
+		score := eval_internal(&p, false)
 		if p.side == Black {
 			score = -score
 		}
@@ -203,7 +210,7 @@ func texelFit() float64 {
 		iteration++
 		parseFEN(&p, epd05[i])
 
-		score := evaluate(&p)
+		score := eval_internal(&p, false)
 		if p.side == Black {
 			score = -score
 		}
@@ -221,6 +228,9 @@ func texelFit() float64 {
 }
 
 func tunerFree() {
+
+	epdLines = nil
+
 	epd10 = nil
 	epd01 = nil
 	epd05 = nil
@@ -267,14 +277,74 @@ func tunePST(table *[6][64]int, tableName string, samplePerBucket int) {
 var pstLabels = [6]string{"P", "N", "B", "R", "Q", "K"}
 var pstPieceName = [6]string{"pawn", "knight", "bishop", "rook", "queen", "king"}
 
-func printPSTSet() {
-	printOnePST("pstMG", &pstMG)
-	fmt.Println()
-	printOnePST("pstEG", &pstEG)
+// prints one-dimensional table; var table can be a slice,
+// which allows to print different-sized tables using one function
+func print1DTable(name string, table []int) {
+	fmt.Printf("var %s = [%d]int{", name, len(table))
+
+	for i, v := range table {
+		if i > 0 {
+			fmt.Print(", ")
+		}
+		fmt.Printf("%d", v)
+	}
+
+	fmt.Println("}")
+}
+
+// prints two-dimensional table, assuming first dimenson is [2].
+// uses a slice to allows printing different-sized tables with one function
+func print2DTable(name string, table [][]int) {
+	fmt.Printf("var %s = [2][%d]int{\n", name, len(table[0]))
+
+	for row := 0; row < 2; row++ {
+		fmt.Printf("\t%d: {", row)
+		for col, v := range table[row] {
+			if col > 0 {
+				fmt.Print(", ")
+			}
+			fmt.Printf("%d", v)
+		}
+		fmt.Println("},")
+	}
+
+	fmt.Println("}")
+}
+
+func printSinglePST(varName string, label string, table *[64]int) {
+	if varName != "" {
+		fmt.Printf("var %s = [64]int{\n", varName)
+	} else {
+		fmt.Printf("\t%s: {\n", label)
+	}
+
+	for row := 0; row < 8; row++ {
+		start := row * 8
+
+		if varName != "" {
+			fmt.Print("\t")
+		} else {
+			fmt.Print("\t\t")
+		}
+
+		for i := 0; i < 8; i++ {
+			if i > 0 {
+				fmt.Print(", ")
+			}
+			fmt.Printf("%4d", table[start+i])
+		}
+		fmt.Println(",")
+	}
+
+	if varName != "" {
+		fmt.Println("}")
+	} else {
+		fmt.Println("\t},")
+	}
 }
 
 // prints a set of piece/square tables for all the pieces
-func printOnePST(name string, pst *[6][64]int) {
+func printPSTforAllPieces(name string, pst *[6][64]int) {
 	fmt.Printf("var %s = [6][64]int{\n", name)
 
 	for piece := 0; piece < 6; piece++ {
@@ -309,42 +379,13 @@ func printOnePST(name string, pst *[6][64]int) {
 	fmt.Println("}")
 }
 
-func printPerRank2D(name string, table *[2][8]int) {
-	fmt.Printf("var %s = [2][8]int{\n", name)
-	for row := 0; row < 2; row++ {
-		comment := "free"
-		if row == 1 {
-			comment = "blocked"
-		}
-		fmt.Printf("\t%d: {%d, %d, %d, %d, %d, %d, %d, %d}, // %s\n",
-			row,
-			table[row][0], table[row][1], table[row][2], table[row][3],
-			table[row][4], table[row][5], table[row][6], table[row][7],
-			comment,
-		)
-	}
-	fmt.Println("}")
+func printPSTSet() {
+	printPSTforAllPieces("pstMG", &pstMG)
+	fmt.Println()
+	printPSTforAllPieces("pstEG", &pstEG)
 }
 
-func printPerRank1D(name string, table *[8]int) {
-	fmt.Printf("var %s = [8]int{%d, %d, %d, %d, %d, %d, %d, %d}\n",
-		name,
-		table[0], table[1], table[2], table[3],
-		table[4], table[5], table[6], table[7],
-	)
-}
-
-func printPerPiece2D(name string, table *[2][6]int) {
-	fmt.Printf("var %s = [2][6]int{\n", name)
-	for row := 0; row < 2; row++ {
-		fmt.Printf("\t%d: {%d, %d, %d, %d, %d, %d},\n",
-			row,
-			table[row][0], table[row][1], table[row][2],
-			table[row][3], table[row][4], table[row][5],
-		)
-	}
-	fmt.Println("}")
-}
+//--- SIMPLE ARRAY TUNERS --- //
 
 func tunePerPiece1D(table *[6]int, tableName string, samplePerBucket int) {
 	tunerInitBatch(samplePerBucket)
@@ -367,13 +408,6 @@ func tunePerPiece1D(table *[6]int, tableName string, samplePerBucket int) {
 	}
 
 	fmt.Printf("Finished batch %s, final fit = %.6f\n", tableName, bestFit)
-}
-
-func printPerPiece1D(name string, table *[6]int) {
-	fmt.Printf("var %s = [6]int{%d, %d, %d, %d, %d, %d}\n",
-		name,
-		table[0], table[1], table[2], table[3], table[4], table[5],
-	)
 }
 
 // tunePerRank2D tunes a [2][8]int table in the same style as tunePST.
@@ -487,8 +521,8 @@ func pstTuningSession() {
 		for i := 0; i < 100; i++ {
 			tunePST(&pstMG, "pstMG", 5000)
 			tunePST(&pstEG, "pstEG", 5000)
-			printOnePST("pstMG", &pstMG)
-			printOnePST("pstEG", &pstEG)
+			printPSTforAllPieces("pstMG", &pstMG)
+			printPSTforAllPieces("pstEG", &pstEG)
 	}
 }
 
@@ -502,13 +536,13 @@ func passerTuningSession() {
 		tunePerRank1D(&theirPasserProximityMG, "theirPasserProximityMG", 5000)
 		tunePerRank1D(&theirPasserProximityEG, "theirPasserProximityEG", 5000)
 
-		printPerRank2D("passedBonusMG", &passedBonusMG)
-		printPerRank2D("passedBonusEG", &passedBonusEG)
+		print2DTable("passedBonusMG", [][]int{ passedBonusMG[0][:], passedBonusMG[1][:],})
+		print2DTable("passedBonusEG", [][]int{ passedBonusEG[0][:], passedBonusEG[1][:],})
 
-		printPerRank1D("ourPasserProximityMG", &ourPasserProximityMG)
-		printPerRank1D("ourPasserProximityEG", &ourPasserProximityEG)
-		printPerRank1D("theirPasserProximityMG", &theirPasserProximityMG)
-		printPerRank1D("theirPasserProximityEG", &theirPasserProximityEG)
+		print1DTable("ourPasserProximityMG", ourPasserProximityMG[:])
+		print1DTable("ourPasserProximityEG", ourPasserProximityEG[:])
+		print1DTable("theirPasserProximityMG", theirPasserProximityMG[:])
+		print1DTable("theirPasserProximityEG", theirPasserProximityEG[:])
 	}
 }
 
@@ -533,22 +567,235 @@ func threatTuningSession() {
 		tunePerPiece1D(&threatByKingMG, "threatByKingMG", 5000)
 		tunePerPiece1D(&threatByKingEG, "threatByKingEG", 5000)
 
-		printPerPiece1D("threatByPawnMG", &threatByPawnMG)
-		printPerPiece1D("threatByPawnEG", &threatByPawnEG)
+		print1DTable("threatByPawnMG", threatByPawnMG[:])
+		print1DTable("threatByPawnEG", threatByPawnEG[:])
 
-		printPerPiece2D("threatByKnightMG", &threatByKnightMG)
-		printPerPiece2D("threatByKnightEG", &threatByKnightEG)
+		print2DTable("threatByKnightMG", [][]int{ threatByKnightMG[0][:], threatByKnightMG[1][:],})
+		print2DTable("threatByKnightEG", [][]int{ threatByKnightEG[0][:], threatByKnightEG[1][:],})
 
-		printPerPiece2D("threatByBishopMG", &threatByBishopMG)
-		printPerPiece2D("threatByBishopEG", &threatByBishopEG)
+		print2DTable("threatByBishopMG", [][]int{ threatByBishopMG[0][:], threatByBishopMG[1][:],})
+		print2DTable("threatByBishopEG", [][]int{ threatByBishopEG[0][:], threatByBishopEG[1][:],})
 
-		printPerPiece2D("threatByRookMG", &threatByRookMG)
-		printPerPiece2D("threatByRookEG", &threatByRookEG)
+		print2DTable("threatByRookMG", [][]int{ threatByRookMG[0][:], threatByRookMG[1][:],})
+		print2DTable("threatByRookEG", [][]int{ threatByRookEG[0][:], threatByRookEG[1][:],})
 
-		printPerPiece2D("threatByQueenMG", &threatByQueenMG)
-		printPerPiece2D("threatByQueenEG", &threatByQueenEG)
+		print2DTable("threatByQueenMG", [][]int{ threatByQueenMG[0][:], threatByQueenMG[1][:],})
+		print2DTable("threatByQueenEG", [][]int{ threatByQueenEG[0][:], threatByQueenEG[1][:],})
 
-		printPerPiece1D("threatByKingMG", &threatByKingMG)
-		printPerPiece1D("threatByKingEG", &threatByKingEG)
+		print1DTable("threatByKingMG", threatByKingMG[:])
+		print1DTable("threatByKingEG", threatByKingEG[:])
 	}
+}
+
+// Second tuner with data extraction
+
+type PhalanxTunePos struct {
+	Result    float64
+	BaseScore int
+	Phase     int
+	Feature   [64]int
+}
+
+func ExtractTuneData(epdLines []string) []PhalanxTunePos {
+	loadTunerFile()
+	var p Pos
+	result := 0.0
+	out := make([]PhalanxTunePos, 0, len(epdLines))
+
+	for _, line := range epdLines {
+		
+		parseFEN(&p, line)
+
+		result = 0.5
+		if strings.Contains(line, "1-0") {
+			result = 1.0
+		} else if strings.Contains(line, "0-1") {
+			result = 0.0
+		}
+		  
+
+		baseScore := eval_internal(&p, false)
+		if p.side == Black { baseScore = -baseScore }
+		phase := extractPhase(line);
+
+		var rec PhalanxTunePos
+		rec.Result = result
+		rec.BaseScore = baseScore
+		rec.Phase = phase
+		rec.Feature = extractFeatures(&p)
+
+		out = append(out, rec)
+	}
+
+	return out
+}
+
+func extractPhase(fen string) int {
+	phase := 0
+
+	// Board part is the first space-separated field in FEN.
+	board := fen
+	if sp := strings.IndexByte(fen, ' '); sp >= 0 {
+		board = fen[:sp]
+	}
+
+	for i := 0; i < len(board); i++ {
+		switch board[i] {
+		case 'n', 'N', 'b', 'B':
+			phase += 1
+		case 'r', 'R':
+			phase += 2
+		case 'q', 'Q':
+			phase += 4
+		}
+	}
+
+	if phase > 24 {
+		phase = 24
+	}
+	return phase
+}
+
+// This needs to be changed, depending what feature we are tuning
+func extractFeatures(p *Pos) [64]int {
+	var feat [64]int
+
+	whitePawns := p.pieceBB(White, P)
+	blackPawns := p.pieceBB(Black, P)
+	allWhitePawns := whitePawns
+	allBlackPawns := blackPawns
+
+	// White phalanx: pawn has a friendly pawn on adjacent file, same rank.
+	for bb := whitePawns; bb != 0; bb &= bb - 1 {
+		sq := lsb(bb)
+		if isPhalanxPawn(allWhitePawns, sq) {
+			feat[sq]++
+		}
+	}
+
+	// Black phalanx: mirror square so one shared White-oriented table works.
+	for bb := blackPawns; bb != 0; bb &= bb - 1 {
+		sq := lsb(bb)
+		if isPhalanxPawn(allBlackPawns, sq) {
+			feat[sq^56]--
+		}
+	}
+
+	return feat
+}
+
+func isPhalanxPawn(pawns uint64, sq int) bool{
+     b := squareBit(sq)
+     return shiftSides(b) & pawns != 0
+}
+
+func scorePhalanxTunePos(tp *PhalanxTunePos, phalanxMG, phalanxEG *[64]int) int {
+	mg := 0
+	eg := 0
+
+	for sq := 0; sq < 64; sq++ {
+		f := int(tp.Feature[sq])
+		if f != 0 {
+			mg += f * phalanxMG[sq]
+			eg += f * phalanxEG[sq]
+		}
+	}
+
+	phScore := (mg*tp.Phase + eg*(24-tp.Phase)) / 24
+	return tp.BaseScore + phScore
+}
+
+func texelFitComposite(data []PhalanxTunePos) float64 {
+	if len(data) == 0 {
+		return 0.0
+	}
+
+	var total float64
+
+	for i := range data {
+		score := scorePhalanxTunePos(&data[i], &phalanxMG, &phalanxEG)
+		pred := texelSigmoid(score, kConst)
+		diff := data[i].Result - pred
+		total += diff * diff
+	}
+
+	return total / float64(len(data))
+}
+
+func phalanxTuningSession() {
+	loadTunerFile()
+	if !tunerLoaded {
+		fmt.Println("tuner data not loaded")
+		return
+	}
+
+	fmt.Printf("Extracting phalanx tune data from %d positions...\n", len(epdLines))
+	data := ExtractTuneData(epdLines)
+	fmt.Printf("Extracted %d phalanx tuning records\n", len(data))
+
+	startFit := texelFitComposite(data)
+	fmt.Printf("Initial phalanx fit = %.6f\n", startFit)
+
+	for i := 0; i < 100; i++ {
+		fmt.Println("STAGE ", i)
+	tune1DTableComposite(phalanxMG[:], "phalanxMG", true, data)
+	tune1DTableComposite(phalanxEG[:], "phalanxEG", true, data)
+
+	finalFit := texelFitComposite(data)
+	fmt.Printf("Final phalanx fit = %.6f\n", finalFit)
+
+	fmt.Println()
+	printSinglePST("phalanxMG", "", &phalanxMG)
+	fmt.Println()
+	printSinglePST("phalanxEG", "", &phalanxEG)
+	}
+}
+
+func tune1DTableComposite(table []int, tableName string, isPrinting bool, data []PhalanxTunePos) {
+	bestFit := texelFitComposite(data)
+	if isPrinting {
+		fmt.Printf("Starting new batch for %s, initial fit = %.6f\n", tableName, bestFit)
+	}
+
+	for i := 0; i < len(table); i++ {
+		orig := table[i]
+
+		localBestVal, localBestFit, changed := tuneValueComposite(orig, bestFit, func(v int) {
+			table[i] = v
+		}, data)
+
+		if changed {
+			bestFit = localBestFit
+			if isPrinting {
+				fmt.Printf("%s[%d]: %d -> %d  fit = %.6f\n",
+					tableName, i, orig, localBestVal, bestFit)
+			}
+		}
+	}
+
+	if isPrinting {
+		fmt.Printf("Finished pass through %s, final fit = %.6f\n", tableName, bestFit)
+	}
+}
+
+func tuneValueComposite(orig int, bestFit float64, set func(int), data []PhalanxTunePos) (int, float64, bool) {
+	localBestVal := orig
+	localBestFit := bestFit
+
+	set(orig + 1)
+	fitPlus := texelFitComposite(data)
+	if fitPlus < localBestFit {
+		localBestFit = fitPlus
+		localBestVal = orig + 1
+	}
+
+	set(orig - 1)
+	fitMinus := texelFitComposite(data)
+	if fitMinus < localBestFit {
+		localBestFit = fitMinus
+		localBestVal = orig - 1
+	}
+
+	set(localBestVal)
+	return localBestVal, localBestFit, localBestVal != orig
 }
