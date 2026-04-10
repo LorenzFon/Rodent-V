@@ -90,18 +90,19 @@ func swap(p *Pos, from, to int) int {
 		}
 
 		// Remove one attacker (the LSB of candidates) and reveal any
-		// X-ray attackers behind it.
-		occ ^= candidates & (^candidates + 1)
-
-		// Regenerate attacks along the ray vacated by removed attacker
-		if (attType == P || attType == B || attType == Q) {
-			attackers |= (bishopAttacks(occ, to) & (p.typeBB[B] | p.typeBB[Q]))
+		// X-ray attackers behind it.  Only recompute rays that pass
+		// through both the removed square and the target square —
+		// a removed piece can only unblock sliders it was aligned with.
+		lsbBit := candidates & (^candidates + 1)
+		sq := lsb(uint64(lsbBit))
+		occ ^= lsbBit
+		toBit := squareBit(to)
+		if lineMasks[0][sq]&toBit != 0 || lineMasks[1][sq]&toBit != 0 {
+			attackers |= rookAttacks(occ, to) & (p.typeBB[R] | p.typeBB[Q])
 		}
-
-		if (attType == R || attType == Q) {
-			attackers |= (rookAttacks(occ, to) & (p.typeBB[R] | p.typeBB[Q]))
+		if lineMasks[2][sq]&toBit != 0 || lineMasks[3][sq]&toBit != 0 {
+			attackers |= bishopAttacks(occ, to) & (p.typeBB[B] | p.typeBB[Q])
 		}
-
 		attackers &= occ
 
 		side ^= 1
