@@ -99,6 +99,33 @@ func clearTT() {
 	}
 }
 
+// ttHashfull returns TT utilization in UCI hashfull units (permille).
+// 1000 means table is fully occupied by recent searches.
+func ttHashfull() int {
+	if ttSize <= 0 {
+		return 0
+	}
+
+	// Sample the first 1000 entries (or ttSize if small)
+	sampleSize := min(ttSize, 1000)
+
+	active := 0
+	for i := 0; i < sampleSize; i++ {
+		e := &tt[i]
+		if e.key == 0 {
+			continue
+		}
+		// Consider an entry active if it's from the current or previous generation.
+		// Handling 8-bit wrap around using bitwise AND just like the replacement policy.
+		age := (ttDate - int(e.date)) & 255
+		if age <= 1 {
+			active++
+		}
+	}
+
+	return (active * 1000) / sampleSize
+}
+
 // probeTT looks up a position in the transposition table.
 //
 // If a matching entry is found at sufficient depth, *move is set to
@@ -168,10 +195,6 @@ func storeTT(key uint64, move, score, bound, depth, ply int) {
 		e := &bucket[i]
 		if e.key == key {
 			// Reuse the existing slot; preserve the move if we have none.
-			if move == 0 {
-				move = int(e.move)
-			}
-			replace = e
 			break
 		}
 		// Age score: prefer to replace stale, shallow entries.
