@@ -111,6 +111,7 @@ var (
 	timeLimit    int64        // allocated move time in ms (-1 = unlimited)
 	pondering    bool         // true while in ponder mode (ignore clock)
 	rootDepth    int          // current iterative deepening depth
+	selDepth     int          // maximum ply reached in the current search
 	nodes        int64        // total nodes searched (search-goroutine only; no atomic needed)
 	abortFlag    int32        // set to 1 atomically to stop the search
 	searchStart  int64        // Unix ms at the start of think()
@@ -171,6 +172,7 @@ func initLMRTable() {
 func think(p *Pos, maxDepth int) {
 	ttDate = (ttDate + 1) & 255
 	nodes = 0
+	selDepth = 0
 	atomic.StoreInt32(&abortFlag, 0)
 	searchStart = time.Now().UnixMilli()
 	rootHistLen = p.histLen
@@ -263,6 +265,9 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	}
 
 	nodes++
+	if ply > selDepth {
+		selDepth = ply
+	}
 	checkTime()
 	if atomic.LoadInt32(&abortFlag) != 0 {
 		return 0
@@ -619,6 +624,9 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 // checkmate score.  Outside of check the standard stand-pat applies.
 func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	nodes++
+	if ply > selDepth {
+		selDepth = ply
+	}
 	checkTime()
 	if atomic.LoadInt32(&abortFlag) != 0 {
 		return 0
@@ -785,8 +793,8 @@ func reportInfo(score int, pv []int) {
 
 	// Output
 	hashfull := ttHashfull()
-	fmt.Printf("info depth %d time %d nodes %d nps %d hashfull %d score %s %d pv %s\n",
-		rootDepth, elapsed, nodes, nps, hashfull, scoreType, score, pvString(pv))
+	fmt.Printf("info depth %d seldepth %d time %d nodes %d nps %d hashfull %d score %s %d pv %s\n",
+		rootDepth, selDepth, elapsed, nodes, nps, hashfull, scoreType, score, pvString(pv))
 }
 
 // checkTime is called periodically (every 4096 nodes) to see whether

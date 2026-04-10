@@ -195,6 +195,10 @@ func storeTT(key uint64, move, score, bound, depth, ply int) {
 		e := &bucket[i]
 		if e.key == key {
 			// Reuse the existing slot; preserve the move if we have none.
+			if move == 0 {
+				move = int(e.move)
+			}
+			replace = e
 			break
 		}
 		// Age score: prefer to replace stale, shallow entries.
