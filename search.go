@@ -642,6 +642,15 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		return evaluate(p)
 	}
 
+	// TT probe: use depth=0 for all qsearch entries.
+	ttMove := 0
+	ttScore := 0
+	ttFlag := 0
+	ttDepth := 0
+	if probeTT(p.key, &ttMove, &ttScore, &ttFlag, &ttDepth, alpha, beta, 0, ply) {
+		return ttScore
+	}
+
 	inCheck := p.inCheck()
 
 	picker := &moveBuffers[ply]
