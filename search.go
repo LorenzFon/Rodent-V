@@ -784,8 +784,9 @@ func reportInfo(score int, pv []int) {
 	nps := nodes * 1000 / elapsed
 
 	// Output
-	fmt.Printf("info depth %d time %d nodes %d nps %d score %s %d pv %s\n",
-		rootDepth, elapsed, nodes, nps, scoreType, score, pvString(pv))
+	hashfull := ttHashfull()
+	fmt.Printf("info depth %d time %d nodes %d nps %d hashfull %d score %s %d pv %s\n",
+		rootDepth, elapsed, nodes, nps, hashfull, scoreType, score, pvString(pv))
 }
 
 // checkTime is called periodically (every 4096 nodes) to see whether
