@@ -382,10 +382,11 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	if depth > 1 && !isPv && !nodeInCheck && p.canNullMove() && beta <= staticEval &&
 		excludedMove[ply] == 0 {
 		contValid[ply] = false // null move: no valid piece context for cont hist
+		reduction := 2 + depth / 6
 		var u Undo
 		makeNullMove(p, &u)
 		var nullPv [maxPly]int
-		score = -search(p, ply+1, -beta, -beta+1, depth-3, nullPv[:])
+		score = -search(p, ply+1, -beta, -beta+1, depth-1 - reduction, nullPv[:])
 		unmakeNullMove(p, &u)
 		if atomic.LoadInt32(&abortFlag) != 0 {
 			return 0
