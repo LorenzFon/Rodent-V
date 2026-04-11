@@ -200,7 +200,7 @@ func think(p *Pos, maxDepth int) {
 
 		if rootDepth < 5 {
 			// Aspiration windows are unreliable at shallow depths.
-			iterScore = search(p, 0, -inf, inf, rootDepth, pv[:])
+			iterScore = search(p, 0, -inf, inf, rootDepth, false, pv[:])
 		} else {
 			// Score-adaptive initial delta: balanced positions get a tight
 			// window; large scores widen it to reduce retry churn.
@@ -209,7 +209,7 @@ func think(p *Pos, maxDepth int) {
 			beta := min(inf, score+delta)
 
 			for {
-				iterScore = search(p, 0, alpha, beta, rootDepth, pv[:])
+				iterScore = search(p, 0, alpha, beta, rootDepth, false, pv[:])
 				if atomic.LoadInt32(&abortFlag) != 0 {
 					break
 				}
@@ -259,7 +259,7 @@ func think(p *Pos, maxDepth int) {
 //	pv: principal variation output buffer
 //
 // Returns the score for the side to move (negamax convention).
-func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
+func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	if depth <= 0 {
 		return quiesce(p, ply, alpha, beta, pv)
 	}
@@ -379,14 +379,14 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 	// --- Null-move pruning ---
 	// Skip if: depth <= 1 (too shallow to be reliable), the position
 	// is already beyond beta, we are in check, or only pawns remain.
-	if depth > 1 && !isPv && !nodeInCheck && p.canNullMove() && beta <= staticEval &&
+	if depth > 1 && !isPv && !nodeInCheck && !wasNull && p.canNullMove() && beta <= staticEval &&
 		excludedMove[ply] == 0 {
 		contValid[ply] = false // null move: no valid piece context for cont hist
 		reduction := 2 + depth / 6
 		var u Undo
 		makeNullMove(p, &u)
 		var nullPv [maxPly]int
-		score = -search(p, ply+1, -beta, -beta+1, depth-1 - reduction, nullPv[:])
+		score = -search(p, ply+1, -beta, -beta+1, depth-1 - reduction, true, nullPv[:])
 		unmakeNullMove(p, &u)
 		if atomic.LoadInt32(&abortFlag) != 0 {
 			return 0
@@ -449,7 +449,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 			savedPicker := *picker
 			excludedMove[ply] = move
 			var sePv [maxPly]int
-			sScore := search(p, ply, sBeta-1, sBeta, (depth-1)/2, sePv[:])
+			sScore := search(p, ply, sBeta-1, sBeta, (depth-1)/2, false, sePv[:])
 			excludedMove[ply] = 0
 			*picker = savedPicker
 			if sScore < sBeta {
@@ -517,7 +517,7 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 				if reduction > newDepth-1 {
 					reduction = newDepth - 1
 				}
-				score = -search(p, ply+1, -alpha-1, -alpha, newDepth-reduction, childPv[:])
+				score = -search(p, ply+1, -alpha-1, -alpha, newDepth-reduction, false, childPv[:])
 				if score <= alpha {
 					isReduced = true
 				}
@@ -530,11 +530,11 @@ func search(p *Pos, ply, alpha, beta, depth int, pv []int) int {
 		// only if the ZW fails high AND we are at a PV node.
 		if !isReduced {
 			if movesTried == 0 {
-				score = -search(p, ply+1, -beta, -alpha, newDepth, childPv[:])
+				score = -search(p, ply+1, -beta, -alpha, newDepth, false, childPv[:])
 			} else {
-				score = -search(p, ply+1, -alpha-1, -alpha, newDepth, childPv[:])
+				score = -search(p, ply+1, -alpha-1, -alpha, newDepth, false, childPv[:])
 				if score > alpha && isPv {
-					score = -search(p, ply+1, -beta, -alpha, newDepth, childPv[:])
+					score = -search(p, ply+1, -beta, -alpha, newDepth, false, childPv[:])
 				}
 			}
 		}
