@@ -160,6 +160,22 @@ func tunerInitBatch(samplePerBucket int) {
 	fmt.Printf("sampled: W %d  L %d  D %d\n", len(epd10), len(epd01), len(epd05))
 }
 
+// tunerInitBatchAll loads all the positions from file.
+// Used in getFit to get mean square error on the entire training set.
+func tunerInitBatchAll() {
+	loadTunerFile()
+	if !tunerLoaded {
+		return
+	}
+
+	epd10 = allEpd10
+	epd01 = allEpd01
+	epd05 = allEpd05
+
+	fmt.Printf("loaded: W %d  L %d  D %d\n", len(epd10), len(epd01), len(epd05))
+}
+
+
 // texelSigmoid translates eval score into a winning probability
 // between 0 and 1.
 func texelSigmoid(score int, k float64) float64 {
@@ -227,6 +243,45 @@ func texelFit() float64 {
 	return 1000.0 * (sum / float64(iteration))
 }
 
+// getFit calculates mean square error based on the entire dataset.
+// Useful mainly for verification of a tuner run or for manual
+// optimization of values.
+func getFit() {
+	loadTunerFile()
+	tunerInitBatchAll()
+	var bestFit = texelFit()
+	fmt.Print(bestFit)
+}
+
+// tuneValue is a helper function that tries to modify a single value
+func tuneValue(orig int, bestFit float64, set func(int)) (int, float64, bool) {
+	localBestVal := orig
+	localBestFit := bestFit
+
+	// try adding 1 to the current weight
+	firstTrySucceeded := false
+	set(orig + 1)
+	fitPlus := texelFit()
+	if fitPlus < localBestFit {
+		firstTrySucceeded = true
+		localBestFit = fitPlus
+		localBestVal = orig + 1
+	}
+
+	// if addition failed, try subtracting
+	if !firstTrySucceeded {
+		set(orig - 1)
+		fitMinus := texelFit()
+		if fitMinus < localBestFit {
+			localBestFit = fitMinus
+			localBestVal = orig - 1
+		}
+	}
+
+	set(localBestVal)
+	return localBestVal, localBestFit, localBestVal != orig
+}
+
 func tunerFree() {
 
 	epdLines = nil
@@ -246,7 +301,7 @@ func tunerFree() {
 	tunerLoaded = false
 }
 
-// tuneOST is a classical Texel hill-climber for one PST table.
+// tunePST is a classical Texel hill-climber for one PST table set.
 // It calls tunerInitBatch() at the beginning, to select
 // a new batch of positions.
 func tunePST(table *[6][64]int, tableName string, samplePerBucket int) {
@@ -488,35 +543,6 @@ func tunePerPiece2D(table *[2][6]int, tableName string, samplePerBucket int) {
 	fmt.Printf("Finished batch %s, final fit = %.6f\n", tableName, bestFit)
 }
 
-// tuneValue is a helper function that tries to modify a single value
-func tuneValue(orig int, bestFit float64, set func(int)) (int, float64, bool) {
-	localBestVal := orig
-	localBestFit := bestFit
-
-	// try adding 1 to the current weight
-	firstTrySucceeded := false
-	set(orig + 1)
-	fitPlus := texelFit()
-	if fitPlus < localBestFit {
-		firstTrySucceeded = true
-		localBestFit = fitPlus
-		localBestVal = orig + 1
-	}
-
-	// if addition failed, try subtracting
-	if !firstTrySucceeded {
-		set(orig - 1)
-		fitMinus := texelFit()
-		if fitMinus < localBestFit {
-			localBestFit = fitMinus
-			localBestVal = orig - 1
-		}
-	}
-
-	set(localBestVal)
-	return localBestVal, localBestFit, localBestVal != orig
-}
-
 func pstTuningSession() {
 		for i := 0; i < 100; i++ {
 			tunePST(&pstMG, "pstMG", 5000)
@@ -589,18 +615,18 @@ func threatTuningSession() {
 
 // Second tuner with data extraction
 
-type PhalanxTunePos struct {
+type TunePos struct {
 	Result    float64
 	BaseScore int
 	Phase     int
 	Feature   [64]int
 }
 
-func ExtractTuneData(epdLines []string) []PhalanxTunePos {
+func ExtractTuneData(epdLines []string) []TunePos {
 	loadTunerFile()
 	var p Pos
 	result := 0.0
-	out := make([]PhalanxTunePos, 0, len(epdLines))
+	out := make([]TunePos, 0, len(epdLines))
 
 	for _, line := range epdLines {
 		
@@ -618,7 +644,7 @@ func ExtractTuneData(epdLines []string) []PhalanxTunePos {
 		if p.side == Black { baseScore = -baseScore }
 		phase := extractPhase(line);
 
-		var rec PhalanxTunePos
+		var rec TunePos
 		rec.Result = result
 		rec.BaseScore = baseScore
 		rec.Phase = phase
@@ -668,7 +694,7 @@ func extractFeatures(p *Pos) [64]int {
 	// White phalanx: pawn has a friendly pawn on adjacent file, same rank.
 	for bb := whitePawns; bb != 0; bb &= bb - 1 {
 		sq := lsb(bb)
-		if isPhalanxPawn(allWhitePawns, sq) {
+		if isPawn(allWhitePawns, sq) {
 			feat[sq]++
 		}
 	}
@@ -676,7 +702,7 @@ func extractFeatures(p *Pos) [64]int {
 	// Black phalanx: mirror square so one shared White-oriented table works.
 	for bb := blackPawns; bb != 0; bb &= bb - 1 {
 		sq := lsb(bb)
-		if isPhalanxPawn(allBlackPawns, sq) {
+		if isPawn(allBlackPawns, sq) {
 			feat[sq^56]--
 		}
 	}
@@ -684,20 +710,29 @@ func extractFeatures(p *Pos) [64]int {
 	return feat
 }
 
+func isPawn(pawns uint64, sq int) bool{
+    b := squareBit(sq)
+    return b & pawns != 0
+}
+
 func isPhalanxPawn(pawns uint64, sq int) bool{
      b := squareBit(sq)
      return shiftSides(b) & pawns != 0
 }
 
-func scorePhalanxTunePos(tp *PhalanxTunePos, phalanxMG, phalanxEG *[64]int) int {
+func isDefendedPawn(side int, pawns uint64, sq int) bool {
+	return pawnAtk[opp(side)][sq]&pawns != 0
+}
+
+func scoreTundeElementPos(tp *TunePos, pawnMG, pawnEG *[64]int) int {
 	mg := 0
 	eg := 0
 
 	for sq := 0; sq < 64; sq++ {
 		f := int(tp.Feature[sq])
 		if f != 0 {
-			mg += f * phalanxMG[sq]
-			eg += f * phalanxEG[sq]
+			mg += f * pawnMG[sq]
+			eg += f * pawnEG[sq]
 		}
 	}
 
@@ -705,7 +740,23 @@ func scorePhalanxTunePos(tp *PhalanxTunePos, phalanxMG, phalanxEG *[64]int) int 
 	return tp.BaseScore + phScore
 }
 
-func texelFitComposite(data []PhalanxTunePos) float64 {
+func scorePhalanxTunePos(tp *TunePos, pawnMG, pawnEG *[64]int) int {
+	mg := 0
+	eg := 0
+
+	for sq := 0; sq < 64; sq++ {
+		f := int(tp.Feature[sq])
+		if f != 0 {
+			mg += f * pawnMG[sq]
+			eg += f * pawnEG[sq]
+		}
+	}
+
+	tuneScore := (mg*tp.Phase + eg*(24-tp.Phase)) / 24
+	return tp.BaseScore + tuneScore
+}
+
+func texelFitComposite(data []TunePos) float64 {
 	if len(data) == 0 {
 		return 0.0
 	}
@@ -713,7 +764,7 @@ func texelFitComposite(data []PhalanxTunePos) float64 {
 	var total float64
 
 	for i := range data {
-		score := scorePhalanxTunePos(&data[i], &phalanxMG, &phalanxEG)
+		score := scoreTundeElementPos(&data[i], &pawnMG, &pawnEG)
 		pred := texelSigmoid(score, kConst)
 		diff := data[i].Result - pred
 		total += diff * diff
@@ -722,36 +773,36 @@ func texelFitComposite(data []PhalanxTunePos) float64 {
 	return total / float64(len(data))
 }
 
-func phalanxTuningSession() {
+func pawnTuningSession() {
 	loadTunerFile()
 	if !tunerLoaded {
 		fmt.Println("tuner data not loaded")
 		return
 	}
 
-	fmt.Printf("Extracting phalanx tune data from %d positions...\n", len(epdLines))
+	fmt.Printf("Extracting pawn tune data from %d positions...\n", len(epdLines))
 	data := ExtractTuneData(epdLines)
-	fmt.Printf("Extracted %d phalanx tuning records\n", len(data))
+	fmt.Printf("Extracted %d pawn tuning records\n", len(data))
 
 	startFit := texelFitComposite(data)
-	fmt.Printf("Initial phalanx fit = %.6f\n", startFit)
+	fmt.Printf("Initial pawn fit = %.6f\n", startFit)
 
 	for i := 0; i < 100; i++ {
 		fmt.Println("STAGE ", i)
-	tune1DTableComposite(phalanxMG[:], "phalanxMG", true, data)
-	tune1DTableComposite(phalanxEG[:], "phalanxEG", true, data)
+	tune1DTableComposite(pawnMG[:], "pawnMG", true, data)
+	tune1DTableComposite(pawnEG[:], "pawnEG", true, data)
 
 	finalFit := texelFitComposite(data)
-	fmt.Printf("Final phalanx fit = %.6f\n", finalFit)
+	fmt.Printf("Final defended fit = %.6f\n", finalFit)
 
 	fmt.Println()
-	printSinglePST("phalanxMG", "", &phalanxMG)
+	printSinglePST("pawnMG", "", &pawnMG)
 	fmt.Println()
-	printSinglePST("phalanxEG", "", &phalanxEG)
+	printSinglePST("pawnEG", "", &pawnEG)
 	}
 }
 
-func tune1DTableComposite(table []int, tableName string, isPrinting bool, data []PhalanxTunePos) {
+func tune1DTableComposite(table []int, tableName string, isPrinting bool, data []TunePos) {
 	bestFit := texelFitComposite(data)
 	if isPrinting {
 		fmt.Printf("Starting new batch for %s, initial fit = %.6f\n", tableName, bestFit)
@@ -778,7 +829,7 @@ func tune1DTableComposite(table []int, tableName string, isPrinting bool, data [
 	}
 }
 
-func tuneValueComposite(orig int, bestFit float64, set func(int), data []PhalanxTunePos) (int, float64, bool) {
+func tuneValueComposite(orig int, bestFit float64, set func(int), data []TunePos) (int, float64, bool) {
 	localBestVal := orig
 	localBestFit := bestFit
 

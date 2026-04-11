@@ -47,6 +47,8 @@ func init() {
 func main() {
 	// stuff like reading data from file should go here
 	// to handle errors
+	//getFit()
+	//pawnTuningSession()
 	uciLoop()
 }
 

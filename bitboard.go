@@ -70,6 +70,15 @@ func fillSouth(b uint64) uint64 {
 	return b
 }
 
+// color-dependent forward fill
+func fillForward(b uint64, color int) uint64 {
+
+    if color == White {
+		return fillNorth(shiftNorth(b)) 
+	} 
+    return fillSouth(shiftSouth(b))
+}
+
 func PrintBitboard(bb uint64) {
 	fmt.Println("---------------------------------")
 	for rank := 7; rank >= 0; rank-- {

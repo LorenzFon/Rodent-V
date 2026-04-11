@@ -35,6 +35,7 @@ package main
 // --- Bitmasks used in eval only, put into init() to preserve locality ---
 var (
 	passedMask  [2][64]uint64
+	supportMask [2][64]uint64
 	adjFileMask [8]uint64
 )
 
@@ -66,6 +67,14 @@ func init() {
 		}
 	}
 
+	// --- Support mask to detect backward pawns ---
+	for sq := A1; sq < 64; sq++ {
+		base := shiftSides(squareBit(sq))
+
+		supportMask[White][sq] = base | fillSouth(base)
+		supportMask[Black][sq] = base | fillNorth(base)
+	}
+
 	// --- Adjacent file masks ---
 	// adjFileMask[f]: bitboard of the two files neighboring file f.
 	// A pawn is isolated if adjFileMask[file] & ownPawns == 0.
@@ -83,7 +92,7 @@ func init() {
 }
 
 // --- Eval params ---
-var pieceValMG = [7]int{82,  343, 365, 485, 1029, 0, 0}
+var pieceValMG = [7]int{83,  343, 365, 485, 1029, 0, 0}
 var pieceValEG = [7]int{100, 273, 293, 523, 952, 0, 0}
 
 // bishopPairMG/EG: bonus for owning both bishops.
@@ -142,8 +151,8 @@ var passedBonusMG = [2][8]int{
         1: {0, 17, 23, 1, 17, 15, 87, 0}, // blocked: push square occupied
 }
 var passedBonusEG = [2][8]int{
-        0: {0, 19, 23, 7, 35, 61, 184, 0}, // free
-        1: {0, 20, 29, -6, 18, -11, 78, 0}, // blocked
+        0: {0, 19, 23, 7, 35, 91, 184, 0}, // free
+        1: {0, 20, 29, -6, 18, 36, 78, 0}, // blocked
 }
 
 // ourPasserProximityMG/EG: bonus when our king is close to the passer's
@@ -458,10 +467,22 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 				}
 			}
 		}
+		frontMask := fillForward(squareBit(sq), side)
+		isOpen := frontMask & p.pieceBB(side, P) == 0
+
 		// Isolated pawn: no friendly pawns on adjacent files.
 		if adjFileMask[fileOf(sq)]&p.pieceBB(side, P) == 0 {
-			add(e, side, EvalPawns, -20, -20)
+			add(e, side, EvalPawns, -10, -18)
+			if (isOpen) {
+				add(e, side, EvalPawns, -9, 0)
+			}
+		} else if supportMask[side][sq] &p.pieceBB(side, P) == 0 {
+			add(e, side, EvalPawns, 0, -5)
+			if (isOpen) {
+				add(e, side, EvalPawns, -4, 0)
+			}
 		}
+	
 		// Doubled pawn: a friendly pawn stands directly ahead on the same file.
 		// We only penalise when the pawn cannot immediately capture an enemy
 		// pawn — if it can, the doubled structure is likely resolved tactically.
