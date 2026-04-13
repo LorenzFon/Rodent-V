@@ -92,7 +92,7 @@ func init() {
 }
 
 // --- Eval params ---
-var pieceValMG = [7]int{83,  343, 365, 485, 1029, 0, 0}
+var pieceValMG = [7]int{ 83, 343, 365, 485, 1029, 0, 0}
 var pieceValEG = [7]int{100, 273, 293, 523, 952,  0, 0}
 
 // mobility
@@ -236,6 +236,18 @@ func eval_internal(p *Pos, shouldReport bool) int {
 	}
 
 	score := (mg*e.phase + eg*(24-e.phase)) / 24
+
+	// Pull score of drawish endgames closer to 0
+	if e.phase < 6 {  // R+R+B = 5
+		weight := 100
+		if (score > 0) {
+			weight = getDrawishness(p, White, Black)
+		} else if (score < 0) {
+			weight = getDrawishness(p, Black, White)
+		} 
+		score *= weight
+		score /= 100
+	}
 
 	// Clamp to the range that the transposition table can distinguish
 	// from a forced mate score.
