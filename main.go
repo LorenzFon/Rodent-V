@@ -48,6 +48,7 @@ func main() {
 	// stuff like reading data from file should go here
 	// to handle errors
 	//getFit()
+	//newTunerFree()
 	//gradientTuneSession(5000, 10000.0)
 	uciLoop()
 }

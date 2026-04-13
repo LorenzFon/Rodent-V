@@ -219,3 +219,4 @@ func storeTT(key uint64, move, score, bound, depth, ply int) {
 	replace.bound = uint8(bound)
 	replace.depth = uint8(depth)
 }
+
