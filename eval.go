@@ -93,12 +93,17 @@ func init() {
 
 // --- Eval params ---
 var pieceValMG = [7]int{83,  343, 365, 485, 1029, 0, 0}
-var pieceValEG = [7]int{100, 273, 293, 523, 952, 0, 0}
+var pieceValEG = [7]int{100, 273, 293, 523, 952,  0, 0}
+
+// mobility
+var mobOffset =  [7]int{  0,   4,   6,   7,  14,  0, 0}
+var mobMG =      [7]int{  0,   3,   5,   3,   2,  0, 0}
+var mobEG =      [7]int{  0,   3,   4,   2,   2,  0, 0}
 
 // bishopPairMG/EG: bonus for owning both bishops.
 // The EG value is higher because open boards in the endgame
 // let the bishop pair dominate knight+bishop or two knights.
-const bishopPairMG = 20
+const bishopPairMG = 21
 const bishopPairEG = 60
 
 // Rook on open/semi-open file bonuses.
@@ -106,10 +111,18 @@ const bishopPairEG = 60
 // penetration potential.  Semi-open (no own pawn, enemy pawn present):
 // smaller bonus; the rook pressures the enemy pawn but is partly blocked.
 // EG values are near-zero: open files drive MG tactics, not endgame play.
-const rookOpenFileMG = 30
+const rookOpenFileMG = 31
 const rookOpenFileEG = 3
 const rookSemiOpenFileMG = 20
 const rookSemiOpenFileEG = -1
+
+// Pawn weaknesses
+const isolatedMG = -10
+const isolatedEG = -18
+const isolatedOpenMG = -9
+const backwardMG = 0
+const backwardEG = -5
+const backwardOpenMG = -4
 
 // minorHomeBB[side]: bitboard of the four squares where knights and bishops
 // start the game.  A minor still on one of these squares counts as undeveloped.
@@ -136,9 +149,6 @@ const devPenaltyScale = 5
 // position simplifies, since they cannot create a passed pawn by themselves.
 var doubledPawnMG = [4]int{0, 3, -6, -14}
 var doubledPawnEG = [4]int{-48, -38, -28, -10}
-
-// OLD: info depth 25 time 68658 nodes 69782126 nps 1016372 score cp 20 pv e2e4 c7c5 g1f3 d7d6 f1b5 c8d7 b5d7 b8d7 e1g1 g8f6 b1c3 e7e6 a2a4 d7e5 a4a5 a7a6 d2d3 f8e7 c1e3 e8g8 f3e5 d6e5 d1f3 e7d6 f3g3
-// NEW: info depth 25 time 65073 nodes 69782126 nps 1072366 score cp 20 pv e2e4 c7c5 g1f3 d7d6 f1b5 c8d7 b5d7 b8d7 e1g1 g8f6 b1c3 e7e6 a2a4 d7e5 a4a5 a7a6 d2d3 f8e7 c1e3 e8g8 f3e5 d6e5 d1f3 e7d6 f3g3
 
 // passedBonusMG / passedBonusEG: bonus for a passed pawn indexed by
 // [blocked][relativeRank].  relativeRank is 0 at own back rank and 7
@@ -265,8 +275,8 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		e.addAttacks(side, N, atks)
 
 		// knight mobility
-		mob := popCount(atks&^p.colorBB[side]) - 4
-		add(e, side, EvalMobility, 3*mob, 3*mob)
+		mob := popCount(atks&^p.colorBB[side]) - mobOffset[N]
+		add(e, side, EvalMobility, mobMG[N]*mob, mobEG[N]*mob)
 
 		// knight attacks enemy king
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -302,8 +312,8 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		e.addAttacks(side, B, bishopAttacks(occ, sq))
 
 		// bishop mobility
-		mob := popCount(atks) - 6
-		add(e, side, EvalMobility, 5*mob, 4*mob)
+		mob := popCount(atks) - mobOffset[B]
+		add(e, side, EvalMobility, mobMG[B]*mob, mobEG[B]*mob)
 
 		// bishop attacks enemy king
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -339,8 +349,8 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		e.addAttacks(side, R, rookAttacks(occ, sq))
 
 		// rook mobility
-		mob := popCount(atks) - 7
-		add(e, side, EvalMobility, 3*mob, 2*mob)
+		mob := popCount(atks) - mobOffset[R]
+		add(e, side, EvalMobility, mobMG[R]*mob, mobEG[R]*mob)
 
 		// rook attacks enemy king
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -377,8 +387,8 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		e.addAttacks(side, Q, queenAttacks(occ, sq))
 
 		// queen mobility
-		mob := popCount(atks) - 14
-		add(e, side, EvalMobility, 2*mob, 2*mob)
+		mob := popCount(atks) - mobOffset[Q]
+		add(e, side, EvalMobility, mobMG[Q]*mob, mobEG[Q]*mob)
 
 		// queen attacks enemy king
 		if ringAtks := atks & enemyRing; ringAtks != 0 {
@@ -472,14 +482,14 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 
 		// Isolated pawn: no friendly pawns on adjacent files.
 		if adjFileMask[fileOf(sq)]&p.pieceBB(side, P) == 0 {
-			add(e, side, EvalPawns, -10, -18)
+			add(e, side, EvalPawns, isolatedMG, isolatedEG)
 			if (isOpen) {
-				add(e, side, EvalPawns, -9, 0)
+				add(e, side, EvalPawns, isolatedOpenMG, 0)
 			}
 		} else if supportMask[side][sq] &p.pieceBB(side, P) == 0 {
-			add(e, side, EvalPawns, 0, -5)
+			add(e, side, EvalPawns, backwardMG, backwardEG)
 			if (isOpen) {
-				add(e, side, EvalPawns, -4, 0)
+				add(e, side, EvalPawns, backwardOpenMG, 0)
 			}
 		}
 	
@@ -753,13 +763,11 @@ func evaluateThreats(p *Pos, e *EvalData, side int) {
 }
 
 func addPhalanx(e *EvalData, side, sq int) {
-
     add(e, side, EvalPawns, phalanxMgByColor[side][sq], phalanxEgByColor[side][sq])
 }
 
 // addPST adds the piece-square table score for a piece on sq.
 func addPST(e *EvalData, side, piece, sq int) {
-
 	add(e, side, EvalPst, pstMGByColor[side][piece][sq], pstEGByColor[side][piece][sq]);
 }
 
