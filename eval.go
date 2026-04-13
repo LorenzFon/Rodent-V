@@ -103,7 +103,7 @@ var mobEG =      [7]int{  0,   3,   4,   2,   2,  0, 0}
 // bishopPairMG/EG: bonus for owning both bishops.
 // The EG value is higher because open boards in the endgame
 // let the bishop pair dominate knight+bishop or two knights.
-const bishopPairMG = 20
+const bishopPairMG = 21
 const bishopPairEG = 60
 
 // Rook on open/semi-open file bonuses.
@@ -111,7 +111,7 @@ const bishopPairEG = 60
 // penetration potential.  Semi-open (no own pawn, enemy pawn present):
 // smaller bonus; the rook pressures the enemy pawn but is partly blocked.
 // EG values are near-zero: open files drive MG tactics, not endgame play.
-const rookOpenFileMG = 30
+const rookOpenFileMG = 31
 const rookOpenFileEG = 3
 const rookSemiOpenFileMG = 20
 const rookSemiOpenFileEG = -1
