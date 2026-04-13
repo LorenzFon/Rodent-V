@@ -2,7 +2,7 @@
 
 ## Goal for first release
 
-- **3200 Elo CCRL** (is 2600-2700)
+- **3200 Elo CCRL** (is 2800)
 - Ability to define playing styles ("personalities") in a text file
 - Weakening in a sensible range (not necessarily to absolute beginner level)
 - HCE eval (for style) supplemented by an auxiliary neural network (for strength boost)
@@ -23,7 +23,7 @@
 
 - [x] King safety
 - [x] Doubled pawns
-- [ ] Backward pawns
+- [x] Backward pawns
 - [x] King pawn shield
 - [ ] Rook on 7th rank
 
@@ -33,6 +33,7 @@
 
 - [x] minimal tuner to assess new eval terms
 - [x] Texel tuner with batches
+- [x] gradient descent
 - [x] tune pst
 - [x] tune passers
 - [ ] tune threats
@@ -63,7 +64,7 @@
 
 ## Milestone: Regaining eval speed
 
-- [ ] Eval hashtable
+- [x] Eval hashtable
 - [ ] Separating eval functions related only to pawns and kings
 - [ ] Pawn hashtable
 
@@ -71,16 +72,15 @@
 
 ## Milestone: Small search gains (expect long tuning runs)
 
-- [ ] mate distance pruning
+- [x] mate distance pruning
 - [ ] futility pruning
 
 ---
 
 ## Milestone: advanced search additions
 
-- [ ] Singular extensions
-- [ ] refutaton history
-- [ ] continuation history if does not fail
+- [x] Singular extensions
+- [x] continuation history
 - [ ] correction history if does not fail
 - [ ] multi-threading (lazy SMP)
 
@@ -88,6 +88,7 @@
 
 ## Milestone: tuning round 2
 
+- [ ] Gradien descent tuner uses batches
 - [ ] Multi-threaded tuner
 - [ ] Retune everything with a better set
 
@@ -103,7 +104,7 @@
 
 - [ ] Outposts
 - [ ] Pawn in front of a minor piece
-- [ ] Drawish endgames
+- [x] Drawish endgames
 - [ ] Material imbalances
 - [ ] Phalanx pawns
 - [ ] Defended pawns
