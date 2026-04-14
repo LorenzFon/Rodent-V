@@ -400,6 +400,48 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 		}
 	}
 
+	// --- ProbCut ---
+	// If a tactical move already exceeds beta by a safety margin at reduced
+	// depth, assume the full node will also fail high and prune the rest.
+	if !isPv && !nodeInCheck && depth >= probcutMinDepth && beta < mate-maxPly &&
+		excludedMove[ply] == 0 {
+		probcutBeta := min(beta+probcutMargin, mate-maxPly)
+		probcutDepth := depth - 1 - probcutReduction
+		probcutPicker := &moveBuffers[ply]
+		initQSearch(p, probcutPicker)
+		var probcutPv [maxPly]int
+
+		for {
+			move := probcutPicker.nextCapture()
+			if move == 0 {
+				break
+			}
+			if isBadCapture(p, move) {
+				continue
+			}
+
+			var u Undo
+			makeMove(p, move, &u)
+			if p.selfInCheck() {
+				unmakeMove(p, move, &u)
+				continue
+			}
+
+			score = -quiesce(p, ply+1, -probcutBeta, -probcutBeta+1, probcutPv[:])
+			if score >= probcutBeta && probcutDepth > 0 {
+				score = -search(p, ply+1, -probcutBeta, -probcutBeta+1, probcutDepth, false, probcutPv[:])
+			}
+			unmakeMove(p, move, &u)
+
+			if atomic.LoadInt32(&abortFlag) != 0 {
+				return 0
+			}
+			if score >= probcutBeta {
+				return score
+			}
+		}
+	}
+
 	// --- Internal iterative reduction ---
 	// Without a TT move the move picker has no good hint; search one
 	// ply shallower so the cost of poor ordering is contained.
