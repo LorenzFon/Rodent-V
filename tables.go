@@ -122,6 +122,8 @@ const (
 	rfpMargin    = 100      // centipawns per depth for reverse futility pruning (not improving)
 	rfpImpMargin = 60       // centipawns per depth for reverse futility pruning (improving)
 	noEval       = -inf - 1 // sentinel: no static eval stored for this ply (in check)
+	fpMargin     = 120      // centipawns per depth for main-search move-loop futility pruning
+	fpMaxDepth   = 4        // only prune quiet moves by futility at shallow depth
 	razorMargin  = 300      // centipawns per depth for razoring
 	qsFpMargin   = 100      // base margin for quiescence futility pruning
 )
