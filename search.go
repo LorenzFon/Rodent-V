@@ -382,11 +382,11 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	if depth > 1 && !isPv && !nodeInCheck && !wasNull && p.canNullMove() && beta <= staticEval &&
 		excludedMove[ply] == 0 {
 		contValid[ply] = false // null move: no valid piece context for cont hist
-		reduction := 2 + depth / 6
+		reduction := 2 + depth/6
 		var u Undo
 		makeNullMove(p, &u)
 		var nullPv [maxPly]int
-		score = -search(p, ply+1, -beta, -beta+1, depth-1 - reduction, true, nullPv[:])
+		score = -search(p, ply+1, -beta, -beta+1, depth-1-reduction, true, nullPv[:])
 		unmakeNullMove(p, &u)
 		if atomic.LoadInt32(&abortFlag) != 0 {
 			return 0
@@ -489,12 +489,21 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 		// or the only escape from a mating attack.
 		// When improving we allow more moves (position is trending up, so
 		// later moves are more likely to be relevant).
+		// Futility pruning: at shallow depth, skip late quiet moves that
+		// cannot plausibly raise alpha even with a generous margin.
 		lmpThreshold := 4*depth + 1
 		if improving {
 			lmpThreshold = 6*depth + 1
 		}
 		if stage == StageQuiet && !isPv && !nodeInCheck && depth < 4 &&
 			quietTried > lmpThreshold && !givesCheck {
+			unmakeMove(p, move, &u)
+			continue
+		}
+		if stage == StageQuiet && !isPv && !nodeInCheck && !givesCheck &&
+			excludedMove[ply] == 0 && depth <= fpMaxDepth &&
+			quietTried > 0 && alpha < mate-maxPly &&
+			staticEval+fpMargin*depth <= alpha {
 			unmakeMove(p, move, &u)
 			continue
 		}
