@@ -207,9 +207,10 @@ func think(p *Pos, maxDepth int) {
 			delta := 25 + score*score/16384
 			alpha := max(-inf, score-delta)
 			beta := min(inf, score+delta)
+			aspDepth := rootDepth
 
 			for {
-				iterScore = search(p, 0, alpha, beta, rootDepth, false, pv[:])
+				iterScore = search(p, 0, alpha, beta, aspDepth, false, pv[:])
 				if atomic.LoadInt32(&abortFlag) != 0 {
 					break
 				}
@@ -218,9 +219,12 @@ func think(p *Pos, maxDepth int) {
 					// alpha so the high side doesn't grow unnecessarily.
 					beta = (alpha + beta) / 2
 					alpha = max(-inf, alpha-delta)
+					aspDepth = rootDepth
 				} else if iterScore >= beta {
-					// Fail high: widen the window above and retry.
+					// Fail high: widen the window above and retry at a slightly
+					// reduced depth to keep volatile re-searches cheaper.
 					beta = min(inf, beta+delta)
+					aspDepth = max(rootDepth-1, 1)
 				} else {
 					break // score is inside the window
 				}
