@@ -488,7 +488,7 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 			ttDepth >= depth-3 &&
 			ttFlag != UPPER &&
 			abs(ttScore) < mate-maxPly {
-			sBeta := ttScore - 6*depth
+			sBeta := ttScore - seBetaMargin*depth
 			// The SE sub-search calls search(p, ply, ...) which reinitialises
 			// moveBuffers[ply], destroying the main loop's picker state.
 			// Save and restore the picker around the sub-search.
@@ -500,6 +500,9 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 			*picker = savedPicker
 			if sScore < sBeta {
 				extension = 1
+				if !isPv && sScore < sBeta-seDoubleMargin {
+					extension = 2
+				}
 			}
 		}
 

@@ -127,6 +127,8 @@ const (
 	probcutMargin    = 120      // extra margin above beta for ProbCut verification
 	probcutMinDepth  = 6        // only apply ProbCut when enough depth remains
 	probcutReduction = 2        // depth reduction used by the reduced verification search
+	seBetaMargin     = 6        // centipawns per ply subtracted from ttScore for singular verification
+	seDoubleMargin   = 64       // extra centipawns below singular beta needed for a double extension
 	razorMargin      = 300      // centipawns per depth for razoring
 	qsFpMargin       = 100      // base margin for quiescence futility pruning
 )
