@@ -39,18 +39,18 @@ package main
 // makeMove applies move to position p.  The Undo record u must be
 // passed in so that unmakeMove() can restore the position exactly.
 func makeMove(p *Pos, move int, u *Undo) {
-	side     := p.side
-	from     := moveFrom(move)
-	to       := moveTo(move)
+	side := p.side
+	from := moveFrom(move)
+	to := moveTo(move)
 	fromType := p.typeAt(from)
-	toType   := p.typeAt(to)
+	toType := p.typeAt(to)
 
 	// Save fields that will be destroyed by this move.
-	u.captured     = toType
+	u.captured = toType
 	u.castleRights = p.castleRights
-	u.epSquare     = p.epSquare
-	u.clock        = p.clock
-	u.key          = p.key
+	u.epSquare = p.epSquare
+	u.clock = p.clock
+	u.key = p.key
 
 	// Append current key to the repetition history.
 	p.keyHist[p.histLen] = p.key
@@ -77,9 +77,9 @@ func makeMove(p *Pos, move int, u *Undo) {
 
 	// --- Move the piece from -> to ---
 	p.board[from] = NO_PC
-	p.board[to]   = makePiece(side, fromType)
+	p.board[to] = makePiece(side, fromType)
 	p.key ^= zobPiece[makePiece(side, fromType)][from] ^
-	         zobPiece[makePiece(side, fromType)][to]
+		zobPiece[makePiece(side, fromType)][to]
 	p.colorBB[side] ^= squareBit(from) | squareBit(to)
 	p.typeBB[fromType] ^= squareBit(from) | squareBit(to)
 
@@ -93,7 +93,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.key ^= zobPiece[makePiece(opp(side), toType)][to]
 		p.colorBB[opp(side)] ^= squareBit(to)
 		p.typeBB[toType] ^= squareBit(to)
-		p.count[opp(side)][toType] --
+		p.count[opp(side)][toType]--
 	}
 
 	// --- Special move type handling ---
@@ -108,15 +108,15 @@ func makeMove(p *Pos, move int, u *Undo) {
 		var rookFrom, rookTo int
 		if to > from {
 			rookFrom = from + 3 // H-file rook
-			rookTo   = to - 1   // F-file landing
+			rookTo = to - 1     // F-file landing
 		} else {
 			rookFrom = from - 4 // A-file rook
-			rookTo   = to + 1   // D-file landing
+			rookTo = to + 1     // D-file landing
 		}
 		p.board[rookFrom] = NO_PC
-		p.board[rookTo]   = makePiece(side, R)
+		p.board[rookTo] = makePiece(side, R)
 		p.key ^= zobPiece[makePiece(side, R)][rookFrom] ^
-		         zobPiece[makePiece(side, R)][rookTo]
+			zobPiece[makePiece(side, R)][rookTo]
 		p.colorBB[side] ^= squareBit(rookFrom) | squareBit(rookTo)
 		p.typeBB[R] ^= squareBit(rookFrom) | squareBit(rookTo)
 
@@ -127,7 +127,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.key ^= zobPiece[makePiece(opp(side), P)][capSq]
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
-		p.count[opp(side)][P] --
+		p.count[opp(side)][P]--
 
 	case EP_SET:
 		// Double pawn push: record the en-passant square if an enemy
@@ -143,11 +143,11 @@ func makeMove(p *Pos, move int, u *Undo) {
 		fromType = promType(move)
 		p.board[to] = makePiece(side, fromType)
 		p.key ^= zobPiece[makePiece(side, P)][to] ^
-		         zobPiece[makePiece(side, fromType)][to]
+			zobPiece[makePiece(side, fromType)][to]
 		p.typeBB[P] ^= squareBit(to)
 		p.typeBB[fromType] ^= squareBit(to)
-		p.count[side][fromType] ++
-		p.count[side][P] --
+		p.count[side][fromType]++
+		p.count[side][P]--
 	}
 
 	p.side ^= 1
@@ -157,22 +157,22 @@ func makeMove(p *Pos, move int, u *Undo) {
 // unmakeMove restores position p to the state before move was made.
 // u must be the Undo record filled by the corresponding makeMove call.
 func unmakeMove(p *Pos, move int, u *Undo) {
-	side        := opp(p.side)           // the side that made the move
-	from        := moveFrom(move)
-	to          := moveTo(move)
-	movingType  := p.typeAt(to)           // type of piece now on "to"
-	capType     := u.captured
+	side := opp(p.side) // the side that made the move
+	from := moveFrom(move)
+	to := moveTo(move)
+	movingType := p.typeAt(to) // type of piece now on "to"
+	capType := u.captured
 
 	// Restore the saved fields.
 	p.castleRights = u.castleRights
-	p.epSquare     = u.epSquare
-	p.clock        = u.clock
-	p.key          = u.key
+	p.epSquare = u.epSquare
+	p.clock = u.clock
+	p.key = u.key
 	p.histLen--
 
 	// --- Move piece back: to -> from ---
 	p.board[from] = makePiece(side, movingType)
-	p.board[to]   = NO_PC
+	p.board[to] = NO_PC
 	p.colorBB[side] ^= squareBit(from) | squareBit(to)
 	p.typeBB[movingType] ^= squareBit(from) | squareBit(to)
 
@@ -186,7 +186,7 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.board[to] = makePiece(opp(side), capType)
 		p.colorBB[opp(side)] ^= squareBit(to)
 		p.typeBB[capType] ^= squareBit(to)
-		p.count[opp(side)] [capType] ++
+		p.count[opp(side)][capType]++
 	}
 
 	// --- Reverse special move effects ---
@@ -198,12 +198,12 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		var rookFrom, rookTo int
 		if to > from {
 			rookFrom = from + 3
-			rookTo   = to - 1
+			rookTo = to - 1
 		} else {
 			rookFrom = from - 4
-			rookTo   = to + 1
+			rookTo = to + 1
 		}
-		p.board[rookTo]   = NO_PC
+		p.board[rookTo] = NO_PC
 		p.board[rookFrom] = makePiece(side, R)
 		p.colorBB[side] ^= squareBit(rookFrom) | squareBit(rookTo)
 		p.typeBB[R] ^= squareBit(rookFrom) | squareBit(rookTo)
@@ -213,7 +213,7 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.board[capSq] = makePiece(opp(side), P)
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
-		p.count[opp(side)][P] ++
+		p.count[opp(side)][P]++
 
 	case EP_SET:
 		// Nothing extra. epSquare was restored from u above.
@@ -224,8 +224,8 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.board[from] = makePiece(side, P)
 		p.typeBB[P] ^= squareBit(from)
 		p.typeBB[movingType] ^= squareBit(from)
-		p.count[opp(side)][P] ++
-		p.count[opp(side)][movingType] --
+		p.count[side][P]++
+		p.count[side][movingType]--
 	}
 
 	p.side ^= 1
@@ -248,7 +248,7 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 // u.key are saved; the other fields are not touched.
 func makeNullMove(p *Pos, u *Undo) {
 	u.epSquare = p.epSquare
-	u.key      = p.key
+	u.key = p.key
 
 	p.keyHist[p.histLen] = p.key
 	p.histLen++
@@ -266,7 +266,7 @@ func makeNullMove(p *Pos, u *Undo) {
 // unmakeNullMove reverses makeNullMove.
 func unmakeNullMove(p *Pos, u *Undo) {
 	p.epSquare = u.epSquare
-	p.key      = u.key
+	p.key = u.key
 	p.histLen--
 	p.clock--
 	p.side ^= 1
