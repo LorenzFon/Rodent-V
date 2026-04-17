@@ -81,7 +81,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 	p.board[to] = makePiece(side, fromType)
 	p.key ^= zobPiece[makePiece(side, fromType)][from] ^
 		zobPiece[makePiece(side, fromType)][to]
-	if fromType == P /*|| fromType == K*/ {
+	if fromType == P {
 		p.pawnKey[side] = p.pawnKey[side] ^ zobPiece[makePiece(side, fromType)][from] ^
 		zobPiece[makePiece(side, fromType)][to]
 	}

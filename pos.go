@@ -276,6 +276,7 @@ func computeZobrist(p *Pos) uint64 {
 	return key
 }
 
+// calculates pawn hash key for one side
 func computePawnKey(p *Pos, side int) uint64 {
 	var key uint64
 	for sq := 0; sq < 64; sq++ {
@@ -287,8 +288,11 @@ func computePawnKey(p *Pos, side int) uint64 {
 	return key
 }
 
+// returns full pawn-king hash key
 func getPawnKey(p *Pos) uint64 {
-	return p.pawnKey[White] ^ p.pawnKey[Black]
+	return p.pawnKey[White] ^ p.pawnKey[Black] ^
+	zobPiece[makePiece(White, K)][p.kingSq[White]] ^
+	zobPiece[makePiece(Black, K)][p.kingSq[Black]]
 }
 
 func PrintBoard(p *Pos) {

@@ -430,7 +430,18 @@ func evaluatePawnStructure(p *Pos, e *EvalData) {
 	}
 }
 
+// evaluatePawns evaluates pawn structure
+//
+// - king's pawn shield
+// - pawn phalanxes
+// - isolated pawns
+// - backward pawns
+// - doubled pawns
 func evaluatePawns(p *Pos, e *EvalData, side int) {
+
+	// Pawn shield only matters in the middlegame.
+	shieldMG := pawnShieldMG(p, side)
+	add(e, side, EvalPawns, shieldMG, 0)
 
 	var pushSq int
 	pieces := p.pieceBB(side, P)
@@ -487,15 +498,12 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 	}
 }
 
-// evaluatePassers scores the pawn structure for one side.
+// evaluatePassers scores the passed pawns for one side.
 //
-//	Passed pawn (+25..+50 cp): no enemy pawn can block or capture it
-//	on the same or adjacent file ahead of it.  The bonus grows with
+//	Passed pawn cannot be blocked or captured on the same 
+//  or adjacent file ahead of it.  The bonus grows with
 //	rank; a pawn on the 7th rank is almost a queen.
-//
-//	Isolated pawn (-20 cp): no friendly pawn on an adjacent file.
-//	Isolated pawns cannot be defended by other pawns and are easy
-//	targets for the opponent's rooks.
+
 func evaluatePassers(p *Pos, e *EvalData, side int) {
 
 	pieces := p.pieceBB(side, P)
@@ -619,10 +627,6 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 	sq := p.kingSq[side]
 	addPST(e, side, K, sq)
 	e.addAttacks(side, K, kingAtk[sq])
-
-	// Pawn shield only matters in the middlegame.
-	shieldMG := pawnShieldMG(p, side)
-	add(e, side, EvalSafety, shieldMG, 0)
 
 	// King-attack danger: pressure accumulated by the *enemy* on our
 	// king ring.  We only trigger this when at least two distinct pieces
