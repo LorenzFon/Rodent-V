@@ -48,12 +48,21 @@ package main
 // entry in the range [-maxHist, +maxHist].
 const maxHist = 16384
 
+// Correction history constants.
+const (
+	corrHistSize        = 16384              // number of entries per side
+	corrHistGrain       = 256                // scaling factor for diff
+	corrHistWeightScale = 256                // weight divisor
+	corrHistMax         = corrHistGrain * 32 // absolute clamp
+)
+
 // Global heuristic tables, reset before each new search.
 var (
 	histTable    [2][64][64]int          // history[side][fromSq][toSq]
 	contHistMain [2][6][64][2][6][64]int // continuation history[prevSide][prevPieceType][prevTo][side][pieceType][to]
 	killerMoves  [maxPly][2]int          // killerMoves[ply][0..1]
 	moveBuffers  [maxPly]MovePicker      // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
+	corrHist     [2][corrHistSize]int    // pawn correction history[side][pawnKeyIndex]
 )
 
 type MoveGenStage int
@@ -301,6 +310,24 @@ func clearHistory() {
 	histTable = [2][64][64]int{}
 	contHistMain = [2][6][64][2][6][64]int{}
 	killerMoves = [maxPly][2]int{}
+	corrHist = [2][corrHistSize]int{}
+}
+
+// getCorrHist returns the correction value for the given side and pawn key.
+func getCorrHist(side int, pawnKey uint64) int {
+	idx := int(pawnKey % corrHistSize)
+	return corrHist[side][idx] / corrHistGrain
+}
+
+// addCorrHist updates the correction history entry for the given side/pawnKey
+// with the difference between the search score and the raw static eval.
+func addCorrHist(side int, pawnKey uint64, depth, diff int) {
+	idx := int(pawnKey % corrHistSize)
+	entry := &corrHist[side][idx]
+	newWeight := min(16, 1+depth)
+	scaledDiff := diff * corrHistGrain
+	update := (*entry)*(corrHistWeightScale-newWeight) + scaledDiff*newWeight
+	*entry = max(-corrHistMax, min(corrHistMax, update/corrHistWeightScale))
 }
 
 // histBonus returns the bonus/malus value for a history update at the

@@ -327,8 +327,11 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	// Store in evalStack for the improving heuristic (ply-2 comparison).
 	// When in check we store a sentinel so the improving check below works correctly.
 	staticEval := 0
+	rawEval := 0
 	if !nodeInCheck {
-		staticEval = evaluate(p)
+		rawEval = evaluate(p)
+		correction := getCorrHist(p.side, getPawnKey(p))
+		staticEval = rawEval + correction
 		evalStack[ply] = staticEval
 	} else {
 		evalStack[ply] = noEval
@@ -616,6 +619,11 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 			if excludedMove[ply] == 0 {
 				storeTT(p.key, move, score, LOWER, depth, ply)
 			}
+			// Update pawn correction history on beta cutoff.
+			if !nodeInCheck && isQuiet(p, move) &&
+				!(score <= staticEval) {
+				addCorrHist(p.side, getPawnKey(p), depth, score-rawEval)
+			}
 			return score
 		}
 
@@ -662,8 +670,10 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	// Store the result in the TT with the appropriate bound type.
 	// Skip during singular extension sub-searches: their partial results
 	// (with one move excluded) must not corrupt the main TT entries.
+	bound := UPPER
 	if excludedMove[ply] == 0 {
 		if bestScore > origAlpha {
+			bound = EXACT
 			if isQuiet(p, bestMove) {
 				updateHistory(p, bestMove, depth, ply, nil)
 			}
@@ -672,6 +682,18 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 			storeTT(p.key, 0, bestScore, UPPER, depth, ply)
 		}
 	}
+
+	// Update pawn correction history: adjust the correction table when the
+	// search result disagrees with the raw static eval.  Skip when in check
+	// (no reliable eval), when the best move is tactical, or when the bound
+	// direction is consistent with the eval (no useful correction signal).
+	if !nodeInCheck && excludedMove[ply] == 0 &&
+		!(bestMove != 0 && !isQuiet(p, bestMove)) &&
+		!((bound == LOWER && bestScore <= staticEval) ||
+			(bound == UPPER && bestScore >= staticEval)) {
+		addCorrHist(p.side, getPawnKey(p), depth, bestScore-rawEval)
+	}
+
 	return bestScore
 }
 
@@ -731,7 +753,8 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	best := -inf
 	futilityBase := -inf
 	if !inCheck {
-		best = evaluate(p)
+		rawQEval := evaluate(p)
+		best = rawQEval + getCorrHist(p.side, getPawnKey(p))
 		if best >= beta {
 			return best
 		}
