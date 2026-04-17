@@ -37,7 +37,10 @@
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 // init() is guaranteed to run before main()
 func init() {
@@ -45,6 +48,10 @@ func init() {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "genmagics" {
+		FindMagics()
+		return
+	}
 	// stuff like reading data from file should go here
 	// to handle errors
 	//getFit()

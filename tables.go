@@ -185,12 +185,6 @@ const (
 //                       diagonal through sq. dir: 0=rank, 1=file,
 //                       2=diag (A1->H8), 3=anti (A8->H1).
 //
-//   slidingAtk[dir][sq][occIdx]: attack set for a sliding piece on
-//                       sq, given a 6-bit occupancy index for that
-//                       line. This is the classical (non-magic)
-//                       approach; see initTables for how the index
-//                       is derived.
-//
 //   pawnAtk[color][sq]: squares a pawn of the given color attacks
 //                       from sq.
 //
@@ -211,7 +205,6 @@ const (
 //
 var (
 	lineMasks  [4][64]uint64
-	slidingAtk [4][64][64]uint64
 	pawnAtk    [2][64]uint64
 	knightAtk  [64]uint64
 	kingAtk    [64]uint64
@@ -346,55 +339,8 @@ func to0x88(sq int) int   { return (sq & 7) | ((sq & ^7) << 1) }
 func from0x88(sq int) int { return (sq & 7) | ((sq & ^7) >> 1) }
 func offBoard(sq int) int { return int(uint(sq) & 0x88) }
 
-// ================================================================
-// SLIDING ATTACK INDEX FUNCTIONS
-// ================================================================
-//
-//   Magic-free approach: for each of the four line directions, we
-//   derive a 6-bit occupancy index from the occupied bitboard and
-//   the square.  That index selects a pre-filled attack bitboard
-//   from slidingAtk[dir][sq][idx].
-//
-//   rankOccIdx: 6 bits extracted from the rank containing sq.
-//   fileOccIdx: 6 bits from the file, folded via a diagonal mul.
-//   diagOccIdx: 6 bits from the diagonal through sq.
-//   antiOccIdx: 6 bits from the anti-diagonal through sq.
-//
-
-func rankOccIdx(occ uint64, sq int) int {
-	return int((occ >> uint((sq&56)+1)) & 63)
-}
-
-func fileOccIdx(occ uint64, sq int) int {
-	return int(((fileABB & (occ >> uint(sq&7))) * diagB8H2BB) >> 58)
-}
-
-func diagOccIdx(occ uint64, sq int) int {
-	return int(((occ & lineMasks[2][sq]) * fileBBB) >> 58)
-}
-
-func antiOccIdx(occ uint64, sq int) int {
-	return int(((occ & lineMasks[3][sq]) * fileBBB) >> 58)
-}
-
-// ================================================================
-// SLIDING PIECE ATTACK GENERATORS
-// ================================================================
-//
-//   These four functions look up the precomputed attack bitboard
-//   for a sliding piece on sq given the current occupancy.
-//   They compose into the public-facing rookAttacks, bishopAttacks,
-//   and queenAttacks used throughout the engine.
-//
-
-func rankSlide(occ uint64, sq int) uint64 { return slidingAtk[0][sq][rankOccIdx(occ, sq)] }
-func fileSlide(occ uint64, sq int) uint64 { return slidingAtk[1][sq][fileOccIdx(occ, sq)] }
-func diagSlide(occ uint64, sq int) uint64 { return slidingAtk[2][sq][diagOccIdx(occ, sq)] }
-func antiSlide(occ uint64, sq int) uint64 { return slidingAtk[3][sq][antiOccIdx(occ, sq)] }
-
-func rookAttacks(occ uint64, sq int) uint64   { return rankSlide(occ, sq) | fileSlide(occ, sq) }
-func bishopAttacks(occ uint64, sq int) uint64 { return diagSlide(occ, sq) | antiSlide(occ, sq) }
-func queenAttacks(occ uint64, sq int) uint64  { return rookAttacks(occ, sq) | bishopAttacks(occ, sq) }
+// Sliding piece attack functions (rookAttacks, bishopAttacks, queenAttacks)
+// are now in magics.go, implemented via magic bitboard lookups.
 
 // ================================================================
 // ZOBRIST RANDOM NUMBER GENERATOR
@@ -438,10 +384,6 @@ func nextRand() uint64 {
 //
 
 func initTables() {
-	// Direction vectors in 0x88 space.
-	// dirs[0] = rank (+/-1), dirs[1] = file (+/-16),
-	// dirs[2] = diagonal (+/-17), dirs[3] = anti-diagonal (+/-15).
-	dirs := [4][2]int{{1, -1}, {16, -16}, {17, -17}, {15, -15}}
 	pMoves := [2][2]int{{15, 17}, {-17, -15}} // pawn attack offsets (0x88)
 	nMoves := [8]int{-33, -31, -18, -14, 14, 18, 31, 33}
 	kMoves := [8]int{-17, -16, -15, -1, 1, 15, 16, 17}
@@ -464,32 +406,8 @@ func initTables() {
 		}
 	}
 
-	// --- Sliding attack tables ---
-	for d := 0; d < 4; d++ {
-		for sq := 0; sq < 64; sq++ {
-			for occ := 0; occ < 64; occ++ {
-				slidingAtk[d][sq][occ] = 0
-				for side := 0; side < 2; side++ {
-					x := to0x88(sq) + dirs[d][side]
-					for offBoard(x) == 0 {
-						dest := from0x88(x)
-						slidingAtk[d][sq][occ] |= squareBit(dest)
-						// Determine blocker bit position within the 6-bit index.
-						var pos int
-						if d != 1 {
-							pos = fileOf(dest)
-						} else {
-							pos = rankOf(dest)
-						}
-						if (occ<<1)&(1<<uint(pos)) != 0 {
-							break // ray is blocked
-						}
-						x += dirs[d][side]
-					}
-				}
-			}
-		}
-	}
+	// --- Magic bitboard tables ---
+	initMagics()
 
 	// --- Pawn attacks ---
 	for c := 0; c < 2; c++ {
