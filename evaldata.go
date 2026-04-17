@@ -147,8 +147,8 @@ func PrintThreatDebug(p *Pos) {
 	e.kingRing[Black] = kingAtk[p.kingSq[Black]]
 	evaluatePieces(p, &e, White)
 	evaluatePieces(p, &e, Black)
-	evaluatePawns(p, &e, White)
-	evaluatePawns(p, &e, Black)
+	evaluatePassers(p, &e, White)
+	evaluatePassers(p, &e, Black)
 	evaluateKing(p, &e, White)
 	evaluateKing(p, &e, Black)
 

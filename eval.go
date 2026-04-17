@@ -89,6 +89,7 @@ func init() {
 	}
 
 	initEvalHash(128 * 128)
+	initPawnHash(64 * 128)
 }
 
 // --- Eval params ---
@@ -220,8 +221,9 @@ func eval_internal(p *Pos, shouldReport bool) int {
 
 	evaluatePieces(p, &e, White)
 	evaluatePieces(p, &e, Black)
-	evaluatePawns(p, &e, White)
-	evaluatePawns(p, &e, Black)
+    evaluatePawnStructure(p, &e)
+	evaluatePassers(p, &e, White)
+	evaluatePassers(p, &e, Black)
 	evaluateKing(p, &e, White)
 	evaluateKing(p, &e, Black)
 	// Threats use the fully-built attack maps from all evaluators above.
@@ -413,7 +415,79 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 	}
 }
 
-// evaluatePawns scores the pawn structure for one side.
+func evaluatePawnStructure(p *Pos, e *EvalData) {
+
+	var key = getPawnKey(p)
+
+	if wscoreMG, bscoreMG, wscoreEG, bscoreEG, ok := probePawnHash(key); ok {
+		add(e, White, EvalPawns, wscoreMG, wscoreEG)
+        add(e, Black, EvalPawns, bscoreMG, bscoreEG)
+	} else {
+		evaluatePawns(p, e, White)
+		evaluatePawns(p, e, Black)
+		storePawnHash(key, e.mgScore[White][EvalPawns], e.mgScore[Black][EvalPawns], 
+						   e.egScore[White][EvalPawns], e.egScore[Black][EvalPawns])
+	}
+}
+
+func evaluatePawns(p *Pos, e *EvalData, side int) {
+
+	var pushSq int
+	pieces := p.pieceBB(side, P)
+
+	for pieces != 0 {
+		sq := lsb(pieces)
+		b := squareBit(sq);
+
+		// Pawn phalanx: two pawns standing side by side.
+		if shiftSides(b) & p.pieceBB(side, P) > 0 {
+			addPhalanx(e, side, sq);
+		}
+
+		frontMask := fillForward(b, side)
+		isOpen := frontMask & p.pieceBB(side, P) == 0
+
+		// Isolated pawn: no friendly pawns on adjacent files.
+		if adjFileMask[fileOf(sq)]&p.pieceBB(side, P) == 0 {
+			add(e, side, EvalPawns, isolatedMG, isolatedEG)
+			if (isOpen) {
+				add(e, side, EvalPawns, isolatedOpenMG, 0)
+			}
+		// Backward pawn
+		} else if supportMask[side][sq] &p.pieceBB(side, P) == 0 {
+			add(e, side, EvalPawns, backwardMG, backwardEG)
+			if (isOpen) {
+				add(e, side, EvalPawns, backwardOpenMG, 0)
+			}
+		}
+
+		// Doubled pawn: a friendly pawn stands directly ahead on the same file.
+		// We only penalise when the pawn cannot immediately capture an enemy
+		// pawn — if it can, the doubled structure is likely resolved tactically.
+		// The penalty is indexed by distance-to-edge so central files (where
+		// the doubled pawn blocks the most pawn breaks) are hurt the most in MG,
+		// while edge files are punished more in EG (they can rarely promote).
+		if side == White {
+			pushSq = sq + 8
+		} else {
+			pushSq = sq - 8
+		}
+		if pushSq >= 0 && pushSq < 64 && p.pieceBB(side, P)&squareBit(pushSq) != 0 {
+			// Only penalise if the doubled pawn has no immediate captures.
+			if pawnAtk[side][sq]&p.pieceBB(opp(side), P) == 0 {
+				fileIdx := fileOf(sq)
+				if fileIdx > 3 {
+					fileIdx = 7 - fileIdx
+				}
+				add(e, side, EvalPawns, doubledPawnMG[fileIdx], doubledPawnEG[fileIdx])
+			}
+		}
+		
+		pieces &= pieces - 1
+	}
+}
+
+// evaluatePassers scores the pawn structure for one side.
 //
 //	Passed pawn (+25..+50 cp): no enemy pawn can block or capture it
 //	on the same or adjacent file ahead of it.  The bonus grows with
@@ -422,7 +496,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 //	Isolated pawn (-20 cp): no friendly pawn on an adjacent file.
 //	Isolated pawns cannot be defended by other pawns and are easy
 //	targets for the opponent's rooks.
-func evaluatePawns(p *Pos, e *EvalData, side int) {
+func evaluatePassers(p *Pos, e *EvalData, side int) {
 
 	pieces := p.pieceBB(side, P)
 
@@ -430,12 +504,6 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 		sq := lsb(pieces)
 		add(e, side, EvalMaterial, pieceValMG[P], pieceValEG[P])
 		addPST(e, side, P, sq)
-
-		// phalanx
-		b := squareBit(sq);
-		if shiftSides(b) & p.pieceBB(side, P) > 0 {
-			addPhalanx(e, side, sq);
-		}
 
 		// pushSq: the square directly in front of this pawn.
 		// Pawns can't legally sit on the promotion rank, but guard anyway.
@@ -487,43 +555,6 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 				if behindMask&enemySliders != 0 {
 					add(e, side, EvalPassers, -25, -45)
 				}
-			}
-		}
-		frontMask := fillForward(squareBit(sq), side)
-		isOpen := frontMask & p.pieceBB(side, P) == 0
-
-		// Isolated pawn: no friendly pawns on adjacent files.
-		if adjFileMask[fileOf(sq)]&p.pieceBB(side, P) == 0 {
-			add(e, side, EvalPawns, isolatedMG, isolatedEG)
-			if (isOpen) {
-				add(e, side, EvalPawns, isolatedOpenMG, 0)
-			}
-		} else if supportMask[side][sq] &p.pieceBB(side, P) == 0 {
-			add(e, side, EvalPawns, backwardMG, backwardEG)
-			if (isOpen) {
-				add(e, side, EvalPawns, backwardOpenMG, 0)
-			}
-		}
-	
-		// Doubled pawn: a friendly pawn stands directly ahead on the same file.
-		// We only penalise when the pawn cannot immediately capture an enemy
-		// pawn — if it can, the doubled structure is likely resolved tactically.
-		// The penalty is indexed by distance-to-edge so central files (where
-		// the doubled pawn blocks the most pawn breaks) are hurt the most in MG,
-		// while edge files are punished more in EG (they can rarely promote).
-		if side == White {
-			pushSq = sq + 8
-		} else {
-			pushSq = sq - 8
-		}
-		if pushSq >= 0 && pushSq < 64 && p.pieceBB(side, P)&squareBit(pushSq) != 0 {
-			// Only penalise if the doubled pawn has no immediate captures.
-			if pawnAtk[side][sq]&p.pieceBB(opp(side), P) == 0 {
-				fileIdx := fileOf(sq)
-				if fileIdx > 3 {
-					fileIdx = 7 - fileIdx
-				}
-				add(e, side, EvalPawns, doubledPawnMG[fileIdx], doubledPawnEG[fileIdx])
 			}
 		}
 		pieces &= pieces - 1

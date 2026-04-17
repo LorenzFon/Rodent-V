@@ -6,7 +6,15 @@ type EvalHashEntry struct {
 	used  bool
 }
 
+type PawnHashEntry struct {
+	key   uint64
+	scoreMG[2] int
+	scoreEG[2] int
+	used  bool
+}
+
 var evalTT []EvalHashEntry
+var pawnTT []PawnHashEntry
 
 func initEvalHash(size int) {
 	if size <= 0 {
@@ -43,4 +51,47 @@ func storeEvalHash(key uint64, score int) {
 		score: score,
 		used:  true,
 	}
+}
+
+// --- Pawn hash ---
+
+func initPawnHash(size int) {
+	if size <= 0 {
+		pawnTT = nil
+		return
+	}
+	pawnTT = make([]PawnHashEntry, size)
+}
+
+func clearPawnHash() {
+	for i := range evalTT {
+		pawnTT[i] = PawnHashEntry{}
+	}
+}
+
+func probePawnHash(key uint64) (int, int, int, int, bool) {
+	if len(pawnTT) == 0 {
+		return 0, 0, 0, 0, false
+	}
+
+	e := pawnTT[key%uint64(len(pawnTT))]
+	if e.used && e.key == key {
+		return e.scoreMG[White], e.scoreMG[Black], e.scoreEG[White], e.scoreEG[Black], true
+	}
+	return 0, 0, 0, 0, false
+}
+
+func storePawnHash(key uint64, wscoreMG, bscoreMG, wscoreEG, bscoreEG int) {
+	if len(evalTT) == 0 {
+		return
+	}
+
+	addr := key%uint64(len(pawnTT))
+
+    pawnTT[addr].key = key
+	pawnTT[addr].scoreMG[White] = wscoreMG
+	pawnTT[addr].scoreMG[Black] = bscoreMG
+	pawnTT[addr].scoreEG[White] = wscoreEG
+	pawnTT[addr].scoreEG[Black] = bscoreEG
+	pawnTT[addr].used = true
 }
