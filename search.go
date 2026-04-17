@@ -451,6 +451,7 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	}
 
 	var bestMove int
+	origAlpha := alpha
 
 	// --- Main move loop ---
 	bestScore := -inf
@@ -538,8 +539,6 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 		// or the only escape from a mating attack.
 		// When improving we allow more moves (position is trending up, so
 		// later moves are more likely to be relevant).
-		// Futility pruning: at shallow depth, skip late quiet moves that
-		// cannot plausibly raise alpha even with a generous margin.
 		lmpThreshold := 4*depth + 1
 		if improving {
 			lmpThreshold = 6*depth + 1
@@ -549,6 +548,9 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 			unmakeMove(p, move, &u)
 			continue
 		}
+
+		// Futility pruning: at shallow depth, skip late quiet moves that
+		// cannot plausibly raise alpha even with a generous margin.
 		if stage == StageQuiet && !isPv && !nodeInCheck && !givesCheck &&
 			excludedMove[ply] == 0 && depth <= fpMaxDepth &&
 			quietTried > 0 && alpha < mate-maxPly &&
@@ -626,9 +628,10 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 
 		if score > bestScore {
 			bestScore = score
+			bestMove = move
 			if score > alpha {
 				alpha = score
-				bestMove = move
+				//bestMove = move
 				buildPV(pv, childPv[:], move)
 				if isRoot {
 					reportInfo(score, pv)
@@ -660,7 +663,7 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	// Skip during singular extension sub-searches: their partial results
 	// (with one move excluded) must not corrupt the main TT entries.
 	if excludedMove[ply] == 0 {
-		if bestMove != 0 {
+		if bestScore > origAlpha {
 			if isQuiet(p, bestMove) {
 				updateHistory(p, bestMove, depth, ply, nil)
 			}
