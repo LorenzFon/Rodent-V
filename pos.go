@@ -57,6 +57,7 @@ type Pos struct {
 	clock       int        // half-move clock for the 50-move rule
 	histLen     int        // number of keys stored in keyHist
 	key         uint64     // Zobrist hash of the current position
+	pawnKey     [2]uint64   // Zorbrist hash of pawn position
 	keyHist     [256]uint64 // hash keys since last irreversible move
 }
 
@@ -70,6 +71,7 @@ type Undo struct {
 	epSquare    int    // epSquare before the move
 	clock       int    // half-move clock before the move
 	key         uint64 // Zobrist key before the move
+	pawnKey[2]  uint64 // Zobrist key of pawn positions
 }
 
 // ---- Position query helpers ----
@@ -244,6 +246,8 @@ func parseFEN(p *Pos, epd string) {
 	}
 
 	p.key = computeZobrist(p)
+	p.pawnKey[White] = computePawnKey(p, White)
+	p.pawnKey[Black] = computePawnKey(p, Black)
 }
 
 // ================================================================
@@ -270,6 +274,21 @@ func computeZobrist(p *Pos) uint64 {
 		key ^= sideKey
 	}
 	return key
+}
+
+func computePawnKey(p *Pos, side int) uint64 {
+	var key uint64
+	for sq := 0; sq < 64; sq++ {
+		if p.board[sq] == makePiece(side, P) {
+			key ^= zobPiece[p.board[sq]][sq]
+		}
+	}
+
+	return key
+}
+
+func getPawnKey(p *Pos) uint64 {
+	return p.pawnKey[White] ^ p.pawnKey[Black]
 }
 
 func PrintBoard(p *Pos) {

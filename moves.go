@@ -51,6 +51,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 	u.epSquare = p.epSquare
 	u.clock = p.clock
 	u.key = p.key
+	u.pawnKey = p.pawnKey
 
 	// Append current key to the repetition history.
 	p.keyHist[p.histLen] = p.key
@@ -80,6 +81,10 @@ func makeMove(p *Pos, move int, u *Undo) {
 	p.board[to] = makePiece(side, fromType)
 	p.key ^= zobPiece[makePiece(side, fromType)][from] ^
 		zobPiece[makePiece(side, fromType)][to]
+	if fromType == P /*|| fromType == K*/ {
+		p.pawnKey[side] = p.pawnKey[side] ^ zobPiece[makePiece(side, fromType)][from] ^
+		zobPiece[makePiece(side, fromType)][to]
+	}
 	p.colorBB[side] ^= squareBit(from) | squareBit(to)
 	p.typeBB[fromType] ^= squareBit(from) | squareBit(to)
 
@@ -91,6 +96,9 @@ func makeMove(p *Pos, move int, u *Undo) {
 	// --- Handle a normal capture at "to" ---
 	if toType != NO_TP {
 		p.key ^= zobPiece[makePiece(opp(side), toType)][to]
+		if (toType == P) {
+			p.pawnKey[opp(side)] = p.pawnKey[opp(side)] ^ zobPiece[makePiece(opp(side), toType)][to]
+		}
 		p.colorBB[opp(side)] ^= squareBit(to)
 		p.typeBB[toType] ^= squareBit(to)
 		p.count[opp(side)][toType]--
@@ -125,6 +133,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 		capSq := to ^ 8
 		p.board[capSq] = NO_PC
 		p.key ^= zobPiece[makePiece(opp(side), P)][capSq]
+		p.pawnKey[opp(side)] = p.pawnKey[opp(side)] ^ zobPiece[makePiece(opp(side), P)][capSq]
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
 		p.count[opp(side)][P]--
@@ -144,6 +153,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.board[to] = makePiece(side, fromType)
 		p.key ^= zobPiece[makePiece(side, P)][to] ^
 			zobPiece[makePiece(side, fromType)][to]
+		p.pawnKey[side] = p.pawnKey[side] ^ zobPiece[makePiece(side, P)][to]
 		p.typeBB[P] ^= squareBit(to)
 		p.typeBB[fromType] ^= squareBit(to)
 		p.count[side][fromType]++
@@ -168,6 +178,7 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 	p.epSquare = u.epSquare
 	p.clock = u.clock
 	p.key = u.key
+	p.pawnKey = u.pawnKey
 	p.histLen--
 
 	// --- Move piece back: to -> from ---
