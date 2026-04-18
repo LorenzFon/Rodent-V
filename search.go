@@ -805,6 +805,13 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 			continue
 		}
 		movesTried++
+		// QS LMP: cap captures tried outside of check to prevent explosion
+		// in pathological positions with many equal-value captures.
+		// Commented: only uncomment when testing positions like: 1b2kBbK/2BbB1B1/2B2bb1/B2b4/bbb1b3/BBb2BBB/BB3b2/BB1bb2b w - - 0 1
+		// if !inCheck && movesTried > qsLmpLimit {
+		// 	unmakeMove(p, move, &u)
+		// 	break
+		// }
 		score := -quiesce(p, ply+1, -beta, -alpha, childPv[:])
 		unmakeMove(p, move, &u)
 

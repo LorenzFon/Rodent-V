@@ -131,6 +131,7 @@ const (
 	seDoubleMargin   = 64       // extra centipawns below singular beta needed for a double extension
 	razorMargin      = 300      // centipawns per depth for razoring
 	qsFpMargin       = 100      // base margin for quiescence futility pruning
+	qsLmpLimit       = 3        // max captures tried per qs node (outside check) to cap explosion
 )
 
 // startFEN is the standard opening position in FEN notation.
