@@ -389,7 +389,7 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	if depth > 1 && !isPv && !nodeInCheck && !wasNull && p.canNullMove() && beta <= staticEval &&
 		excludedMove[ply] == 0 {
 		contValid[ply] = false // null move: no valid piece context for cont hist
-		reduction := 2 + depth/6
+		reduction := 3 + depth/3
 		var u Undo
 		makeNullMove(p, &u)
 		var nullPv [maxPly]int
