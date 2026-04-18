@@ -58,11 +58,12 @@ const (
 
 // Global heuristic tables, reset before each new search.
 var (
-	histTable    [2][64][64]int          // history[side][fromSq][toSq]
-	contHistMain [2][6][64][2][6][64]int // continuation history[prevSide][prevPieceType][prevTo][side][pieceType][to]
-	killerMoves  [maxPly][2]int          // killerMoves[ply][0..1]
-	moveBuffers  [maxPly]MovePicker      // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
-	corrHist     [2][corrHistSize]int    // pawn correction history[side][pawnKeyIndex]
+	histTable       [2][64][64]int          // history[side][fromSq][toSq]
+	contHistMain    [2][6][64][2][6][64]int // continuation history[prevSide][prevPieceType][prevTo][side][pieceType][to]
+	killerMoves     [maxPly][2]int          // killerMoves[ply][0..1]
+	moveBuffers     [maxPly]MovePicker      // pre-allocated pickers, one per ply; avoids zeroing 6 KB on every node
+	corrHist        [2][corrHistSize]int    // pawn correction history[side][pawnKeyIndex]
+	nonPawnCorrHist [2][2][corrHistSize]int // non-pawn correction history[nonPawnColor][side][index]
 )
 
 type MoveGenStage int
@@ -311,23 +312,35 @@ func clearHistory() {
 	contHistMain = [2][6][64][2][6][64]int{}
 	killerMoves = [maxPly][2]int{}
 	corrHist = [2][corrHistSize]int{}
+	nonPawnCorrHist = [2][2][corrHistSize]int{}
 }
 
-// getCorrHist returns the correction value for the given side and pawn key.
-func getCorrHist(side int, pawnKey uint64) int {
-	idx := int(pawnKey % corrHistSize)
-	return corrHist[side][idx] / corrHistGrain
+// getCorrection returns the total correction value for the position,
+// combining pawn and non-pawn correction history.
+func getCorrection(p *Pos) int {
+	side := p.side
+	pawnIdx := int((p.pawnKey[White] ^ p.pawnKey[Black]) % corrHistSize)
+	corr := corrHist[side][pawnIdx] / corrHistGrain
+	corr += nonPawnCorrHist[White][side][int(p.nonPawnKey[White]%corrHistSize)] / corrHistGrain
+	corr += nonPawnCorrHist[Black][side][int(p.nonPawnKey[Black]%corrHistSize)] / corrHistGrain
+	return corr
 }
 
-// addCorrHist updates the correction history entry for the given side/pawnKey
-// with the difference between the search score and the raw static eval.
-func addCorrHist(side int, pawnKey uint64, depth, diff int) {
-	idx := int(pawnKey % corrHistSize)
-	entry := &corrHist[side][idx]
-	newWeight := min(16, 1+depth)
-	scaledDiff := diff * corrHistGrain
+// updateCorrEntry applies a weighted update to a single correction history entry.
+func updateCorrEntry(entry *int, newWeight, scaledDiff int) {
 	update := (*entry)*(corrHistWeightScale-newWeight) + scaledDiff*newWeight
 	*entry = max(-corrHistMax, min(corrHistMax, update/corrHistWeightScale))
+}
+
+// addCorrection updates all correction history entries for the position.
+func addCorrection(p *Pos, depth, diff int) {
+	side := p.side
+	newWeight := min(16, 1+depth)
+	scaledDiff := diff * corrHistGrain
+	pawnIdx := int((p.pawnKey[White] ^ p.pawnKey[Black]) % corrHistSize)
+	updateCorrEntry(&corrHist[side][pawnIdx], newWeight, scaledDiff)
+	updateCorrEntry(&nonPawnCorrHist[White][side][int(p.nonPawnKey[White]%corrHistSize)], newWeight, scaledDiff)
+	updateCorrEntry(&nonPawnCorrHist[Black][side][int(p.nonPawnKey[Black]%corrHistSize)], newWeight, scaledDiff)
 }
 
 // histBonus returns the bonus/malus value for a history update at the

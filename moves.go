@@ -52,6 +52,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 	u.clock = p.clock
 	u.key = p.key
 	u.pawnKey = p.pawnKey
+	u.nonPawnKey = p.nonPawnKey
 
 	// Append current key to the repetition history.
 	p.keyHist[p.histLen] = p.key
@@ -83,7 +84,10 @@ func makeMove(p *Pos, move int, u *Undo) {
 		zobPiece[makePiece(side, fromType)][to]
 	if fromType == P {
 		p.pawnKey[side] = p.pawnKey[side] ^ zobPiece[makePiece(side, fromType)][from] ^
-		zobPiece[makePiece(side, fromType)][to]
+			zobPiece[makePiece(side, fromType)][to]
+	} else {
+		p.nonPawnKey[side] ^= zobPiece[makePiece(side, fromType)][from] ^
+			zobPiece[makePiece(side, fromType)][to]
 	}
 	p.colorBB[side] ^= squareBit(from) | squareBit(to)
 	p.typeBB[fromType] ^= squareBit(from) | squareBit(to)
@@ -96,8 +100,10 @@ func makeMove(p *Pos, move int, u *Undo) {
 	// --- Handle a normal capture at "to" ---
 	if toType != NO_TP {
 		p.key ^= zobPiece[makePiece(opp(side), toType)][to]
-		if (toType == P) {
+		if toType == P {
 			p.pawnKey[opp(side)] = p.pawnKey[opp(side)] ^ zobPiece[makePiece(opp(side), toType)][to]
+		} else if toType != K {
+			p.nonPawnKey[opp(side)] ^= zobPiece[makePiece(opp(side), toType)][to]
 		}
 		p.colorBB[opp(side)] ^= squareBit(to)
 		p.typeBB[toType] ^= squareBit(to)
@@ -124,6 +130,8 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.board[rookFrom] = NO_PC
 		p.board[rookTo] = makePiece(side, R)
 		p.key ^= zobPiece[makePiece(side, R)][rookFrom] ^
+			zobPiece[makePiece(side, R)][rookTo]
+		p.nonPawnKey[side] ^= zobPiece[makePiece(side, R)][rookFrom] ^
 			zobPiece[makePiece(side, R)][rookTo]
 		p.colorBB[side] ^= squareBit(rookFrom) | squareBit(rookTo)
 		p.typeBB[R] ^= squareBit(rookFrom) | squareBit(rookTo)
@@ -154,6 +162,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.key ^= zobPiece[makePiece(side, P)][to] ^
 			zobPiece[makePiece(side, fromType)][to]
 		p.pawnKey[side] = p.pawnKey[side] ^ zobPiece[makePiece(side, P)][to]
+		p.nonPawnKey[side] ^= zobPiece[makePiece(side, fromType)][to]
 		p.typeBB[P] ^= squareBit(to)
 		p.typeBB[fromType] ^= squareBit(to)
 		p.count[side][fromType]++
@@ -179,6 +188,7 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 	p.clock = u.clock
 	p.key = u.key
 	p.pawnKey = u.pawnKey
+	p.nonPawnKey = u.nonPawnKey
 	p.histLen--
 
 	// --- Move piece back: to -> from ---

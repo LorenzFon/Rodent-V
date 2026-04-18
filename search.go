@@ -330,7 +330,7 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	rawEval := 0
 	if !nodeInCheck {
 		rawEval = evaluate(p)
-		correction := getCorrHist(p.side, getPawnKey(p))
+		correction := getCorrection(p)
 		staticEval = rawEval + correction
 		evalStack[ply] = staticEval
 	} else {
@@ -619,10 +619,10 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 			if excludedMove[ply] == 0 {
 				storeTT(p.key, move, score, LOWER, depth, ply)
 			}
-			// Update pawn correction history on beta cutoff.
+			// Update correction history on beta cutoff.
 			if !nodeInCheck && isQuiet(p, move) &&
 				!(score <= staticEval) {
-				addCorrHist(p.side, getPawnKey(p), depth, score-rawEval)
+				addCorrection(p, depth, score-rawEval)
 			}
 			return score
 		}
@@ -683,7 +683,7 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 		}
 	}
 
-	// Update pawn correction history: adjust the correction table when the
+	// Update correction history: adjust the correction table when the
 	// search result disagrees with the raw static eval.  Skip when in check
 	// (no reliable eval), when the best move is tactical, or when the bound
 	// direction is consistent with the eval (no useful correction signal).
@@ -691,7 +691,7 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 		!(bestMove != 0 && !isQuiet(p, bestMove)) &&
 		!((bound == LOWER && bestScore <= staticEval) ||
 			(bound == UPPER && bestScore >= staticEval)) {
-		addCorrHist(p.side, getPawnKey(p), depth, bestScore-rawEval)
+		addCorrection(p, depth, bestScore-rawEval)
 	}
 
 	return bestScore
@@ -754,7 +754,7 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	futilityBase := -inf
 	if !inCheck {
 		rawQEval := evaluate(p)
-		best = rawQEval + getCorrHist(p.side, getPawnKey(p))
+		best = rawQEval + getCorrection(p)
 		if best >= beta {
 			return best
 		}

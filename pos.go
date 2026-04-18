@@ -46,19 +46,20 @@ import "fmt"
 // Every field can be derived from the board array alone, but the
 // redundant fields are maintained incrementally for speed.
 type Pos struct {
-	colorBB     [2]uint64  // colorBB[c]: bitboard of all pieces of color c
-	typeBB      [6]uint64  // typeBB[t]: bitboard of all pieces of type t
-	board       [64]int    // board[sq]: piece on that square, or NO_PC
-	kingSq      [2]int     // kingSq[c]: square of the king of color c
-	count       [2][6]int  // count[c][t] count of pieces of color c and type t
-	side        int        // side to move: White or Black
-	castleRights int       // castling availability: bit0=WK, bit1=WQ, bit2=BK, bit3=BQ
-	epSquare    int        // en-passant target square, or NO_SQ
-	clock       int        // half-move clock for the 50-move rule
-	histLen     int        // number of keys stored in keyHist
-	key         uint64     // Zobrist hash of the current position
-	pawnKey     [2]uint64   // Zorbrist hash of pawn position
-	keyHist     [256]uint64 // hash keys since last irreversible move
+	colorBB      [2]uint64   // colorBB[c]: bitboard of all pieces of color c
+	typeBB       [6]uint64   // typeBB[t]: bitboard of all pieces of type t
+	board        [64]int     // board[sq]: piece on that square, or NO_PC
+	kingSq       [2]int      // kingSq[c]: square of the king of color c
+	count        [2][6]int   // count[c][t] count of pieces of color c and type t
+	side         int         // side to move: White or Black
+	castleRights int         // castling availability: bit0=WK, bit1=WQ, bit2=BK, bit3=BQ
+	epSquare     int         // en-passant target square, or NO_SQ
+	clock        int         // half-move clock for the 50-move rule
+	histLen      int         // number of keys stored in keyHist
+	key          uint64      // Zobrist hash of the current position
+	pawnKey      [2]uint64   // Zobrist hash of pawn position (per side)
+	nonPawnKey   [2]uint64   // Zobrist hash of non-pawn pieces (per color)
+	keyHist      [256]uint64 // hash keys since last irreversible move
 }
 
 // Undo stores the information needed to reverse a single move.
@@ -66,12 +67,13 @@ type Pos struct {
 // piece type, castling flags, en-passant square, 50-move clock) are
 // saved here before makeMove() modifies them.
 type Undo struct {
-	captured    int    // type of the piece that was captured (NO_TP if none)
-	castleRights int   // castleRights before the move
-	epSquare    int    // epSquare before the move
-	clock       int    // half-move clock before the move
-	key         uint64 // Zobrist key before the move
-	pawnKey[2]  uint64 // Zobrist key of pawn positions
+	captured     int       // type of the piece that was captured (NO_TP if none)
+	castleRights int       // castleRights before the move
+	epSquare     int       // epSquare before the move
+	clock        int       // half-move clock before the move
+	key          uint64    // Zobrist key before the move
+	pawnKey      [2]uint64 // pawnKey before the move
+	nonPawnKey   [2]uint64 // nonPawnKey before the move
 }
 
 // ---- Position query helpers ----
@@ -187,7 +189,7 @@ func parseFEN(p *Pos, epd string) {
 				if typeOf(pc) == K {
 					p.kingSq[colorOf(pc)] = sq
 				}
-				p.count[colorOf(pc)][typeOf(pc)] ++
+				p.count[colorOf(pc)][typeOf(pc)]++
 				file++
 			}
 			idx++
@@ -207,10 +209,22 @@ func parseFEN(p *Pos, epd string) {
 	if epd[idx] == '-' {
 		idx++
 	} else {
-		if idx < len(epd) && epd[idx] == 'K' { p.castleRights |= 1; idx++ }
-		if idx < len(epd) && epd[idx] == 'Q' { p.castleRights |= 2; idx++ }
-		if idx < len(epd) && epd[idx] == 'k' { p.castleRights |= 4; idx++ }
-		if idx < len(epd) && epd[idx] == 'q' { p.castleRights |= 8; idx++ }
+		if idx < len(epd) && epd[idx] == 'K' {
+			p.castleRights |= 1
+			idx++
+		}
+		if idx < len(epd) && epd[idx] == 'Q' {
+			p.castleRights |= 2
+			idx++
+		}
+		if idx < len(epd) && epd[idx] == 'k' {
+			p.castleRights |= 4
+			idx++
+		}
+		if idx < len(epd) && epd[idx] == 'q' {
+			p.castleRights |= 8
+			idx++
+		}
 	}
 	idx++ // skip space
 
@@ -248,6 +262,8 @@ func parseFEN(p *Pos, epd string) {
 	p.key = computeZobrist(p)
 	p.pawnKey[White] = computePawnKey(p, White)
 	p.pawnKey[Black] = computePawnKey(p, Black)
+	p.nonPawnKey[White] = computeNonPawnKey(p, White)
+	p.nonPawnKey[Black] = computeNonPawnKey(p, Black)
 }
 
 // ================================================================
@@ -288,11 +304,25 @@ func computePawnKey(p *Pos, side int) uint64 {
 	return key
 }
 
+// computeNonPawnKey builds the non-pawn Zobrist hash for one color by scanning
+// all non-pawn pieces (including kings) of that color.  Called once from parseFEN();
+// updated incrementally in makeMove/unmakeMove afterwards.
+func computeNonPawnKey(p *Pos, side int) uint64 {
+	var key uint64
+	for sq := 0; sq < 64; sq++ {
+		pc := p.board[sq]
+		if pc != NO_PC && colorOf(pc) == side && typeOf(pc) != P {
+			key ^= zobPiece[pc][sq]
+		}
+	}
+	return key
+}
+
 // returns full pawn-king hash key
 func getPawnKey(p *Pos) uint64 {
 	return p.pawnKey[White] ^ p.pawnKey[Black] ^
-	zobPiece[makePiece(White, K)][p.kingSq[White]] ^
-	zobPiece[makePiece(Black, K)][p.kingSq[Black]]
+		zobPiece[makePiece(White, K)][p.kingSq[White]] ^
+		zobPiece[makePiece(Black, K)][p.kingSq[Black]]
 }
 
 func PrintBoard(p *Pos) {
@@ -342,7 +372,6 @@ func PrintBoard(p *Pos) {
 		p.count[Black][Q],
 		p.count[Black][K],
 	)
-
 
 	fmt.Println("--------------------------------------------")
 }
