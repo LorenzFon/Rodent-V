@@ -659,6 +659,17 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 		danger += popCount(weakInRing) * 2
 		danger += safeKnightChecks*3 + safeBishopChecks*3 + safeRookChecks*4 + safeQueenChecks*6
 
+		// Queen contact check: enemy queen can land on a square in our king
+		// ring that is supported by enemy pieces but not defended by our
+		// non-queen pieces.
+		enemySupport := e.attackedBy[enemy][P] | e.attackedBy[enemy][N] |
+			e.attackedBy[enemy][B] | e.attackedBy[enemy][R]
+		ourDefense := e.attackedBy[side][P] | e.attackedBy[side][N] |
+			e.attackedBy[side][B] | e.attackedBy[side][R] | e.attackedBy[side][Q]
+		if e.kingRing[side]&e.attackedBy[enemy][Q]&enemySupport & ^ourDefense != 0 {
+			danger += 20
+		}
+
 		// No-queen discount: an attacking force without a queen is far
 		// less likely to deliver mate; scale danger down sharply.
 		if p.pieceBB(enemy, Q) == 0 {
