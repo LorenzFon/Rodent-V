@@ -386,10 +386,11 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	// --- Null-move pruning ---
 	// Skip if: depth <= 1 (too shallow to be reliable), the position
 	// is already beyond beta, we are in check, or only pawns remain.
+	// Reduction = base + depth/depthDiv + min((eval-beta)/evalDiv, maxEvalBonus).
 	if depth > 1 && !isPv && !nodeInCheck && !wasNull && p.canNullMove() && beta <= staticEval &&
 		excludedMove[ply] == 0 {
 		contValid[ply] = false // null move: no valid piece context for cont hist
-		reduction := 3 + depth/3
+		reduction := nmpBaseReduction + depth/nmpDepthReduction
 		var u Undo
 		makeNullMove(p, &u)
 		var nullPv [maxPly]int

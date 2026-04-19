@@ -114,24 +114,26 @@ const (
 
 // Search and engine limits.
 const (
-	maxPly           = 64       // maximum search depth
-	maxMoves         = 256      // maximum legal moves in any position
-	inf              = 32767    // larger than any real score; used as +/-inf
-	mate             = 32000    // base value of checkmate score
-	maxEval          = 29999    // largest returned by evaluate(); mate scores exceed this
-	rfpMargin        = 100      // centipawns per depth for reverse futility pruning (not improving)
-	rfpImpMargin     = 60       // centipawns per depth for reverse futility pruning (improving)
-	noEval           = -inf - 1 // sentinel: no static eval stored for this ply (in check)
-	fpMargin         = 120      // centipawns per depth for main-search move-loop futility pruning
-	fpMaxDepth       = 4        // only prune quiet moves by futility at shallow depth
-	probcutMargin    = 120      // extra margin above beta for ProbCut verification
-	probcutMinDepth  = 6        // only apply ProbCut when enough depth remains
-	probcutReduction = 2        // depth reduction used by the reduced verification search
-	seBetaMargin     = 6        // centipawns per ply subtracted from ttScore for singular verification
-	seDoubleMargin   = 64       // extra centipawns below singular beta needed for a double extension
-	razorMargin      = 300      // centipawns per depth for razoring
-	qsFpMargin       = 100      // base margin for quiescence futility pruning
-	qsLmpLimit       = 3        // max captures tried per qs node (outside check) to cap explosion
+	maxPly            = 64       // maximum search depth
+	maxMoves          = 256      // maximum legal moves in any position
+	inf               = 32767    // larger than any real score; used as +/-inf
+	mate              = 32000    // base value of checkmate score
+	maxEval           = 29999    // largest returned by evaluate(); mate scores exceed this
+	rfpMargin         = 100      // centipawns per depth for reverse futility pruning (not improving)
+	rfpImpMargin      = 60       // centipawns per depth for reverse futility pruning (improving)
+	noEval            = -inf - 1 // sentinel: no static eval stored for this ply (in check)
+	fpMargin          = 120      // centipawns per depth for main-search move-loop futility pruning
+	fpMaxDepth        = 4        // only prune quiet moves by futility at shallow depth
+	nmpBaseReduction  = 3        // base ply reduction for null-move pruning
+	nmpDepthReduction = 3        // depth divisor for depth-scaled NMP reduction
+	probcutMargin     = 120      // extra margin above beta for ProbCut verification
+	probcutMinDepth   = 6        // only apply ProbCut when enough depth remains
+	probcutReduction  = 2        // depth reduction used by the reduced verification search
+	seBetaMargin      = 6        // centipawns per ply subtracted from ttScore for singular verification
+	seDoubleMargin    = 64       // extra centipawns below singular beta needed for a double extension
+	razorMargin       = 300      // centipawns per depth for razoring
+	qsFpMargin        = 100      // base margin for quiescence futility pruning
+	qsLmpLimit        = 2        // max captures tried per qs node (outside check) to cap explosion
 )
 
 // startFEN is the standard opening position in FEN notation.
