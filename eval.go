@@ -93,13 +93,13 @@ func init() {
 }
 
 // --- Eval params ---
-var pieceValMG = [7]int{ 83, 343, 365, 485, 1029, 0, 0}
-var pieceValEG = [7]int{100, 273, 293, 523, 952,  0, 0}
+var pieceValMG = [7]int{83, 343, 365, 485, 1029, 0, 0}
+var pieceValEG = [7]int{100, 273, 293, 523, 952, 0, 0}
 
 // mobility
-var mobOffset =  [7]int{  0,   4,   6,   7,  14,  0, 0}
-var mobMG =      [7]int{  0,   3,   5,   3,   2,  0, 0}
-var mobEG =      [7]int{  0,   3,   4,   2,   2,  0, 0}
+var mobOffset = [7]int{0, 4, 6, 7, 14, 0, 0}
+var mobMG = [7]int{0, 3, 5, 3, 2, 0, 0}
+var mobEG = [7]int{0, 3, 4, 2, 2, 0, 0}
 
 // bishopPairMG/EG: bonus for owning both bishops.
 // The EG value is higher because open boards in the endgame
@@ -158,12 +158,12 @@ var doubledPawnEG = [4]int{-48, -38, -28, -10}
 // The values are tuned automatically, by a variant of Texel tuning
 // that uses many small batches and I am deeply sorry how it turned out.
 var passedBonusMG = [2][8]int{
-        0: {0, 25, 20, -6, 5, 15, 83, 0}, // free: push square empty
-        1: {0, 17, 23, 1, 17, 15, 87, 0}, // blocked: push square occupied
+	0: {0, 25, 20, -6, 5, 15, 83, 0}, // free: push square empty
+	1: {0, 17, 23, 1, 17, 15, 87, 0}, // blocked: push square occupied
 }
 var passedBonusEG = [2][8]int{
-        0: {0, 19, 23, 7, 35, 91, 184, 0}, // free
-        1: {0, 20, 29, -6, 18, 36, 78, 0}, // blocked
+	0: {0, 19, 23, 7, 35, 91, 184, 0}, // free
+	1: {0, 20, 29, -6, 18, 36, 78, 0}, // blocked
 }
 
 // ourPasserProximityMG/EG: bonus when our king is close to the passer's
@@ -212,7 +212,7 @@ func eval_internal(p *Pos, shouldReport bool) int {
 	e.attackedBy[White][P] = shiftWPAttacks(p.pieceBB(White, P))
 	e.attackedBy[Black][P] = shiftBPAttacks(p.pieceBB(Black, P))
 	e.attacked[White] = e.attackedBy[White][P]
-    e.attacked[Black] = e.attackedBy[Black][P]
+	e.attacked[Black] = e.attackedBy[Black][P]
 
 	// King rings must be set before evaluatePieces so that attack
 	// tracking against the enemy king zone is available.
@@ -221,7 +221,7 @@ func eval_internal(p *Pos, shouldReport bool) int {
 
 	evaluatePieces(p, &e, White)
 	evaluatePieces(p, &e, Black)
-    evaluatePawnStructure(p, &e)
+	evaluatePawnStructure(p, &e)
 	evaluatePassers(p, &e, White)
 	evaluatePassers(p, &e, Black)
 	evaluateKing(p, &e, White)
@@ -240,13 +240,13 @@ func eval_internal(p *Pos, shouldReport bool) int {
 	score := (mg*e.phase + eg*(24-e.phase)) / 24
 
 	// Pull score of drawish endgames closer to 0
-	if e.phase < 6 {  // R+R+B = 5
+	if e.phase < 6 { // R+R+B = 5
 		weight := 100
-		if (score > 0) {
+		if score > 0 {
 			weight = getDrawishness(p, White, Black)
-		} else if (score < 0) {
+		} else if score < 0 {
 			weight = getDrawishness(p, Black, White)
-		} 
+		}
 		score *= weight
 		score /= 100
 	}
@@ -421,12 +421,12 @@ func evaluatePawnStructure(p *Pos, e *EvalData) {
 
 	if wscoreMG, bscoreMG, wscoreEG, bscoreEG, ok := probePawnHash(key); ok {
 		add(e, White, EvalPawns, wscoreMG, wscoreEG)
-        add(e, Black, EvalPawns, bscoreMG, bscoreEG)
+		add(e, Black, EvalPawns, bscoreMG, bscoreEG)
 	} else {
 		evaluatePawns(p, e, White)
 		evaluatePawns(p, e, Black)
-		storePawnHash(key, e.mgScore[White][EvalPawns], e.mgScore[Black][EvalPawns], 
-						   e.egScore[White][EvalPawns], e.egScore[Black][EvalPawns])
+		storePawnHash(key, e.mgScore[White][EvalPawns], e.mgScore[Black][EvalPawns],
+			e.egScore[White][EvalPawns], e.egScore[Black][EvalPawns])
 	}
 }
 
@@ -448,26 +448,26 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 
 	for pieces != 0 {
 		sq := lsb(pieces)
-		b := squareBit(sq);
+		b := squareBit(sq)
 
 		// Pawn phalanx: two pawns standing side by side.
-		if shiftSides(b) & p.pieceBB(side, P) > 0 {
-			addPhalanx(e, side, sq);
+		if shiftSides(b)&p.pieceBB(side, P) > 0 {
+			addPhalanx(e, side, sq)
 		}
 
 		frontMask := fillForward(b, side)
-		isOpen := frontMask & p.pieceBB(side, P) == 0
+		isOpen := frontMask&p.pieceBB(side, P) == 0
 
 		// Isolated pawn: no friendly pawns on adjacent files.
 		if adjFileMask[fileOf(sq)]&p.pieceBB(side, P) == 0 {
 			add(e, side, EvalPawns, isolatedMG, isolatedEG)
-			if (isOpen) {
+			if isOpen {
 				add(e, side, EvalPawns, isolatedOpenMG, 0)
 			}
-		// Backward pawn
-		} else if supportMask[side][sq] &p.pieceBB(side, P) == 0 {
+			// Backward pawn
+		} else if supportMask[side][sq]&p.pieceBB(side, P) == 0 {
 			add(e, side, EvalPawns, backwardMG, backwardEG)
-			if (isOpen) {
+			if isOpen {
 				add(e, side, EvalPawns, backwardOpenMG, 0)
 			}
 		}
@@ -493,14 +493,14 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 				add(e, side, EvalPawns, doubledPawnMG[fileIdx], doubledPawnEG[fileIdx])
 			}
 		}
-		
+
 		pieces &= pieces - 1
 	}
 }
 
 // evaluatePassers scores the passed pawns for one side.
 //
-//	Passed pawn cannot be blocked or captured on the same 
+//	Passed pawn cannot be blocked or captured on the same
 //  or adjacent file ahead of it.  The bonus grows with
 //	rank; a pawn on the 7th rank is almost a queen.
 
@@ -637,15 +637,33 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 		// the engine does not become reckless about piece sacrifices.
 		danger := e.attackWt[enemy] * (e.attackCnt[enemy] + 2) / 8
 
-		// Virtual checks: enemy pieces that can reach a checking square
-		// right now (ignoring whether that square is defended).
 		occ := p.occupied()
-		knightChecks := popCount(p.pieceBB(enemy, N) & knightAtk[sq])
-		bishopChecks := popCount(p.pieceBB(enemy, B) & bishopAttacks(occ, sq))
-		rookChecks := popCount(p.pieceBB(enemy, R) & rookAttacks(occ, sq))
-		queenChecks := popCount(p.pieceBB(enemy, Q) & queenAttacks(occ, sq))
 
-		danger += knightChecks*3 + bishopChecks*3 + rookChecks*4 + queenChecks*6
+		// notOurDefense: squares not protected by our pieces, excluding
+		// our king's coverage since the king may be forced to move anyway.
+		notOurDefense := ^(e.attacked[side] &^ e.attackedBy[side][K])
+
+		// Weak squares in king zone: squares the enemy attacks that we
+		// don't cover — each is a potential entry point for an attacker.
+		weakInRing := e.kingRing[side] & e.attacked[enemy] & notOurDefense
+
+		// Safe checks: enemy pieces that can reach a checking square
+		// that is not defended by us — more precise than virtual checks
+		// since we only count checks the attacker can safely execute.
+		safeForEnemy := ^p.colorBB[enemy] & notOurDefense
+		safeKnightChecks := popCount(e.attackedBy[enemy][N] & knightAtk[sq] & safeForEnemy)
+		safeBishopChecks := popCount(e.attackedBy[enemy][B] & bishopAttacks(occ, sq) & safeForEnemy)
+		safeRookChecks := popCount(e.attackedBy[enemy][R] & rookAttacks(occ, sq) & safeForEnemy)
+		safeQueenChecks := popCount(e.attackedBy[enemy][Q] & queenAttacks(occ, sq) & safeForEnemy)
+
+		danger += popCount(weakInRing) * 2
+		danger += safeKnightChecks*3 + safeBishopChecks*3 + safeRookChecks*4 + safeQueenChecks*6
+
+		// No-queen discount: an attacking force without a queen is far
+		// less likely to deliver mate; scale danger down sharply.
+		if p.pieceBB(enemy, Q) == 0 {
+			danger = danger * 3 / 8
+		}
 
 		// Apply mostly to MG; small residual in EG so the eval is not
 		// completely blind to king safety once queens are traded off.
@@ -810,12 +828,12 @@ func evaluateThreats(p *Pos, e *EvalData, side int) {
 }
 
 func addPhalanx(e *EvalData, side, sq int) {
-    add(e, side, EvalPawns, phalanxMgByColor[side][sq], phalanxEgByColor[side][sq])
+	add(e, side, EvalPawns, phalanxMgByColor[side][sq], phalanxEgByColor[side][sq])
 }
 
 // addPST adds the piece-square table score for a piece on sq.
 func addPST(e *EvalData, side, piece, sq int) {
-	add(e, side, EvalPst, pstMGByColor[side][piece][sq], pstEGByColor[side][piece][sq]);
+	add(e, side, EvalPst, pstMGByColor[side][piece][sq], pstEGByColor[side][piece][sq])
 }
 
 // add adds MG/EG scores for one side to EvalData.
