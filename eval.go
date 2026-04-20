@@ -95,7 +95,11 @@ func init() {
 // tunerDisableKingSafety: when true, evaluateKing skips the danger
 // calculation and pawnShieldMG returns 0, so the tuner's BaseScore
 // excludes king safety (the tuner adds it back via its own parameters).
-// var tunerDisableKingSafety bool
+var tunerDisableKingSafety bool
+
+// tunerDisableThreats: when true, evaluateThreats is skipped so the
+// tuner's BaseScore excludes threats (added back via tuner parameters).
+var tunerDisableThreats bool
 
 // --- Eval params ---
 var pieceValMG = [7]int{83, 343, 365, 485, 1029, 0, 0}
@@ -251,8 +255,10 @@ func eval_internal(p *Pos, shouldReport bool) int {
 	evaluateKing(p, &e, White)
 	evaluateKing(p, &e, Black)
 	// Threats use the fully-built attack maps from all evaluators above.
-	evaluateThreats(p, &e, White)
-	evaluateThreats(p, &e, Black)
+	if !tunerDisableThreats {
+		evaluateThreats(p, &e, White)
+		evaluateThreats(p, &e, Black)
+	}
 
 	// Interpolate between game phases
 	mg := e.sumMg(White) - e.sumMg(Black)
@@ -598,9 +604,9 @@ func evaluatePassers(p *Pos, e *EvalData, side int) {
 // and the two adjacent files.  Missing pawns and open/semi-open files
 // near the king are penalised.
 func pawnShieldMG(p *Pos, side int) int {
-	// if tunerDisableKingSafety {
-	// 	return 0
-	// }
+	if tunerDisableKingSafety {
+		return 0
+	}
 	kSq := p.kingSq[side]
 	kFile := fileOf(kSq)
 	kRank := rankOf(kSq)
@@ -655,9 +661,9 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 	addPST(e, side, K, sq)
 	e.addAttacks(side, K, kingAtk[sq])
 
-	// if tunerDisableKingSafety {
-	// 	return
-	// }
+	if tunerDisableKingSafety {
+		return
+	}
 
 	// King-attack danger: pressure accumulated by the *enemy* on our
 	// king ring.  We only trigger this when at least two distinct pieces

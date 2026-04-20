@@ -57,6 +57,11 @@ func main() {
 	//getFit()
 	//newTunerFree()
 	//gradientTuneSession(5000, 10000.0)
+	if len(os.Args) > 1 {
+		gradientTuneSessionFromFile(os.Args[1], 5000, 1.0)
+	} else {
+		gradientTuneSession(5000, 1.0)
+	}
 	uciLoop()
 }
 
