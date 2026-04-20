@@ -92,6 +92,11 @@ func init() {
 	initPawnHash(64 * 128)
 }
 
+// tunerDisableKingSafety: when true, evaluateKing skips the danger
+// calculation and pawnShieldMG returns 0, so the tuner's BaseScore
+// excludes king safety (the tuner adds it back via its own parameters).
+// var tunerDisableKingSafety bool
+
 // --- Eval params ---
 var pieceValMG = [7]int{83, 343, 365, 485, 1029, 0, 0}
 var pieceValEG = [7]int{100, 273, 293, 523, 952, 0, 0}
@@ -182,7 +187,26 @@ var theirPasserProximityEG = [8]int{-32, -37, -16, 22, 52, 55, 50, 46}
 // kingAttackerWeight[pieceType]: how dangerous is each piece type
 // when it attacks squares near the enemy king.
 // Indexed P=0..Q=4; pawns and kings are handled separately.
-var kingAttackerWeight = [6]int{0, 2, 2, 3, 5, 0}
+var kingAttackerWeight = [6]int{0, 65, 78, 44, -29, 0}
+
+// King-safety weights used in evaluateKing.
+// These are package-level vars so the tuner can read/write them.
+var (
+	safeCheckWeight   = [4]int{143, 14, 56, 38} // N, B, R, Q safe check weights
+	weakInRingWeight  = -19
+	queenContactBonus = 87
+	noQueenMul        = 3
+	noQueenDiv        = 8
+	dangerEgDiv       = 4
+)
+
+// Pawn shield penalties (MG only).
+var (
+	shieldMissing  = 11
+	shieldAdvanced = 7
+	shieldOpenFile = 39
+	shieldSemiOpen = 19
+)
 
 // evaluate returns the static score for the current position from the
 // perspective of the side to move.  Positive = better for the mover.
@@ -574,6 +598,9 @@ func evaluatePassers(p *Pos, e *EvalData, side int) {
 // and the two adjacent files.  Missing pawns and open/semi-open files
 // near the king are penalised.
 func pawnShieldMG(p *Pos, side int) int {
+	// if tunerDisableKingSafety {
+	// 	return 0
+	// }
 	kSq := p.kingSq[side]
 	kFile := fileOf(kSq)
 	kRank := rankOf(kSq)
@@ -602,17 +629,17 @@ func pawnShieldMG(p *Pos, side int) int {
 		hasPawnR2 := r2 >= 0 && r2 <= 7 && ownPawns&squareBit(makeSquare(f, r2)) != 0
 
 		if !hasPawnR1 && !hasPawnR2 {
-			penalty += 28 // no shield pawn at all
+			penalty += shieldMissing // no shield pawn at all
 		} else if !hasPawnR1 {
-			penalty += 10 // pawn advanced one step
+			penalty += shieldAdvanced // pawn advanced one step
 		}
 
 		// Additional penalty for open / semi-open files through the king zone.
 		if fileMask&ownPawns == 0 {
 			if fileMask&enemyPawns == 0 {
-				penalty += 15 // open file
+				penalty += shieldOpenFile // open file
 			} else {
-				penalty += 7 // semi-open file
+				penalty += shieldSemiOpen // semi-open file
 			}
 		}
 	}
@@ -627,6 +654,10 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 	sq := p.kingSq[side]
 	addPST(e, side, K, sq)
 	e.addAttacks(side, K, kingAtk[sq])
+
+	// if tunerDisableKingSafety {
+	// 	return
+	// }
 
 	// King-attack danger: pressure accumulated by the *enemy* on our
 	// king ring.  We only trigger this when at least two distinct pieces
@@ -656,8 +687,8 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 		safeRookChecks := popCount(e.attackedBy[enemy][R] & rookAttacks(occ, sq) & safeForEnemy)
 		safeQueenChecks := popCount(e.attackedBy[enemy][Q] & queenAttacks(occ, sq) & safeForEnemy)
 
-		danger += popCount(weakInRing) * 2
-		danger += safeKnightChecks*3 + safeBishopChecks*3 + safeRookChecks*4 + safeQueenChecks*6
+		danger += popCount(weakInRing) * weakInRingWeight
+		danger += safeKnightChecks*safeCheckWeight[0] + safeBishopChecks*safeCheckWeight[1] + safeRookChecks*safeCheckWeight[2] + safeQueenChecks*safeCheckWeight[3]
 
 		// Queen contact check: enemy queen can land on a square in our king
 		// ring that is supported by enemy pieces but not defended by our
@@ -667,18 +698,18 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 		ourDefense := e.attackedBy[side][P] | e.attackedBy[side][N] |
 			e.attackedBy[side][B] | e.attackedBy[side][R] | e.attackedBy[side][Q]
 		if e.kingRing[side]&e.attackedBy[enemy][Q]&enemySupport & ^ourDefense != 0 {
-			danger += 20
+			danger += queenContactBonus
 		}
 
 		// No-queen discount: an attacking force without a queen is far
 		// less likely to deliver mate; scale danger down sharply.
 		if p.pieceBB(enemy, Q) == 0 {
-			danger = danger * 3 / 8
+			danger = danger * noQueenMul / noQueenDiv
 		}
 
 		// Apply mostly to MG; small residual in EG so the eval is not
 		// completely blind to king safety once queens are traded off.
-		add(e, side, EvalSafety, -danger, -danger/4)
+		add(e, side, EvalSafety, -danger, -danger/dangerEgDiv)
 	}
 }
 
