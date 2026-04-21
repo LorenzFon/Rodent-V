@@ -52,16 +52,23 @@ func main() {
 		FindMagics()
 		return
 	}
-	// stuff like reading data from file should go here
-	// to handle errors
-	//getFit()
-	//newTunerFree()
-	//gradientTuneSession(5000, 10000.0)
+
+	// Tuner workflows are opt-in only and must be explicitly requested.
 	if len(os.Args) > 1 {
-		gradientTuneSessionFromFile(os.Args[1], 5000, 1.0)
-	} else {
-		gradientTuneSession(5000, 1.0)
+		switch os.Args[1] {
+		case "tune":
+			gradientTuneSession(5000, 1.0)
+			return
+		case "tunefile":
+			if len(os.Args) < 3 {
+				fmt.Println("usage: rodent-v tunefile <epd-or-book-file>")
+				return
+			}
+			gradientTuneSessionFromFile(os.Args[2], 5000, 1.0)
+			return
+		}
 	}
+
 	uciLoop()
 }
 
