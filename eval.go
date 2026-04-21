@@ -101,38 +101,46 @@ var tunerDisableKingSafety bool
 // tuner's BaseScore excludes threats (added back via tuner parameters).
 var tunerDisableThreats bool
 
+// tunerDisableMaterial: when true, piece value scores are excluded from
+// BaseScore so the tuner can tune pieceValMG/EG directly.
+var tunerDisableMaterial bool
+
+// tunerDisableMobility: when true, mobility scores are excluded from
+// BaseScore so the tuner can tune mobMG/EG directly.
+var tunerDisableMobility bool
+
 // --- Eval params ---
-var pieceValMG = [7]int{83, 343, 365, 485, 1029, 0, 0}
-var pieceValEG = [7]int{100, 273, 293, 523, 952, 0, 0}
+var pieceValMG = [7]int{88, 336, 344, 461, 938, 0, 0}
+var pieceValEG = [7]int{135, 447, 463, 787, 1534, 0, 0}
 
 // mobility
 var mobOffset = [7]int{0, 4, 6, 7, 14, 0, 0}
-var mobMG = [7]int{0, 3, 5, 3, 2, 0, 0}
-var mobEG = [7]int{0, 3, 4, 2, 2, 0, 0}
+var mobMG = [7]int{0, 3, 8, 3, 2, 0, 0}
+var mobEG = [7]int{0, 0, 8, 5, 6, 0, 0}
 
 // bishopPairMG/EG: bonus for owning both bishops.
 // The EG value is higher because open boards in the endgame
 // let the bishop pair dominate knight+bishop or two knights.
-const bishopPairMG = 21
-const bishopPairEG = 60
+const bishopPairMG = 26
+const bishopPairEG = 59
 
 // Rook on open/semi-open file bonuses.
 // Open file (no pawns at all): bigger bonus since the rook has full
 // penetration potential.  Semi-open (no own pawn, enemy pawn present):
 // smaller bonus; the rook pressures the enemy pawn but is partly blocked.
 // EG values are near-zero: open files drive MG tactics, not endgame play.
-const rookOpenFileMG = 31
-const rookOpenFileEG = 3
-const rookSemiOpenFileMG = 20
-const rookSemiOpenFileEG = -1
+const rookOpenFileMG = 30
+const rookOpenFileEG = 6
+const rookSemiOpenFileMG = 18
+const rookSemiOpenFileEG = -3
 
 // Pawn weaknesses
-const isolatedMG = -10
-const isolatedEG = -18
-const isolatedOpenMG = -9
-const backwardMG = 0
-const backwardEG = -5
-const backwardOpenMG = -4
+const isolatedMG = -17
+const isolatedEG = -35
+const isolatedOpenMG = -7
+const backwardMG = -7
+const backwardEG = -17
+const backwardOpenMG = -9
 
 // minorHomeBB[side]: bitboard of the four squares where knights and bishops
 // start the game.  A minor still on one of these squares counts as undeveloped.
@@ -157,8 +165,8 @@ const devPenaltyScale = 5
 // resolved tactically so the positional penalty is inappropriate).
 // Values are mostly EG-heavy: doubled pawns become most dangerous as the
 // position simplifies, since they cannot create a passed pawn by themselves.
-var doubledPawnMG = [4]int{0, 3, -6, -14}
-var doubledPawnEG = [4]int{-48, -38, -28, -10}
+var doubledPawnMG = [4]int{-18, 1, -10, -13}
+var doubledPawnEG = [4]int{-28, -14, -16, -14}
 
 // passedBonusMG / passedBonusEG: bonus for a passed pawn indexed by
 // [blocked][relativeRank].  relativeRank is 0 at own back rank and 7
@@ -167,26 +175,26 @@ var doubledPawnEG = [4]int{-48, -38, -28, -10}
 // The values are tuned automatically, by a variant of Texel tuning
 // that uses many small batches and I am deeply sorry how it turned out.
 var passedBonusMG = [2][8]int{
-	0: {0, 25, 20, -6, 5, 15, 83, 0}, // free: push square empty
-	1: {0, 17, 23, 1, 17, 15, 87, 0}, // blocked: push square occupied
+	0: {0, -5, -13, 0, 1, -15, 87, 0}, // free: push square empty
+	1: {0, -5, -15, -7, 1, 7, 73, 0},  // blocked: push square occupied
 }
 var passedBonusEG = [2][8]int{
-	0: {0, 19, 23, 7, 35, 91, 184, 0}, // free
-	1: {0, 20, 29, -6, 18, 36, 78, 0}, // blocked
+	0: {0, 14, 21, -2, 53, 146, 206, 0}, // free
+	1: {0, 3, 19, -17, 24, 57, 59, 0},   // blocked
 }
 
 // ourPasserProximityMG/EG: bonus when our king is close to the passer's
 // push square, indexed by Chebyshev distance (0 = same square, 7 = far corner).
 // A king escorting its passer is a major endgame advantage.
-var ourPasserProximityMG = [8]int{61, 76, 32, -25, 0, -11, 26, 13}
-var ourPasserProximityEG = [8]int{60, 55, 34, 30, 3, 2, -11, -10}
+var ourPasserProximityMG = [8]int{122, 0, -9, -37, -12, 4, 20, 3}
+var ourPasserProximityEG = [8]int{63, 99, 60, 43, 11, -5, -18, -8}
 
 // theirPasserProximityMG/EG: bonus indexed by Chebyshev distance between
 // the enemy king and the passer's push square.  Convention matches Sirius:
 // a positive value at large distance means the enemy king is far away (good
 // for us); a negative value at distance 0 means the enemy king blocks (bad).
-var theirPasserProximityMG = [8]int{-26, 27, 37, 10, -4, -2, 13, 17}
-var theirPasserProximityEG = [8]int{-32, -37, -16, 22, 52, 55, 50, 46}
+var theirPasserProximityMG = [8]int{-43, 32, 22, 11, -5, -6, -2, -23}
+var theirPasserProximityEG = [8]int{-38, -56, -13, 23, 66, 81, 90, 81}
 
 // kingAttackerWeight[pieceType]: how dangerous is each piece type
 // when it attacks squares near the enemy king.
