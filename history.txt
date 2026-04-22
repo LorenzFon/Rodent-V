@@ -1,5 +1,173 @@
+26-04-22 [search]implement negative extension when ttScore >= beta
+
+26-04-22 [tuning] v2 of the tuner - faster and efficient with more params
+
+26-04-22 [tuning] tuned everything except threats
+
+26-04-21 [tuning] tuner upgrade (only starting tuning when requested)
+
+26-04-20 [tuning] ADAM tuner
+
+- Sparse CoeffEntry representation (~16 entries vs 384 per position, ~50x memory reduction)
+- Parallel gradient accumulation across all CPU cores via goroutines
+- Adam optimizer
+- Extract and tune 50 threat features (xMG+EG) alongside 768 PST + 14 king safety params
+- Add tunerDisableThreats flag so BaseScore excludes threat terms during extraction
+- Adaptive LR decay: halve learning rate when MSE worsens between epochs
+- Auto-fit texelK via ternary search at the start of each session
+
+26-04-20 [tuning] update king safety params
+
+26-04-20 [tuning] update piece/square tables
+
+26-04-19 [eval] add queen contact checks
+
+26-04-19 [eval] king safety improvements
+	counting checks from safe squares only
+
+26-04-18 [search] tweak null move params
+
+26-04-18 [search] non-pawn correction history
+
+26-04-18 [search] pawn correction history
+
+26-04-17 [feat] magic bitboards
+
+26-04-17 [eval] pawn hash, including king's pawn shield
+	approx. 6% speedup
+
+26-04-16 [fix] wrong update of pawn counts on undoing promotion
+	enables endgame eval
+
+26-04-15 [search] double extensions
+
+26-04-14 [search] implement ProbCut pruning
+
+26-04-14 [search] aspiration windows retry at reduced depth when fail high
+
+26-04-14 [search] futility pruning in main search
+
+26-04-14 [search] quiescence futility pruning
+
+26-04-13 [feat] drawish games eval
+	(added as a feature, elo-neutral, later a bug that prevented it from working has been identified)
+
+26-04-13 [feat] gradient descent tuner
+
+26-04-11 [eval] weak pawns and tuning
+Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 17.58 +/- 11.41, nElo: 24.91 +/- 16.14
+LOS: 99.88 %, DrawRatio: 39.33 %, PairsRatio: 1.31
+Games: 1780, Wins: 560, Losses: 470, Draws: 750, Points: 935.0 (52.53 %)
+Ptnml(0-2): [50, 184, 350, 238, 68], WL/DD Ratio: 1.13
+LLR: 2.91 (100.8%) (-2.25, 2.89) [0.00, 10.00]
+
+26-04-11 [search] wasNull flag
+Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 5.41 +/- 8.66, nElo: 8.29 +/- 13.27
+LOS: 88.96 %, DrawRatio: 43.66 %, PairsRatio: 1.07
+Games: 2634, Wins: 754, Losses: 713, Draws: 1167, Points: 1337.5 (50.78 %)
+Ptnml(0-2): [56, 302, 575, 313, 71], WL/DD Ratio: 1.08
+LLR: 2.90 (100.3%) (-2.25, 2.89) [-10.00, 0.00]
+
+26-04-10 [search] adaptative null move
+Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 10.31 +/- 7.92, nElo: 14.90 +/- 11.45
+LOS: 99.46 %, DrawRatio: 39.77 %, PairsRatio: 1.15
+Games: 3540, Wins: 1026, Losses: 921, Draws: 1593, Points: 1822.5 (51.48 %)
+Ptnml(0-2): [90, 406, 704, 449, 121], WL/DD Ratio: 0.91
+LLR: 2.90 (100.3%) (-2.25, 2.89) [0.00, 10.00]
+
+26-04-10 [feat] seldepth
+
+26-04-10 [feat] hashfull reporting
+
+26-04-10 [search] implemented tt probe in qsearch
+
+26-04-10 [perf] SEE: only recompute aligned slider rays after piece removal
+
+26-04-10 tuner update
+
+26-04-09 [perf] SEE: save on captures by the wrong piece types
+
+26-04-09 [search] implement singular extension
+
+26-04-09 [search] implement continuation history (1 ply and 2 ply)
+- clearHistory on every ucinewgame (for some reason it was removed while merging previous commits
+- clear contValid on every search root
+- simplify clearHistory function
+
+26-04-08 [perf] precalculating per-color pst tables + updating pawn attacks at the beginning of eval
+
+26-04-08 [search] mate distance pruning
+
+26-04-08 [search] history pruning added, then reverted
+
+26-04-08 [eval] phalanx pawns
+
+based on unfinished test:
+Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 11.53 +/- 10.41, nElo: 16.80 +/- 15.15
+LOS: 98.51 %, DrawRatio: 40.20 %, PairsRatio: 1.16
+Games: 2020, Wins: 608, Losses: 541, Draws: 871, Points: 1043.5 (51.66 %)
+Ptnml(0-2): [47, 233, 406, 254, 70], WL/DD Ratio: 1.11
+LLR: 1.97 (68.3%) (-2.25, 2.89) [0.00, 10.00]
+
+26-04-08
+	[search] implement razoring
+
+26-04-08
+	[search] improving heuristic in search algorithm and patch probeTT
+
+26-04-07
+	[patch] remove beta condition guard from PVS
+
+26-04-07 [fix] marginal time check speedup
+	second timeout test is done only in case of detecting a draw
+
+26-04-07
+	[feat] eval hashtable and pst centering
+	3,5% speedup
+
+26-04-06
+	[feat] symmetric UCI options
+
+26-04-05
+	[patch] hitory stm index, don't clear history on every search, updated history bonus formula
+
+26-04-04
+	[tune] passer and pst tuning
+
+tuned pst
+
+--------------------------------------------------
+Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 21.71 +/- 13.55, nElo: 27.92 +/- 17.36
+LOS: 99.92 %, DrawRatio: 35.50 %, PairsRatio: 1.30
+Games: 1538, Wins: 557, Losses: 461, Draws: 520, Points: 817.0 (53.12 %)
+Ptnml(0-2): [58, 158, 273, 190, 90], WL/DD Ratio: 2.17
+LLR: 2.90 (100.4%) (-2.25, 2.89) [0.00, 10.00]
+--------------------------------------------------
+
+tuned passers
+
+--------------------------------------------------
+Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 44.60 +/- 19.83, nElo: 60.42 +/- 26.55
+LOS: 100.00 %, DrawRatio: 32.22 %, PairsRatio: 1.86
+Games: 658, Wins: 240, Losses: 156, Draws: 262, Points: 371.0 (56.38 %)
+Ptnml(0-2): [17, 61, 106, 111, 34], WL/DD Ratio: 1.36
+LLR: 2.90 (100.2%) (-2.25, 2.89) [0.00, 10.00]
+--------------------------------------------------
+
 26-04-03
-	feat: threat evaluation
+	[debug] add threat debugging functionality and integrate it with the uci loop
+
+26-04-03
+	[fix] fix slider AddAttacks and push threats
+
+26-04-03
+	[feat] threat evaluation
 
 Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
 Elo: 24.71 +/- 14.39, nElo: 32.43 +/- 18.81
@@ -7,6 +175,9 @@ LOS: 99.96 %, DrawRatio: 35.88 %, PairsRatio: 1.37
 Games: 1310, Wins: 475, Losses: 382, Draws: 453, Points: 701.5 (53.55 %)
 Ptnml(0-2): [45, 132, 235, 171, 72], WL/DD Ratio: 2.13
 LLR: 2.95 (100.1%) (-2.94, 2.94) [0.00, 10.00]
+
+26-04-03
+	enhance pawn evaluation
 
 26-04-03
 	[feat] enhance pawn evaluation with proximity bonuses and Chebyshev distance calculation
