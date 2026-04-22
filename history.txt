@@ -1,4 +1,11 @@
-26-04-22 [search]implement negative extension when ttScore >= beta
+26-04-22 [search]implement negative extension when ttScore >= beta (6 Elo)
+
+Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 5.97 +/- 9.18, nElo: 8.66 +/- 13.30
+LOS: 89.89 %, DrawRatio: 40.08 %, PairsRatio: 1.10
+Games: 2620, Wins: 797, Losses: 752, Draws: 1071, Points: 1332.5 (50.86 %)
+Ptnml(0-2): [74, 299, 525, 332, 80], WL/DD Ratio: 1.39
+LLR: 2.96 (100.6%) (-2.94, 2.94) [-10.00, 0.00]
 
 26-04-22 [tuning] v2 of the tuner - faster and efficient with more params
 
@@ -16,18 +23,39 @@
 - Adaptive LR decay: halve learning rate when MSE worsens between epochs
 - Auto-fit texelK via ternary search at the start of each session
 
-26-04-20 [tuning] update king safety params
+26-04-20 [tuning] update king safety params (+42 Elo)
+
+Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 42.06 +/- 21.34, nElo: 55.12 +/- 27.66
+LOS: 100.00 %, DrawRatio: 34.32 %, PairsRatio: 1.65
+Games: 606, Wins: 244, Losses: 171, Draws: 191, Points: 339.5 (56.02 %)
+Ptnml(0-2): [16, 59, 104, 84, 40], WL/DD Ratio: 3.33
+LLR: 2.95 (100.3%) (-2.94, 2.94) [-10.00, 0.00]
 
 26-04-20 [tuning] update piece/square tables
 
-26-04-19 [eval] add queen contact checks
+26-04-19 [eval] add queen contact checks (+6 Elo)
 
 26-04-19 [eval] king safety improvements
 	counting checks from safe squares only
 
+Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 6.86 +/- 5.54, nElo: 9.61 +/- 7.76
+LOS: 99.24 %, DrawRatio: 39.64 %, PairsRatio: 1.06
+Games: 7704, Wins: 2394, Losses: 2242, Draws: 3068, Points: 3928.0 (50.99 %)
+Ptnml(0-2): [224, 905, 1527, 887, 309], WL/DD Ratio: 1.39
+LLR: 2.95 (100.1%) (-2.94, 2.94) [0.00, 10.00]
+
 26-04-18 [search] tweak null move params
 
-26-04-18 [search] non-pawn correction history
+26-04-18 [search] non-pawn correction history (+11 Elo)
+
+Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 11.70 +/- 8.60, nElo: 16.45 +/- 12.08
+LOS: 99.62 %, DrawRatio: 36.12 %, PairsRatio: 1.16
+Games: 3178, Wins: 1008, Losses: 901, Draws: 1269, Points: 1642.5 (51.68 %)
+Ptnml(0-2): [85, 384, 574, 431, 115], WL/DD Ratio: 1.53
+LLR: 3.01 (102.1%) (-2.94, 2.94) [0.00, 10.00]
 
 26-04-18 [search] pawn correction history
 
@@ -113,8 +141,14 @@ Games: 2020, Wins: 608, Losses: 541, Draws: 871, Points: 1043.5 (51.66 %)
 Ptnml(0-2): [47, 233, 406, 254, 70], WL/DD Ratio: 1.11
 LLR: 1.97 (68.3%) (-2.25, 2.89) [0.00, 10.00]
 
-26-04-08
-	[search] implement razoring
+26-04-08 [search] implement razoring (+33 Elo)
+
+Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 33.04 +/- 16.39, nElo: 46.42 +/- 22.88
+LOS: 100.00 %, DrawRatio: 38.37 %, PairsRatio: 1.65
+Games: 886, Wins: 309, Losses: 225, Draws: 352, Points: 485.0 (54.74 %)
+Ptnml(0-2): [23, 80, 170, 130, 40], WL/DD Ratio: 1.39
+LLR: 2.96 (100.6%) (-2.94, 2.94) [-0.00, 10.00]
 
 26-04-08
 	[search] improving heuristic in search algorithm and patch probeTT
@@ -166,8 +200,7 @@ LLR: 2.90 (100.2%) (-2.25, 2.89) [0.00, 10.00]
 26-04-03
 	[fix] fix slider AddAttacks and push threats
 
-26-04-03
-	[feat] threat evaluation
+26-04-03 [feat] threat evaluation (24 Elo)
 
 Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
 Elo: 24.71 +/- 14.39, nElo: 32.43 +/- 18.81
