@@ -508,8 +508,6 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 				if !isPv && sScore < sBeta-seDoubleMargin {
 					extension = 2
 				}
-			} else if ttScore >= beta {
-				extension = -1
 			}
 		}
 
