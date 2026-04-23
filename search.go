@@ -364,7 +364,7 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	if improving {
 		rfpDepthMargin = rfpImpMargin
 	}
-	if !isPv && !nodeInCheck && depth <= 7 && beta < mate-maxPly &&
+	if !isPv && !nodeInCheck && !wasNull && depth <= 7 && beta < mate-maxPly &&
 		excludedMove[ply] == 0 &&
 		staticEval-rfpDepthMargin*depth >= beta {
 		return staticEval - rfpDepthMargin*depth
