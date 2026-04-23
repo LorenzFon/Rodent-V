@@ -374,7 +374,7 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 	// If static eval is far below alpha at shallow depth, the position is
 	// unlikely to improve enough with quiet moves. Drop into qsearch; if
 	// qsearch also fails low, return immediately without searching further.
-	if !isPv && !nodeInCheck && depth <= 3 &&
+	if !isPv && !nodeInCheck && !wasNull && depth <= 3 &&
 		excludedMove[ply] == 0 &&
 		staticEval <= alpha-razorMargin*depth {
 		s := quiesce(p, ply, alpha, beta, pv)
