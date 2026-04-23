@@ -27,8 +27,12 @@
 //      adjacent file.
 //
 //   5. KING SAFETY
-//      To be ported from Rodent
+//      Evaluationg attacks on the squares in the king's ring,
+//      safe checks, contact queen checks, attacked and undefended
+//      squares near the king
 //
+//   6. THREATS
+//      Attacks on pieces, subdivided into defended and undefended
 
 package main
 
@@ -45,26 +49,10 @@ func init() {
 	// same and adjacent files.  A White pawn on sq is "passed" if
 	// none of these squares contain a Black pawn.
 	for sq := 0; sq < 64; sq++ {
-		passedMask[White][sq] = 0
-		for f := fileOf(sq) - 1; f <= fileOf(sq)+1; f++ {
-			if f < 0 || f > 7 {
-				continue
-			}
-			for r := rankOf(sq) + 1; r <= 7; r++ {
-				passedMask[White][sq] |= squareBit(makeSquare(f, r))
-			}
-		}
-	}
-	for sq := 0; sq < 64; sq++ {
-		passedMask[Black][sq] = 0
-		for f := fileOf(sq) - 1; f <= fileOf(sq)+1; f++ {
-			if f < 0 || f > 7 {
-				continue
-			}
-			for r := rankOf(sq) - 1; r >= 0; r-- {
-				passedMask[Black][sq] |= squareBit(makeSquare(f, r))
-			}
-		}
+        passedMask[White][sq] = fillNorth(shiftNorth(squareBit(sq)));
+        passedMask[White][sq] |= shiftSides(passedMask[White][sq]);
+        passedMask[Black][sq] = fillSouth(shiftSouth(squareBit(sq)));
+        passedMask[Black][sq] |= shiftSides(passedMask[Black][sq]);
 	}
 
 	// --- Support mask to detect backward pawns ---
@@ -146,8 +134,8 @@ const backwardOpenMG = -9
 // start the game.  A minor still on one of these squares counts as undeveloped.
 // White: b1=1, c1=2, f1=5, g1=6   Black: b8=57, c8=58, f8=61, g8=62
 var minorHomeBB = [2]uint64{
-	White: (1 << 1) | (1 << 2) | (1 << 5) | (1 << 6),
-	Black: (1 << 57) | (1 << 58) | (1 << 61) | (1 << 62),
+	White: (1 << B1) | (1 << C1) | (1 << F1) | (1 << G1),
+	Black: (1 << B8) | (1 << C8) | (1 << F8) | (1 << G8),
 }
 
 // devPenaltyScale: multiplier for the quadratic undevelopment penalty.
@@ -222,6 +210,7 @@ var (
 
 // evaluate returns the static score for the current position from the
 // perspective of the side to move.  Positive = better for the mover.
+// Before calculating eval score, it tries to find it in the eval hashtable.
 func evaluate(p *Pos) int {
 	if score, ok := probeEvalHash(p.key); ok {
 		return score
@@ -453,6 +442,7 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 	}
 }
 
+// evaluate pawn structure or read the score from the pawn hashtable
 func evaluatePawnStructure(p *Pos, e *EvalData) {
 
 	var key = getPawnKey(p)
@@ -481,7 +471,6 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 	shieldMG := pawnShieldMG(p, side)
 	add(e, side, EvalPawns, shieldMG, 0)
 
-	var pushSq int
 	pieces := p.pieceBB(side, P)
 
 	for pieces != 0 {
@@ -502,7 +491,7 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 			if isOpen {
 				add(e, side, EvalPawns, isolatedOpenMG, 0)
 			}
-			// Backward pawn
+		// Backward pawn: cannot be defended by any other pawn
 		} else if supportMask[side][sq]&p.pieceBB(side, P) == 0 {
 			add(e, side, EvalPawns, backwardMG, backwardEG)
 			if isOpen {
@@ -516,11 +505,12 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 		// The penalty is indexed by distance-to-edge so central files (where
 		// the doubled pawn blocks the most pawn breaks) are hurt the most in MG,
 		// while edge files are punished more in EG (they can rarely promote).
-		if side == White {
-			pushSq = sq + 8
-		} else {
+		
+		pushSq := sq + 8
+		if side == Black {
 			pushSq = sq - 8
 		}
+
 		if pushSq >= 0 && pushSq < 64 && p.pieceBB(side, P)&squareBit(pushSq) != 0 {
 			// Only penalise if the doubled pawn has no immediate captures.
 			if pawnAtk[side][sq]&p.pieceBB(opp(side), P) == 0 {
@@ -587,16 +577,7 @@ func evaluatePassers(p *Pos, e *EvalData, side int) {
 
 				// Slider behind: enemy rook or queen behind the passer on
 				// the same file controls the promotion path.
-				fileMask := fileABB << uint(fileOf(sq))
-				var behindMask uint64
-				if side == White {
-					// squares below sq on the same file
-					behindMask = fileMask & (squareBit(sq) - 1)
-				} else {
-					// squares above sq on the same file
-					// squareBit(sq+1)-1 masks bits 0..sq, so complement gives sq+1..63
-					behindMask = fileMask &^ (squareBit(sq+1) - 1)
-				}
+				behindMask := fillBackward(squareBit(sq), side)
 				enemySliders := p.pieceBB(opp(side), R) | p.pieceBB(opp(side), Q)
 				if behindMask&enemySliders != 0 {
 					add(e, side, EvalPassers, -25, -45)
