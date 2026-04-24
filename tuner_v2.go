@@ -646,6 +646,8 @@ func tv2PrintParams(params *[tv2NumParams]tv2Pair) {
 		tv2Round(norm[tv2IdxPieceVal+B][1]), tv2Round(norm[tv2IdxPieceVal+R][1]),
 		tv2Round(norm[tv2IdxPieceVal+Q][1]))
 
+    fmt.Printf("var mobOffset = [7]int{0, 4, 6, 7, 14, 0, 0}\n") // not tuned
+
 	fmt.Printf("var mobMG = [7]int{0, %d, %d, %d, %d, 0, 0}\n",
 		tv2Round(norm[tv2IdxMob+0][0]), tv2Round(norm[tv2IdxMob+1][0]),
 		tv2Round(norm[tv2IdxMob+2][0]), tv2Round(norm[tv2IdxMob+3][0]))

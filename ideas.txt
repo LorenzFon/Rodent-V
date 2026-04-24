@@ -1,0 +1,13 @@
+no razoring if tt move != 0
+
+use null move only if depth > 3
+
+no razoring if tt flag is lowerbound
+
+count game phase incrementally (if speedup)
+
+do futility pruning in pv nodes
+
+king rook pawn history
+
+rename corrhist to pawnCorrhist

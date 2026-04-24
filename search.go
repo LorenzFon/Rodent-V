@@ -399,6 +399,22 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 		if atomic.LoadInt32(&abortFlag) != 0 {
 			return 0
 		}
+
+        // --- Null move verification DISABLED ---
+
+        //if depth - reduction > 5 && score >= beta {
+        //    score = search(p, ply, alpha, beta, depth - reduction - 4, true, pv);
+		//}
+
+		//if atomic.LoadInt32(&abortFlag) != 0 {
+		//	return 0
+		//}
+
+        if (score >= beta) {
+            return score;
+        }
+
+
 		if score >= beta {
 			return score
 		}
