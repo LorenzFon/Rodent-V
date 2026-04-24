@@ -1,5 +1,167 @@
 package main
 
+// --- Eval params ---
+var pieceValMG = [7]int{88, 336, 344, 461, 938, 0, 0}
+var pieceValEG = [7]int{135, 447, 463, 787, 1534, 0, 0}
+
+// mobility
+var mobOffset = [7]int{0, 4, 6, 7, 14, 0, 0}
+var mobMG = [7]int{0, 3, 8, 3, 2, 0, 0}
+var mobEG = [7]int{0, 0, 8, 5, 6, 0, 0}
+
+// bishopPairMG/EG: bonus for owning both bishops.
+// The EG value is higher because open boards in the endgame
+// let the bishop pair dominate knight+bishop or two knights.
+var bishopPairMG = 26
+var bishopPairEG = 59
+
+// Rook on open/semi-open file bonuses.
+// Open file (no pawns at all): bigger bonus since the rook has full
+// penetration potential.  Semi-open (no own pawn, enemy pawn present):
+// smaller bonus; the rook pressures the enemy pawn but is partly blocked.
+// EG values are near-zero: open files drive MG tactics, not endgame play.
+var rookOpenFileMG = 30
+var rookOpenFileEG = 6
+var rookSemiOpenFileMG = 18
+var rookSemiOpenFileEG = -3
+
+// Pawn weaknesses
+var isolatedMG = -17
+var isolatedEG = -35
+var isolatedOpenMG = -7
+var backwardMG = -7
+var backwardEG = -17
+var backwardOpenMG = -9
+
+// doubledPawnMG / doubledPawnEG: penalty for the rear pawn of a doubled
+// pair, indexed by distance-to-edge (0=a/h file, 1=b/g, 2=c/f, 3=d/e).
+// The penalty is applied only when the doubled pawn cannot immediately
+// capture an enemy pawn (if it can capture, the structure is likely to be
+// resolved tactically so the positional penalty is inappropriate).
+// Values are mostly EG-heavy: doubled pawns become most dangerous as the
+// position simplifies, since they cannot create a passed pawn by themselves.
+var doubledPawnMG = [4]int{-18, 1, -10, -13}
+var doubledPawnEG = [4]int{-28, -14, -16, -14}
+
+// passedBonusMG / passedBonusEG: bonus for a passed pawn indexed by
+// [blocked][relativeRank].  relativeRank is 0 at own back rank and 7
+// at the promotion square, so it is the same for White and Black.
+//
+// The values are tuned automatically, by a variant of Texel tuning
+// that uses many small batches and I am deeply sorry how it turned out.
+var passedBonusMG = [2][8]int{
+	0: {0, -5, -13, 0, 1, -15, 87, 0}, // free: push square empty
+	1: {0, -5, -15, -7, 1, 7, 73, 0},  // blocked: push square occupied
+}
+var passedBonusEG = [2][8]int{
+	0: {0, 14, 21, -2, 53, 146, 206, 0}, // free
+	1: {0, 3, 19, -17, 24, 57, 59, 0},   // blocked
+}
+
+// ourPasserProximityMG/EG: bonus when our king is close to the passer's
+// push square, indexed by Chebyshev distance (0 = same square, 7 = far corner).
+// A king escorting its passer is a major endgame advantage.
+var ourPasserProximityMG = [8]int{122, 0, -9, -37, -12, 4, 20, 3}
+var ourPasserProximityEG = [8]int{63, 99, 60, 43, 11, -5, -18, -8}
+
+// theirPasserProximityMG/EG: bonus indexed by Chebyshev distance between
+// the enemy king and the passer's push square.  Convention matches Sirius:
+// a positive value at large distance means the enemy king is far away (good
+// for us); a negative value at distance 0 means the enemy king blocks (bad).
+var theirPasserProximityMG = [8]int{-43, 32, 22, 11, -5, -6, -2, -23}
+var theirPasserProximityEG = [8]int{-38, -56, -13, 23, 66, 81, 90, 81}
+
+// kingAttackerWeight[pieceType]: how dangerous is each piece type
+// when it attacks squares near the enemy king.
+// Indexed P=0..Q=4; pawns and kings are handled separately.
+var kingAttackerWeight = [6]int{0, 65, 78, 44, -29, 0}
+
+// King-safety weights used in evaluateKing.
+// These are package-level vars so the tuner can read/write them.
+var (
+	safeCheckWeight   = [4]int{143, 14, 56, 38} // N, B, R, Q safe check weights
+	weakInRingWeight  = -19
+	queenContactBonus = 87
+	noQueenMul        = 3
+	noQueenDiv        = 8
+	dangerEgDiv       = 4
+)
+
+// Pawn shield penalties (MG only).
+var (
+	shieldMissing  = 11
+	shieldAdvanced = 7
+	shieldOpenFile = 39
+	shieldSemiOpen = 19
+)
+
+// Threat scores reward the side whose pieces attack undefended or
+// poorly-defended enemy pieces.  The bonus depends on:
+//   - what piece type is doing the attacking
+//   - what piece type is being attacked (victim)
+//   - whether the victim is defended (index 0=hanging, 1=defended)
+//
+// Pawn and king threats do not use the defended flag: a pawn threat is
+// always serious because capturing is free; a king threat is only
+// rewarded when the victim is undefended (handled in the code).
+//
+// Push threats: a pawn one step away from attacking an enemy non-pawn.
+// Only counted when the push square is safe (not controlled by an enemy pawn).
+
+// threatByPawnMG/EG[victimType] — P..Q (K is never threatened by a pawn).
+var threatByPawnMG = [6]int{-7, 73, 65, 72, 56, 0}
+var threatByPawnEG = [6]int{-19, 41, 72, 50, 24, 0}
+
+// threatByKnightMG/EG[defended][victimType] — 0=hanging, 1=defended.
+var threatByKnightMG = [2][6]int{
+	{5, 12, 50, 86, 41, 0},
+	{-8, 9, 38, 71, 50, 0},
+}
+
+// threatByKnightMG/EG[defended][victimType].
+var threatByKnightEG = [2][6]int{
+	{37, 85, 33, 13, 8, 0},
+	{11, 79, 29, 45, 46, 0},
+}
+
+// threatByBishopMG/EG[defended][victimType].
+var threatByBishopMG = [2][6]int{
+	{3, 36, 12, 58, 61, 0},
+	{-5, 20, 4, 56, 63, 0},
+}
+var threatByBishopEG = [2][6]int{
+	{34, 44, 102, 35, 53, 0},
+	{4, 21, 76, 60, 74, 0},
+}
+
+// threatByRookMG/EG[defended][victimType].
+var threatByRookMG = [2][6]int{
+	{-3, 35, 45, -12, 67, 0},
+	{-10, 8, 19, 1, 54, 0},
+}
+var threatByRookEG = [2][6]int{
+	{50, 52, 49, 50, -10, 0},
+	{10, 15, 4, 22, 85, 0},
+}
+
+// threatByQueenMG/EG[defended][victimType].
+var threatByQueenMG = [2][6]int{
+	{8, 25, 18, 16, -2, 0},
+	{-5, 2, -9, -7, -19, 0},
+}
+var threatByQueenEG = [2][6]int{
+	{21, 30, 65, 12, -17, 0},
+	{16, 8, 37, 7, 1, 0},
+}
+
+// threatByKingMG/EG[victimType] — king only attacks undefended squares.
+var threatByKingMG = [6]int{39, 33, 99, 83, 0, 0}
+var threatByKingEG = [6]int{18, 38, 33, 8, 0, 0}
+
+// pushThreatMG/EG: per non-pawn enemy piece attacked by a safe pawn push.
+var pushThreatMG = 13
+var pushThreatEG = 17
+
 // Piece/square tables are roughly centered around zero, which means that
 // the sum of their values is close to zero. It has a few advantages:
 // changing pst percentage value should not disturb engine's perception
@@ -158,10 +320,14 @@ var phalanxEG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
+// per-color tables used to speed up the evaluation
+
 var pstMGByColor [2][6][64]int
 var pstEGByColor [2][6][64]int
 var phalanxMgByColor [2][64]int
 var phalanxEgByColor [2][64]int
+
+// Init
 
 func init() {
 	for piece := 0; piece < 6; piece++ {
