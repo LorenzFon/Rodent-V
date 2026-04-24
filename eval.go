@@ -21,17 +21,24 @@
 //      interpolated according to game phase. Right now we use PeSTo tables,
 //      modified to cater for existence of passed pawn eval.
 //
-//   4. PAWN STRUCTURE
-//      Passed pawns: bonus that grows with rank (closer to promotion).
+//   4. PASSED PAWNS
+//      Bonus that grows with rank (closer to promotion). Evaluation takes
+//      into account blockade, king proximity and enemy major piece behind
+//      the pawn
+//
+//   5. PAWN STRUCTURE
 //      Isolated pawns: penalty when no friendly pawn stands on an
 //      adjacent file.
+//      Backward pawns: penalty for pawns that cannot be defended by another
+//      Doubled pawns: only one blocking another
+//      Phalanx: bonus for pawns standing side by side
 //
-//   5. KING SAFETY
+//   6. KING SAFETY
 //      Evaluationg attacks on the squares in the king's ring,
 //      safe checks, contact queen checks, attacked and undefended
 //      squares near the king
 //
-//   6. THREATS
+//   7. THREATS
 //      Attacks on pieces, subdivided into defended and undefended
 
 package main
@@ -231,7 +238,13 @@ func eval_trace(p *Pos) int {
 func eval_internal(p *Pos, shouldReport bool) int {
 	var e EvalData // Golang-specific: it will be initialized as all zeroes
 
-	// Pawn attacks
+	// Tempo. Having the right to move is beneficial. Unfortunately
+	// tuning yielded very high values here, when in fact testing with
+	// (16, 8) turned out Elo-neutral. So it seems better not to expose
+	// tempo bonus to the tuner.
+	add(&e, p.side, EvalOther, 8, 4)
+
+	// Init pawn attacks
 	e.attackedBy2[White] = doubleWPAttacks(p.pieceBB(White, P))
 	e.attackedBy2[Black] = doubleBPAttacks(p.pieceBB(Black, P))
 	e.attackedBy[White][P] = shiftWPAttacks(p.pieceBB(White, P))
