@@ -500,10 +500,34 @@ func tv2SigDeriv(score, k float64) float64 {
 }
 
 func tv2MSE(data []tv2Entry, params *[tv2NumParams]tv2Pair, k float64) float64 {
+	nw := runtime.NumCPU()
+	if nw > len(data) {
+		nw = len(data)
+	}
+	chunk := (len(data) + nw - 1) / nw
+	totals := make([]float64, nw)
+	var wg sync.WaitGroup
+	for w := 0; w < nw; w++ {
+		wg.Add(1)
+		go func(wid int) {
+			defer wg.Done()
+			start := wid * chunk
+			end := start + chunk
+			if end > len(data) {
+				end = len(data)
+			}
+			sum := 0.0
+			for i := start; i < end; i++ {
+				d := data[i].result - tv2Sigmoid(tv2Score(&data[i], params), k)
+				sum += d * d
+			}
+			totals[wid] = sum
+		}(w)
+	}
+	wg.Wait()
 	total := 0.0
-	for i := range data {
-		d := data[i].result - tv2Sigmoid(tv2Score(&data[i], params), k)
-		total += d * d
+	for _, t := range totals {
+		total += t
 	}
 	return total / float64(len(data))
 }
