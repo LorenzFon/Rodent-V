@@ -433,13 +433,13 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 
 		if pushSq >= 0 && pushSq < 64 && p.pieceBB(side, P)&squareBit(pushSq) != 0 {
 			// Only penalise if the doubled pawn has no immediate captures.
-			if pawnAtk[side][sq]&p.pieceBB(opp(side), P) == 0 {
+			//if pawnAtk[side][sq]&p.pieceBB(opp(side), P) == 0 {
 				fileIdx := fileOf(sq)
 				if fileIdx > 3 {
 					fileIdx = 7 - fileIdx
 				}
 				add(e, side, EvalPawns, doubledPawnMG[fileIdx], doubledPawnEG[fileIdx])
-			}
+			//}
 		}
 
 		pieces &= pieces - 1

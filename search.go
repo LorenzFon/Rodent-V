@@ -170,6 +170,7 @@ func initLMRTable() {
 // avoiding a needlessly large high-side window.  The delta grows by 50% on
 // each failure (smoother than doubling) until the window opens fully.
 func think(p *Pos, maxDepth int) {
+	engineSide = p.side
 	ttDate = (ttDate + 1) & 255
 	nodes = 0
 	selDepth = 0

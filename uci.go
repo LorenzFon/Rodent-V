@@ -211,7 +211,7 @@ func parseSetOption(tokens []string) {
 
 	// Eval component options, e.g. "Material", "material", "MATERIAL"
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
-		if strings.EqualFold(name, evalComponentName[c]) {
+		if strings.EqualFold(name, "Own"+evalComponentName[c]) {
 			if v, err := strconv.Atoi(value); err == nil {
 				if v < 0 {
 					v = 0
@@ -219,7 +219,19 @@ func parseSetOption(tokens []string) {
 				if v > 500 {
 					v = 500
 				}
-				optionValues[c] = v
+				optionValues[weightOwn][c] = v
+			}
+			return
+		}
+		if strings.EqualFold(name, "Opp"+evalComponentName[c]) {
+			if v, err := strconv.Atoi(value); err == nil {
+				if v < 0 {
+					v = 0
+				}
+				if v > 500 {
+					v = 500
+				}
+				optionValues[weightOpp][c] = v
 			}
 			return
 		}

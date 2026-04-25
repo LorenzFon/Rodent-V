@@ -44,6 +44,7 @@ import (
 
 // init() is guaranteed to run before main()
 func init() {
+	engineSide = White
 	initTables()
 }
 
@@ -68,7 +69,7 @@ func main() {
 			return
 		}
 	}
-
+loadSnapshotFile("eth_fail.txt")
 	uciLoop()
 }
 
