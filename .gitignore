@@ -27,6 +27,18 @@ go.work.sum
 # env file
 .env
 
+# pgn file
+*.pgn
+
+# zip file
+*.zip
+
+# book files
+*.book
+*.epd
+*.txt
+
 # Editor/IDE
 # .idea/
 # .vscode/
+Rodent-V-kingsafety/

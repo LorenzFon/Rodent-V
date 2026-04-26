@@ -67,9 +67,16 @@ func main() {
 			}
 			tv2Tune(os.Args[2], 5000, 1.0)
 			return
+			// case "loadsnapshot":
+			// 	if len(os.Args) < 3 {
+			// 		fmt.Println("usage: rodent-v loadsnapshot <snapshot-file>")
+			// 		return
+			// 	}
+			// 	loadSnapshotFile(os.Args[2])
+			// 	return
 		}
 	}
-loadSnapshotFile("eth_fail.txt")
+
 	uciLoop()
 }
 
