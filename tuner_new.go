@@ -232,7 +232,15 @@ func parseResultFromLine(line string) float64 {
 			}
 		}
 	}
+
 	// EPD format detection.
+	// Semicolon format: "fen; 0.0"
+	if idx := strings.LastIndex(line, ";"); idx != -1 {
+		if score, err := strconv.ParseFloat(strings.TrimSpace(line[idx+1:]), 64); err == nil {
+			return score
+		}
+	}
+	// EPD format: "1-0" / "0-1" in comment
 	if strings.Contains(line, "1-0") {
 		return 1.0
 	} else if strings.Contains(line, "0-1") {
