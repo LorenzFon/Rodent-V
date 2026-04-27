@@ -553,7 +553,6 @@ const (
 	tv2Beta1   = 0.9
 	tv2Beta2   = 0.999
 	tv2AdamEps = 1e-8
-	tv2LRDecay = 0.5
 	tv2LRMin   = 1e-4
 )
 
@@ -670,7 +669,7 @@ func tv2PrintParams(params *[tv2NumParams]tv2Pair) {
 		tv2Round(norm[tv2IdxPieceVal+B][1]), tv2Round(norm[tv2IdxPieceVal+R][1]),
 		tv2Round(norm[tv2IdxPieceVal+Q][1]))
 
-    fmt.Printf("var mobOffset = [7]int{0, 4, 6, 7, 14, 0, 0}\n") // not tuned
+	fmt.Printf("var mobOffset = [7]int{0, 4, 6, 7, 14, 0, 0}\n") // not tuned
 
 	fmt.Printf("var mobMG = [7]int{0, %d, %d, %d, %d, 0, 0}\n",
 		tv2Round(norm[tv2IdxMob+0][0]), tv2Round(norm[tv2IdxMob+1][0]),
@@ -878,24 +877,16 @@ func tv2Tune(filename string, epochs int, lr float64) {
 
 	var mom, vel [tv2NumParams]tv2Pair
 
+	lrInit := lr
 	prevLoss := tv2MSE(data, &params, k)
 	fmt.Printf("[tuner-v2] initial MSE = %.10f  lr = %.6f\n", prevLoss, lr)
 
 	stall := 0
 	for epoch := 1; epoch <= epochs; epoch++ {
+		// Cosine annealing: lr_init -> tv2LRMin over the full run.
+		lr = tv2LRMin + 0.5*(lrInit-tv2LRMin)*(1+math.Cos(math.Pi*float64(epoch-1)/float64(epochs)))
 		loss := tv2Epoch(data, &params, &mom, &vel, lr, k)
 		fmt.Printf("epoch %4d  loss = %.10f  lr = %.6f\n", epoch, loss, lr)
-
-		if loss > prevLoss+1e-12 {
-			newLR := lr * tv2LRDecay
-			if newLR < tv2LRMin {
-				newLR = tv2LRMin
-			}
-			if newLR < lr {
-				fmt.Printf("  lr: %.6f -> %.6f\n", lr, newLR)
-				lr = newLR
-			}
-		}
 
 		if epoch%100 == 0 {
 			fmt.Println("--- snapshot ---")
@@ -903,7 +894,7 @@ func tv2Tune(filename string, epochs int, lr float64) {
 			fmt.Println("--- end snapshot ---")
 		}
 
-		if math.Abs(prevLoss-loss) < 1e-10 {
+		if lr <= tv2LRMin*1.01 && math.Abs(prevLoss-loss) < 1e-10 {
 			stall++
 			if stall >= 20 {
 				fmt.Println("[tuner-v2] converged")
