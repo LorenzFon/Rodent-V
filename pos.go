@@ -325,6 +325,11 @@ func getPawnKey(p *Pos) uint64 {
 		zobPiece[makePiece(Black, K)][p.kingSq[Black]]
 }
 
+// is certain piece on this square?
+func isOnSq(p *Pos, side, piece, sq int) bool { 
+	return (squareBit(sq) & (p.colorBB[side] & p.typeBB[piece])) != 0; 
+}
+
 func PrintBoard(p *Pos) {
 	pieceName := []string{
 		"P ", "p ",

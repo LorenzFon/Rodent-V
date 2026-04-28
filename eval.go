@@ -47,7 +47,6 @@ package main
 
 // minorHomeBB[side]: bitboard of the four squares where knights and bishops
 // start the game.  A minor still on one of these squares counts as undeveloped.
-// White: b1=1, c1=2, f1=5, g1=6   Black: b8=57, c8=58, f8=61, g8=62
 var minorHomeBB = [2]uint64{
 	White: (1 << B1) | (1 << C1) | (1 << F1) | (1 << G1),
 	Black: (1 << B8) | (1 << C8) | (1 << F8) | (1 << G8),
@@ -164,9 +163,10 @@ func eval_internal(p *Pos, shouldReport bool) int {
 	e.kingRing[White] = kingAtk[p.kingSq[White]]
 	e.kingRing[Black] = kingAtk[p.kingSq[Black]]
 
+    evaluatePawnStructure(p, &e)
+
 	evaluatePieces(p, &e, White)
 	evaluatePieces(p, &e, Black)
-	evaluatePawnStructure(p, &e)
 	evaluatePassers(p, &e, White)
 	evaluatePassers(p, &e, Black)
 	evaluateKing(p, &e, White)
@@ -231,6 +231,11 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[N], pieceValEG[N])
 		addPST(e, side, N, sq)
 
+		// Piece/square adjustement for predefined pawn centers
+		if e.center[side] != Undefined {
+			e.mgScore[side][EvalPst] += knightAdjust[e.center[side]][side][sq]
+		}
+
 		// knight board control
 		atks := knightAtk[sq]
 		e.addAttacks(side, N, atks)
@@ -267,6 +272,12 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		// bishop mobility and pst tables
 		add(e, side, EvalMaterial, pieceValMG[B], pieceValEG[B])
 		addPST(e, side, B, sq)
+
+		
+		// Piece/square adjustement for predefined pawn centers
+		if e.center[side] != Undefined {
+			e.mgScore[side][EvalPst] += bishopAdjust[e.center[side]][side][sq]
+		}
 
 		// bishop board control
 		atks := bishopAttacks(occForBishop, sq)
@@ -367,14 +378,78 @@ func evaluatePawnStructure(p *Pos, e *EvalData) {
 
 	var key = getPawnKey(p)
 
-	if wscoreMG, bscoreMG, wscoreEG, bscoreEG, ok := probePawnHash(key); ok {
+	if wscoreMG, bscoreMG, wscoreEG, bscoreEG, wCenter, bCenter, ok := probePawnHash(key); ok {
 		add(e, White, EvalPawns, wscoreMG, wscoreEG)
 		add(e, Black, EvalPawns, bscoreMG, bscoreEG)
+		e.center[White] = CenterType(wCenter)
+		e.center[Black] = CenterType(bCenter)
 	} else {
+
+	    initCenterType(p, e)
 		evaluatePawns(p, e, White)
 		evaluatePawns(p, e, Black)
 		storePawnHash(key, e.mgScore[White][EvalPawns], e.mgScore[Black][EvalPawns],
-			e.egScore[White][EvalPawns], e.egScore[Black][EvalPawns])
+			e.egScore[White][EvalPawns], e.egScore[Black][EvalPawns], int(e.center[White]), int(e.center[Black]))
+	}
+}
+
+func initCenterType(p *Pos, e *EvalData) {
+	
+	// default
+	e.center[White] = Undefined
+	e.center[Black] = Undefined
+
+	narrow := fileDBB | fileEBB // narrow center (d-e files)
+	wide := fileCBB | fileDBB | fileEBB  // wide center (c-d-e files)
+
+	// detect Sicilian center 
+	if popCount(p.pieceBB(White, P) & wide) == 2 && 
+	   popCount(p.pieceBB(Black, P) & wide) == 2 {
+
+       if popCount(p.pieceBB(White, P) & fileDBB) == 0 &&
+	   popCount(p.pieceBB(Black, P) & fileCBB) == 0 &&
+	   isOnSq(p, White, P, E4) {
+			e.center[White] = SICILIAN_high
+			e.center[Black] = SICILIAN_low
+	   }
+
+	   if popCount(p.pieceBB(Black, P) & fileDBB) == 0 &&
+	   popCount(p.pieceBB(White, P) & fileCBB) == 0 &&
+	   isOnSq(p, Black, P, E5) {
+			e.center[White] = SICILIAN_low
+			e.center[Black] = SICILIAN_high
+	   }
+	}
+
+    // detect closed centers (KID / French)
+	if popCount(p.pieceBB(White, P) & narrow) == 2 && 
+	   popCount(p.pieceBB(Black, P) & narrow) == 2 {
+
+	   if isOnSq(p, White, P, E4) && isOnSq(p, Black, P, E5) {
+
+	   		if isOnSq(p, White, P, D5) && isOnSq(p, Black, P, D6) {
+				e.center[White] = KID_high
+				e.center[Black] = KID_low
+		  	}
+
+			if isOnSq(p, White, P, D3) && isOnSq(p, Black, P, D4) {
+				e.center[White] = KID_low
+				e.center[Black] = KID_high
+		  	}
+		}
+
+		if isOnSq(p, White, P, D4) && isOnSq(p, Black, P, D5) {
+
+	   		if isOnSq(p, White, P, E5) && isOnSq(p, Black, P, E6) {
+				e.center[White] = FRENCH_high
+				e.center[Black] = FRENCH_low
+		  	}
+
+			if isOnSq(p, White, P, E3) && isOnSq(p, Black, P, E4) {
+				e.center[White] = FRENCH_low
+				e.center[Black] = FRENCH_high
+		  	}
+		}
 	}
 }
 
@@ -396,6 +471,11 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 	for pieces != 0 {
 		sq := lsb(pieces)
 		b := squareBit(sq)
+
+		// Piece/square adjustement for predefined pawn centers
+		if e.center[side] != Undefined {
+			e.mgScore[side][EvalPawns] += pawnAdjust[e.center[side]][side][sq]
+		}
 
 		// Pawn phalanx: two pawns standing side by side.
 		if shiftSides(b)&p.pieceBB(side, P) > 0 {
@@ -628,6 +708,8 @@ func evaluateKing(p *Pos, e *EvalData, side int) {
 	}
 }
 
+// --- Threat eval ---
+
 // evaluateThreats scores the positional pressure exerted by (side)'s pieces
 // on the enemy.  Must be called after all attack maps are fully built.
 func evaluateThreats(p *Pos, e *EvalData, side int) {
@@ -716,6 +798,8 @@ func evaluateThreats(p *Pos, e *EvalData, side int) {
 	cnt := popCount(pushThreatBB & nonPawnEnemies)
 	add(e, side, EvalThreats, cnt*pushThreatMG, cnt*pushThreatEG)
 }
+
+// --- Helpers ---
 
 func addPhalanx(e *EvalData, side, sq int) {
 	add(e, side, EvalPawns, phalanxMgByColor[side][sq], phalanxEgByColor[side][sq])

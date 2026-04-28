@@ -27,12 +27,25 @@ var evalComponentName = [EvalComponentN]string{
 	EvalOther:    "Other",
 }
 
+type CenterType int
+
+const (
+	KID_low CenterType = iota
+	KID_high
+	FRENCH_low
+	FRENCH_high
+	SICILIAN_low
+	SICILIAN_high
+	Undefined
+)
+
 
 // EvalData is the scratchpad built during evaluation.
 // Attack maps are filled incrementally by evaluatePieces / evaluatePawns /
 // evaluateKing, then consumed by evaluateThreats.
 type EvalData struct {
 	phase   int
+	center [2]CenterType
 	mgScore [2][EvalComponentN]int
 	egScore [2][EvalComponentN]int
 

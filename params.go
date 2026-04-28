@@ -173,7 +173,7 @@ var pstMG = [6][64]int{
 		9, 9, 9, 9, 9, 9, 9, 9,
 		-21, -21, -13, -18, -18, 5, 14, -19,
 		-21, -20, -7, -8, 2, -10, 1, -15,
-		-24, -23, -10, 5, 3, -10, -23, -25,
+		-24, -23, -10, 5, 3, -11, -23, -25,
 		-19, -4, -3, -5, 15, 2, 1, -18,
 		3, 1, 26, 21, 25, 65, 36, 0,
 		30, -26, 13, 31, 32, -7, -32, -60,
@@ -320,12 +320,214 @@ var phalanxEG = [64]int{
 	0, 0, 0, 0, 0, 0, 0, 0,
 }
 
+var frenchHighP = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0,10, 0, 0, 0, 1, 0,
+	0, 3, 0, 0, 0, 6, 1, 0,
+	0, 0, 0, 0, 0, 1, 0, 1,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var frenchLowP = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0,-2, 0, 0, 0, 0, 0,
+	0, 0,-2, 0, 0, 0,-2,-2,
+	0, 0, 3, 0, 0,-2, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var KidHighP = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 1, 0, 0, 0,12, 0, 0,
+	0, 6, 2, 0, 0, 0, 2, 0,
+	0, 0, 2, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var KidLowP = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+   -1, 0,-1, 0, 0,-4,-3,-2,
+	0,-1, 0, 0, 0,-3,-3, 0,
+	0, 1, 1, 0,-8, 8, 8, 4,
+	0, 0, 0, 0, 0,10,10,-2,
+	0, 0, 0, 0, 0,14,14, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var SicHighP = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0,-2, 0, 0,
+    0,-2,-1, 0, 0, 0, 0, 0,
+	2, 0, 1, 0, 1, 2, 0, 1,
+	4, 0, 0, 0, 0, 0, 1, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var SicLowP = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+   -1,-1, 0, 0, 0, 0, 0, 0,
+	8, 0, 0, 0, 1, 0, 0, 0,
+	0, 3, 0, 0, 1, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var frenchHighN = [64]int{
+	0, 2, 0, 0, 0, 0, 1, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,
+	0, 0, 1, 1, 0, 1, 0, 0,
+	0, 0, 0, 0, 0, 1, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var frenchLowN = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	2, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var KidHighN = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 3, 0,-3, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var KidLowN = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+	2, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 2, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var SicHighN = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+	0, 7, 0,-1, 1, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 3, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var SicLowN = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 1, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var frenchHighB = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 2, 0, 0, 0,
+	3, 0, 0, 3, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var frenchLowB = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0,-20, 2,
+	0, 0, 0, 0, 0, 0, 2, 0,
+	1, 0, 0, 0, 0, 2, 0, 2,
+	1, 0, 0, 0, 0, 0, 2, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var KidHighB = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0,-1, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 1, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var KidLowB = [64]int{
+   -1, -1, 2, 0, 0, 0, 0, 0,
+    0,-10, 0, 2, 0, 0, 0, 0,
+   -2, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var SicHighB = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+	0, 1, 0, 0, 0, 5, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var SicLowB = [64]int{
+	0, 0, 0, 0, 0, 0, 0, 0,
+    0, 1, 0, 0, 4, 0, 0, 0,
+	0, 0, 0, 0, 2, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
+
 // per-color tables used to speed up the evaluation
 
 var pstMGByColor [2][6][64]int
 var pstEGByColor [2][6][64]int
 var phalanxMgByColor [2][64]int
 var phalanxEgByColor [2][64]int
+
+var pawnAdjust [Undefined][2][64]int
+var knightAdjust [Undefined][2][64]int
+var bishopAdjust [Undefined][2][64]int
 
 // Init
 
@@ -345,5 +547,47 @@ func init() {
 		phalanxEgByColor[White][sq] = phalanxEG[sq]
 		phalanxMgByColor[Black][sq^56] = phalanxMG[sq]
 		phalanxEgByColor[Black][sq^56] = phalanxEG[sq]
+
+		pawnAdjust[FRENCH_high][White][sq] = frenchHighP[sq]
+		pawnAdjust[FRENCH_high][Black][sq^56] = frenchHighP[sq]
+		knightAdjust[FRENCH_high][White][sq] = frenchHighN[sq]
+		knightAdjust[FRENCH_high][Black][sq^56] = frenchHighN[sq]
+		bishopAdjust[FRENCH_high][White][sq] = frenchHighB[sq]
+		bishopAdjust[FRENCH_high][Black][sq^56] = frenchHighB[sq]
+
+		pawnAdjust[FRENCH_low][White][sq] = frenchLowP[sq]
+		pawnAdjust[FRENCH_low][Black][sq^56] = frenchLowP[sq]
+		knightAdjust[FRENCH_low][White][sq] = frenchLowN[sq]
+		knightAdjust[FRENCH_low][Black][sq^56] = frenchLowN[sq]
+		bishopAdjust[FRENCH_low][White][sq] = frenchLowB[sq]
+		bishopAdjust[FRENCH_low][Black][sq^56] = frenchLowB[sq]
+
+		pawnAdjust[KID_high][White][sq] = KidHighP[sq]
+		pawnAdjust[KID_high][Black][sq^56] = KidHighP[sq]
+		knightAdjust[KID_high][White][sq] = KidHighN[sq]
+		knightAdjust[KID_high][Black][sq^56] = KidHighN[sq]
+		bishopAdjust[KID_high][White][sq] = KidHighB[sq]
+		bishopAdjust[KID_high][Black][sq^56] = KidHighB[sq]
+
+		pawnAdjust[KID_low][White][sq] = KidLowP[sq]
+		pawnAdjust[KID_low][Black][sq^56] = KidLowP[sq]
+		knightAdjust[KID_low][White][sq] = KidLowN[sq]
+		knightAdjust[KID_low][Black][sq^56] = KidLowN[sq]
+		bishopAdjust[KID_low][White][sq] = KidLowB[sq]
+		bishopAdjust[KID_low][Black][sq^56] = KidLowB[sq]
+
+		pawnAdjust[SICILIAN_high][White][sq] = SicHighP[sq]
+		pawnAdjust[SICILIAN_high][Black][sq^56] = SicHighP[sq]
+		knightAdjust[SICILIAN_high][White][sq] = SicHighN[sq]
+		knightAdjust[SICILIAN_high][Black][sq^56] = SicHighN[sq]
+		bishopAdjust[SICILIAN_high][White][sq] = SicHighB[sq]
+		bishopAdjust[SICILIAN_high][Black][sq^56] = SicHighB[sq]
+
+		pawnAdjust[SICILIAN_low][White][sq] = SicLowP[sq]
+		pawnAdjust[SICILIAN_low][Black][sq^56] = SicLowP[sq]
+		knightAdjust[SICILIAN_low][White][sq] = SicLowN[sq]
+		knightAdjust[SICILIAN_low][Black][sq^56] = SicLowN[sq]
+		bishopAdjust[SICILIAN_low][White][sq] = SicLowB[sq]
+		bishopAdjust[SICILIAN_low][Black][sq^56] = SicLowB[sq]
 	}
 }
