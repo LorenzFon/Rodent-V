@@ -11,3 +11,5 @@ do futility pruning in pv nodes
 king rook pawn history
 
 rename corrhist to pawnCorrhist
+
+null move formula ((823 + 67 * depth) / 256)
