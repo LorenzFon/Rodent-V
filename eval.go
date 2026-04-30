@@ -187,7 +187,10 @@ func eval_internal(p *Pos, shouldReport bool) int {
 	score := (mg*e.phase + eg*(24-e.phase)) / 24
 
 	// Pull score of drawish endgames closer to 0
-	if e.phase < 6 { // R+R+B = 5
+	if e.phase < 7 { // R+R+B = 5, Q vs R = 6
+
+		score += checkmateHelper(p, &e)
+
 		weight := 100
 		if score > 0 {
 			weight = getDrawishness(p, White, Black)

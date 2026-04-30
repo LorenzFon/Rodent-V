@@ -414,11 +414,6 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
         if (score >= beta) {
             return score;
         }
-
-
-		if score >= beta {
-			return score
-		}
 	}
 
 	// --- ProbCut ---

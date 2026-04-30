@@ -2,7 +2,7 @@
 
 ## Goal for first release
 
-- **3200 Elo CCRL** (is 2800)
+- **3200 Elo CCRL** (is 3000)
 - Ability to define playing styles ("personalities") in a text file
 - Weakening in a sensible range (not necessarily to absolute beginner level)
 - HCE eval (for style) supplemented by an auxiliary neural network (for strength boost)
@@ -25,7 +25,7 @@
 - [x] Doubled pawns
 - [x] Backward pawns
 - [x] King pawn shield
-- [ ] Rook on 7th rank
+- [-] Rook on 7th rank (fails with current parameters)
 
 ---
 
@@ -36,10 +36,10 @@
 - [x] gradient descent
 - [x] tune pst
 - [x] tune passers
-- [ ] tune threats
-- [ ] tune mobility
-- [ ] tune material (risky)
-- [ ] tune whatever remains
+- [x] tune threats
+- [x] tune mobility
+- [x] tune material (risky)
+- [x] tune whatever remains
 
 ---
 
@@ -56,7 +56,7 @@
 
 ## Milestone: Asymmetric Eval + Personalities
 
-- [ ] Separate options for own vs. opponent attack and mobility weights
+- [x] Separate options for own vs. opponent attack and mobility weights
 - [ ] Define basic option list accessible for personality tuning
 - [ ] Load personalities from a text file at startup
 
@@ -65,15 +65,15 @@
 ## Milestone: Regaining eval speed
 
 - [x] Eval hashtable
-- [ ] Separating eval functions related only to pawns and kings
-- [ ] Pawn hashtable
+- [x] Separating eval functions related only to pawns and kings
+- [x] Pawn hashtable
 
 ---
 
 ## Milestone: Small search gains (expect long tuning runs)
 
 - [x] mate distance pruning
-- [ ] futility pruning
+- [x] futility pruning
 
 ---
 
@@ -81,7 +81,8 @@
 
 - [x] Singular extensions
 - [x] continuation history
-- [ ] correction history if does not fail
+- [x] correction history if does not fail
+- [x] singular extensions
 - [ ] multi-threading (lazy SMP)
 
 ---
@@ -89,8 +90,8 @@
 ## Milestone: tuning round 2
 
 - [ ] Gradien descent tuner uses batches
-- [ ] Multi-threaded tuner
-- [ ] Retune everything with a better set
+- [x] Multi-threaded tuner
+- [x] Retune everything with a better set (passed with lichess-quiet, failed with Ethereal)
 
 ---
 
@@ -111,6 +112,7 @@
 
 ## Milestone: user-facing functionalities
 
+- [ ] Multi-pv
 - [ ] Weakening
 - [ ] Personalities presets
 - [ ] A tool to tune personalities without too many technical options
@@ -123,5 +125,4 @@
 ## Longer term
 
 - NNUE auxiliary network for strength boost alongside HCE
-- Singular extensions
 - Online play integration (Go's HTTP support makes this natural)
