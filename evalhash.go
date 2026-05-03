@@ -7,11 +7,11 @@ type EvalHashEntry struct {
 }
 
 type PawnHashEntry struct {
-	key   uint64
-	scoreMG[2] int
-	scoreEG[2] int
-	center[2] int
-	used  bool
+	key     uint64
+	scoreMG [2]int
+	scoreEG [2]int
+	center  [2]int
+	used    bool
 }
 
 var evalTT []EvalHashEntry
@@ -65,7 +65,7 @@ func initPawnHash(size int) {
 }
 
 func clearPawnHash() {
-	for i := range evalTT {
+	for i := range pawnTT {
 		pawnTT[i] = PawnHashEntry{}
 	}
 }
@@ -84,13 +84,13 @@ func probePawnHash(key uint64) (int, int, int, int, int, int, bool) {
 }
 
 func storePawnHash(key uint64, wscoreMG, bscoreMG, wscoreEG, bscoreEG, wCenter, bCenter int) {
-	if len(evalTT) == 0 {
+	if len(pawnTT) == 0 {
 		return
 	}
 
-	addr := key%uint64(len(pawnTT))
+	addr := key % uint64(len(pawnTT))
 
-    pawnTT[addr].key = key
+	pawnTT[addr].key = key
 	pawnTT[addr].scoreMG[White] = wscoreMG
 	pawnTT[addr].scoreMG[Black] = bscoreMG
 	pawnTT[addr].scoreEG[White] = wscoreEG
