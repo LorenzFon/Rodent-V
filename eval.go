@@ -73,10 +73,10 @@ func init() {
 	// same and adjacent files.  A White pawn on sq is "passed" if
 	// none of these squares contain a Black pawn.
 	for sq := 0; sq < 64; sq++ {
-        passedMask[White][sq] = fillNorth(shiftNorth(squareBit(sq)));
-        passedMask[White][sq] |= shiftSides(passedMask[White][sq]);
-        passedMask[Black][sq] = fillSouth(shiftSouth(squareBit(sq)));
-        passedMask[Black][sq] |= shiftSides(passedMask[Black][sq]);
+		passedMask[White][sq] = fillNorth(shiftNorth(squareBit(sq)))
+		passedMask[White][sq] |= shiftSides(passedMask[White][sq])
+		passedMask[Black][sq] = fillSouth(shiftSouth(squareBit(sq)))
+		passedMask[Black][sq] |= shiftSides(passedMask[Black][sq])
 	}
 
 	// --- Support mask to detect backward pawns ---
@@ -163,7 +163,7 @@ func eval_internal(p *Pos, shouldReport bool) int {
 	e.kingRing[White] = kingAtk[p.kingSq[White]]
 	e.kingRing[Black] = kingAtk[p.kingSq[Black]]
 
-    evaluatePawnStructure(p, &e)
+	evaluatePawnStructure(p, &e)
 
 	evaluatePieces(p, &e, White)
 	evaluatePieces(p, &e, Black)
@@ -276,7 +276,6 @@ func evaluatePieces(p *Pos, e *EvalData, side int) {
 		add(e, side, EvalMaterial, pieceValMG[B], pieceValEG[B])
 		addPST(e, side, B, sq)
 
-		
 		// Piece/square adjustement for predefined pawn centers
 		if e.center[side] != Undefined {
 			e.mgScore[side][EvalPst] += bishopAdjust[e.center[side]][side][sq]
@@ -388,7 +387,7 @@ func evaluatePawnStructure(p *Pos, e *EvalData) {
 		e.center[Black] = CenterType(bCenter)
 	} else {
 
-	    initCenterType(p, e)
+		initCenterType(p, e)
 		evaluatePawns(p, e, White)
 		evaluatePawns(p, e, Black)
 		storePawnHash(key, e.mgScore[White][EvalPawns], e.mgScore[Black][EvalPawns],
@@ -397,61 +396,69 @@ func evaluatePawnStructure(p *Pos, e *EvalData) {
 }
 
 func initCenterType(p *Pos, e *EvalData) {
-	
+
 	// default
 	e.center[White] = Undefined
 	e.center[Black] = Undefined
 
-	narrow := fileDBB | fileEBB // narrow center (d-e files)
-	wide := fileCBB | fileDBB | fileEBB  // wide center (c-d-e files)
+	narrow := fileDBB | fileEBB         // narrow center (d-e files)
+	wide := fileCBB | fileDBB | fileEBB // wide center (c-d-e files)
 
-	// detect Sicilian center 
-	if popCount(p.pieceBB(White, P) & wide) == 2 && 
-	   popCount(p.pieceBB(Black, P) & wide) == 2 {
-
-       if popCount(p.pieceBB(White, P) & fileDBB) == 0 &&
-	   popCount(p.pieceBB(Black, P) & fileCBB) == 0 &&
-	   isOnSq(p, White, P, E4) {
-			e.center[White] = SICILIAN_high
-			e.center[Black] = SICILIAN_low
-	   }
-
-	   if popCount(p.pieceBB(Black, P) & fileDBB) == 0 &&
-	   popCount(p.pieceBB(White, P) & fileCBB) == 0 &&
-	   isOnSq(p, Black, P, E5) {
-			e.center[White] = SICILIAN_low
-			e.center[Black] = SICILIAN_high
-	   }
+	// may be overridden by French
+	if isOnSq(p, White, P, D4) && isOnSq(p, Black, P, D5) {
+		e.center[White] = CLASSIC_d4d5
+		e.center[Black] = CLASSIC_d4d5
 	}
 
-    // detect closed centers (KID / French)
-	if popCount(p.pieceBB(White, P) & narrow) == 2 && 
-	   popCount(p.pieceBB(Black, P) & narrow) == 2 {
+	// may be overridden by KID or Siiclian
+	if isOnSq(p, White, P, E4) && isOnSq(p, Black, P, E5) {
+		e.center[White] = CLASSIC_e4e5
+		e.center[Black] = CLASSIC_e4e5
+	}
 
-	   if isOnSq(p, White, P, E4) && isOnSq(p, Black, P, E5) {
+	// detect closed centers (KID / French)
+	if popCount(p.pieceBB(White, P)&narrow) == 2 &&
+		popCount(p.pieceBB(Black, P)&narrow) == 2 {
 
-	   		if isOnSq(p, White, P, D5) && isOnSq(p, Black, P, D6) {
+		if isOnSq(p, White, P, E4) && isOnSq(p, Black, P, E5) {
+
+			if isOnSq(p, White, P, D5) && isOnSq(p, Black, P, D6) {
 				e.center[White] = KID_high
 				e.center[Black] = KID_low
-		  	}
-
-			if isOnSq(p, White, P, D3) && isOnSq(p, Black, P, D4) {
+			} else if isOnSq(p, White, P, D3) && isOnSq(p, Black, P, D4) {
 				e.center[White] = KID_low
 				e.center[Black] = KID_high
-		  	}
+			}
 		}
 
 		if isOnSq(p, White, P, D4) && isOnSq(p, Black, P, D5) {
 
-	   		if isOnSq(p, White, P, E5) && isOnSq(p, Black, P, E6) {
+			if isOnSq(p, White, P, E5) && isOnSq(p, Black, P, E6) {
 				e.center[White] = FRENCH_high
 				e.center[Black] = FRENCH_low
-		  	}
-
-			if isOnSq(p, White, P, E3) && isOnSq(p, Black, P, E4) {
+			} else if isOnSq(p, White, P, E3) && isOnSq(p, Black, P, E4) {
 				e.center[White] = FRENCH_low
 				e.center[Black] = FRENCH_high
-		  	}
+			}
+		}
+	}
+
+	// detect Sicilian center
+	if popCount(p.pieceBB(White, P)&wide) == 2 &&
+		popCount(p.pieceBB(Black, P)&wide) == 2 {
+
+		if popCount(p.pieceBB(White, P)&fileDBB) == 0 &&
+			popCount(p.pieceBB(Black, P)&fileCBB) == 0 &&
+			isOnSq(p, White, P, E4) {
+			e.center[White] = SICILIAN_high
+			e.center[Black] = SICILIAN_low
+		}
+
+		if popCount(p.pieceBB(Black, P)&fileDBB) == 0 &&
+			popCount(p.pieceBB(White, P)&fileCBB) == 0 &&
+			isOnSq(p, Black, P, E5) {
+			e.center[White] = SICILIAN_low
+			e.center[Black] = SICILIAN_high
 		}
 	}
 }
@@ -494,7 +501,7 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 			if isOpen {
 				add(e, side, EvalPawns, isolatedOpenMG, 0)
 			}
-		// Backward pawn: cannot be defended by any other pawn
+			// Backward pawn: cannot be defended by any other pawn
 		} else if supportMask[side][sq]&p.pieceBB(side, P) == 0 {
 			add(e, side, EvalPawns, backwardMG, backwardEG)
 			if isOpen {
@@ -508,7 +515,7 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 		// The penalty is indexed by distance-to-edge so central files (where
 		// the doubled pawn blocks the most pawn breaks) are hurt the most in MG,
 		// while edge files are punished more in EG (they can rarely promote).
-		
+
 		pushSq := sq + 8
 		if side == Black {
 			pushSq = sq - 8
@@ -517,11 +524,11 @@ func evaluatePawns(p *Pos, e *EvalData, side int) {
 		if pushSq >= 0 && pushSq < 64 && p.pieceBB(side, P)&squareBit(pushSq) != 0 {
 			// Only penalise if the doubled pawn has no immediate captures.
 			//if pawnAtk[side][sq]&p.pieceBB(opp(side), P) == 0 {
-				fileIdx := fileOf(sq)
-				if fileIdx > 3 {
-					fileIdx = 7 - fileIdx
-				}
-				add(e, side, EvalPawns, doubledPawnMG[fileIdx], doubledPawnEG[fileIdx])
+			fileIdx := fileOf(sq)
+			if fileIdx > 3 {
+				fileIdx = 7 - fileIdx
+			}
+			add(e, side, EvalPawns, doubledPawnMG[fileIdx], doubledPawnEG[fileIdx])
 			//}
 		}
 

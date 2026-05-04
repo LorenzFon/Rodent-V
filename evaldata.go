@@ -36,16 +36,17 @@ const (
 	FRENCH_high
 	SICILIAN_low
 	SICILIAN_high
+	CLASSIC_e4e5
+	CLASSIC_d4d5
 	Undefined
 )
-
 
 // EvalData is the scratchpad built during evaluation.
 // Attack maps are filled incrementally by evaluatePieces / evaluatePawns /
 // evaluateKing, then consumed by evaluateThreats.
 type EvalData struct {
 	phase   int
-	center [2]CenterType
+	center  [2]CenterType
 	mgScore [2][EvalComponentN]int
 	egScore [2][EvalComponentN]int
 
@@ -74,7 +75,7 @@ func (e *EvalData) addAttacks(side, pieceType int, atks uint64) {
 func (e *EvalData) sumMg(side int) int {
 	sum := 0
 	weights := weightsFor(side)
-	
+
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		sum += e.mgScore[side][c] * weights[c] / 100
 	}
@@ -85,7 +86,7 @@ func (e *EvalData) sumMg(side int) int {
 func (e *EvalData) sumEg(side int) int {
 	sum := 0
 	weights := weightsFor(side)
-	
+
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		sum += e.egScore[side][c] * weights[c] / 100
 	}
@@ -93,7 +94,7 @@ func (e *EvalData) sumEg(side int) int {
 	return sum
 }
 
-func weightsFor(side int) [EvalComponentN]int  {
+func weightsFor(side int) [EvalComponentN]int {
 	if side == engineSide {
 		return optionValues[weightOwn]
 	}
@@ -101,7 +102,7 @@ func weightsFor(side int) [EvalComponentN]int  {
 }
 
 func nameEvalComponent(c EvalComponent) string {
-		if c < 0 || c >= EvalComponentN {
+	if c < 0 || c >= EvalComponentN {
 		return "Unknown"
 	}
 	return evalComponentName[c]
@@ -165,6 +166,7 @@ func (e *EvalData) PrintEvalDetails(p *Pos) {
 	fmt.Printf("From side-to-move point of view: %d cp\n", stmBlend)
 	fmt.Println()
 }
+
 // PrintThreatDebug prints the full attack map state and per-piece threats
 // for a position, to verify the threat system is correct.
 func PrintThreatDebug(p *Pos) {
@@ -179,7 +181,7 @@ func PrintThreatDebug(p *Pos) {
 	evaluateKing(p, &e, Black)
 
 	pieceNames := [6]string{"P", "N", "B", "R", "Q", "K"}
-	sideNames  := [2]string{"White", "Black"}
+	sideNames := [2]string{"White", "Black"}
 
 	for _, side := range []int{White, Black} {
 		fmt.Printf("\n=== %s attack maps ===\n", sideNames[side])
