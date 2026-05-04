@@ -401,19 +401,19 @@ func search(p *Pos, ply, alpha, beta, depth int, wasNull bool, pv []int) int {
 			return 0
 		}
 
-        // --- Null move verification DISABLED ---
+		// --- Null move verification DISABLED ---
 
-        //if depth - reduction > 5 && score >= beta {
-        //    score = search(p, ply, alpha, beta, depth - reduction - 4, true, pv);
+		//if depth - reduction > 5 && score >= beta {
+		//    score = search(p, ply, alpha, beta, depth - reduction - 4, true, pv);
 		//}
 
 		//if atomic.LoadInt32(&abortFlag) != 0 {
 		//	return 0
 		//}
 
-        if (score >= beta) {
-            return score;
-        }
+		if score >= beta {
+			return score
+		}
 	}
 
 	// --- ProbCut ---
@@ -756,6 +756,9 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		return ttScore
 	}
 
+	origAlpha := alpha
+	bestMove := 0
+
 	inCheck := p.inCheck()
 
 	picker := &moveBuffers[ply]
@@ -769,6 +772,7 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		rawQEval := evaluate(p)
 		best = rawQEval + getCorrection(p)
 		if best >= beta {
+			storeTT(p.key, 0, best, LOWER, 0, ply)
 			return best
 		}
 		if best > alpha {
@@ -777,7 +781,7 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		futilityBase = best + qsFpMargin
 		initQSearch(p, picker)
 	} else {
-		initMovePicker(p, picker, 0, ply)
+		initMovePicker(p, picker, ttMove, ply)
 	}
 
 	movesTried := 0
@@ -832,10 +836,12 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 			return 0
 		}
 		if score >= beta {
+			storeTT(p.key, move, score, LOWER, 0, ply)
 			return score
 		}
 		if score > best {
 			best = score
+			bestMove = move
 			if score > alpha {
 				alpha = score
 				buildPV(pv, childPv[:], move)
@@ -848,6 +854,13 @@ func quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		return -mate + ply
 	}
 
+	if atomic.LoadInt32(&abortFlag) == 0 {
+		if best > origAlpha {
+			storeTT(p.key, bestMove, best, EXACT, 0, ply)
+		} else {
+			storeTT(p.key, 0, best, UPPER, 0, ply)
+		}
+	}
 	return best
 }
 
