@@ -115,9 +115,10 @@ func (p *Pos) canNullMove() bool {
 // isInsufficientMaterial returns true when neither side has enough
 // material to force checkmate by any sequence of legal moves.
 // Covered cases:
-//   K vs K
-//   K+B vs K  (either side has the bishop)
-//   K+N vs K  (either side has the knight)
+//
+//	K vs K
+//	K+B vs K  (either side has the bishop)
+//	K+N vs K  (either side has the knight)
 //
 // Two-minor configurations (K+B vs K+B, K+N vs K+N, etc.) are intentionally
 // excluded — with one minor per side there are corner-checkmate edge cases
@@ -326,11 +327,65 @@ func getPawnKey(p *Pos) uint64 {
 }
 
 // is certain piece on this square?
-func isOnSq(p *Pos, side, piece, sq int) bool { 
-	return (squareBit(sq) & (p.colorBB[side] & p.typeBB[piece])) != 0; 
+func isOnSq(p *Pos, side, piece, sq int) bool {
+	return (squareBit(sq) & (p.colorBB[side] & p.typeBB[piece])) != 0
+}
+
+// --- Printing the board ---
+
+const (
+	ansiReset       = "\x1b[0m"
+	ansiWhitePieces = "\x1b[97m"
+	ansiBlackPieces = "\x1b[96m" // cyan
+)
+
+var pieceColored = []string{
+	ansiWhitePieces + "  ♙ " + ansiReset, // white pawn
+	ansiBlackPieces + "  ♙ " + ansiReset, // black pawn, same glyph recolored
+
+	ansiWhitePieces + "  ♘ " + ansiReset,
+	ansiBlackPieces + "  ♘ " + ansiReset,
+
+	ansiWhitePieces + "  ♗ " + ansiReset,
+	ansiBlackPieces + "  ♗ " + ansiReset,
+
+	ansiWhitePieces + "  ♖ " + ansiReset,
+	ansiBlackPieces + "  ♖ " + ansiReset,
+
+	ansiWhitePieces + "  ♕ " + ansiReset,
+	ansiBlackPieces + "  ♕ " + ansiReset,
+
+	ansiWhitePieces + "  ♔ " + ansiReset,
+	ansiBlackPieces + "  ♔ " + ansiReset,
+
+	"  . ",
 }
 
 func PrintBoard(p *Pos) {
+	fmt.Println("--------------------------------------------")
+	fmt.Print("  ")
+
+	for sq := 0; sq < 64; sq++ {
+		mappedSq := sq ^ 56
+		fmt.Print(pieceColored[p.board[mappedSq]])
+
+		if (sq+1)%8 == 0 {
+			fmt.Printf("   %d\n", 8-sq/8)
+			fmt.Println()
+			if sq != 63 {
+				fmt.Print("  ")
+			}
+		}
+	}
+
+	fmt.Println()
+	fmt.Println("    a   b   c   d   e   f   g   h")
+	fmt.Println()
+
+	fmt.Println("--------------------------------------------")
+}
+
+func PrintBoardAscii(p *Pos) {
 	pieceName := []string{
 		"P ", "p ",
 		"N ", "n ",
