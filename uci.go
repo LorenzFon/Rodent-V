@@ -59,6 +59,16 @@ func uciLoop() {
 	parseFEN(&p, startFEN)
 	allocTT(16)
 
+	// Allocate one SearchState per thread slot.
+	// The main thread always uses states[0]; helpers use states[1..N-1].
+	// Allocate enough for the maximum allowed thread count up front so
+	// we never allocate during a search.
+	const maxAllowedThreads = 256
+	states := make([]*SearchState, maxAllowedThreads)
+	for i := range states {
+		states[i] = new(SearchState)
+	}
+
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 65536), 65536)
 
@@ -75,7 +85,7 @@ func uciLoop() {
 	}
 
 	for scanner.Scan() {
-		line   := strings.TrimRight(scanner.Text(), "\r\n ")
+		line := strings.TrimRight(scanner.Text(), "\r\n ")
 		tokens := strings.Fields(line)
 		if len(tokens) == 0 {
 			continue
@@ -83,10 +93,11 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V 0.2.13")
+			fmt.Println("id name Rodent V 0019")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
+			fmt.Println("option name Threads type spin default 1 min 1 max 256")
 			printUciOptions()
 			fmt.Println("uciok")
 
@@ -100,8 +111,9 @@ func uciLoop() {
 		case "ucinewgame":
 			stopSearch()
 			clearTT()
-			clearHistory()
-			contValid = [maxPly]bool{}
+			for i := 0; i < numThreads; i++ {
+				states[i].clearHistory()
+			}
 			parseFEN(&p, startFEN)
 
 		case "position":
@@ -120,10 +132,10 @@ func uciLoop() {
 				}
 			}
 			posForSearch := p // copy: the search owns its own position
-			searchDone   = make(chan struct{})
+			searchDone = make(chan struct{})
 			go func(pos Pos, done chan struct{}, maxDepth int) {
 				defer close(done)
-				think(&pos, maxDepth)
+				think(&pos, states, maxDepth)
 			}(posForSearch, searchDone, md)
 
 		case "stop":
@@ -146,8 +158,8 @@ func uciLoop() {
 					depth = d
 				}
 			}
-			start   := time.Now()
-			n       := perft(&p, depth)
+			start := time.Now()
+			n := perft(&p, depth)
 			elapsed := time.Since(start).Milliseconds()
 			if elapsed < 1 {
 				elapsed = 1
@@ -175,8 +187,9 @@ func uciLoop() {
 // ---- Option parsing ----
 
 // parseSetOption handles the "setoption name <n> value <v>" command.
-//   Hash: resize the transposition table (in megabytes).
-//   Clear Hash: zero the transposition table.
+//
+//	Hash: resize the transposition table (in megabytes).
+//	Clear Hash: zero the transposition table.
 func parseSetOption(tokens []string) {
 	name := ""
 	value := ""
@@ -206,6 +219,18 @@ func parseSetOption(tokens []string) {
 
 	case strings.EqualFold(name, "Clear Hash"):
 		clearTT()
+		return
+
+	case strings.EqualFold(name, "Threads"):
+		if n, err := strconv.Atoi(value); err == nil {
+			if n < 1 {
+				n = 1
+			}
+			if n > 256 {
+				n = 256
+			}
+			numThreads = n
+		}
 		return
 	}
 
@@ -253,6 +278,9 @@ func parsePosition(p *Pos, tokens []string) {
 	if tokens[i] == "startpos" {
 		parseFEN(p, startFEN)
 		i++
+	} else if tokens[i] == "m8" {
+		parseFEN(p, m8FEN)
+		i++
 	} else if tokens[i] == "fen" {
 		i++
 		var parts []string
@@ -282,31 +310,50 @@ func parsePosition(p *Pos, tokens []string) {
 // ---- Time management ----
 
 // parseGoParams reads the "go" command parameters and returns:
-//   timeLimit (ms): allocated time for this move; -1 = no limit.
-//   maxDepth: maximum search depth.
+//
+//	timeLimit (ms): allocated time for this move; -1 = no limit.
+//	maxDepth: maximum search depth.
 func parseGoParams(tokens []string, p *Pos) (int64, int) {
-	wtime     := int64(-1)
-	btime     := int64(-1)
-	winc      := int64(0)
-	binc      := int64(0)
+	wtime := int64(-1)
+	btime := int64(-1)
+	winc := int64(0)
+	binc := int64(0)
 	movestogo := int64(40)
-	movetime  := int64(-1)
-	maxDepth  := maxPly - 1
+	movetime := int64(-1)
+	maxDepth := maxPly - 1
 
 	for i := 0; i < len(tokens); i++ {
 		switch tokens[i] {
 		case "wtime":
-			if i+1 < len(tokens) { i++; wtime, _ = strconv.ParseInt(tokens[i], 10, 64) }
+			if i+1 < len(tokens) {
+				i++
+				wtime, _ = strconv.ParseInt(tokens[i], 10, 64)
+			}
 		case "btime":
-			if i+1 < len(tokens) { i++; btime, _ = strconv.ParseInt(tokens[i], 10, 64) }
+			if i+1 < len(tokens) {
+				i++
+				btime, _ = strconv.ParseInt(tokens[i], 10, 64)
+			}
 		case "winc":
-			if i+1 < len(tokens) { i++; winc, _ = strconv.ParseInt(tokens[i], 10, 64) }
+			if i+1 < len(tokens) {
+				i++
+				winc, _ = strconv.ParseInt(tokens[i], 10, 64)
+			}
 		case "binc":
-			if i+1 < len(tokens) { i++; binc, _ = strconv.ParseInt(tokens[i], 10, 64) }
+			if i+1 < len(tokens) {
+				i++
+				binc, _ = strconv.ParseInt(tokens[i], 10, 64)
+			}
 		case "movestogo":
-			if i+1 < len(tokens) { i++; movestogo, _ = strconv.ParseInt(tokens[i], 10, 64) }
+			if i+1 < len(tokens) {
+				i++
+				movestogo, _ = strconv.ParseInt(tokens[i], 10, 64)
+			}
 		case "movetime":
-			if i+1 < len(tokens) { i++; movetime, _ = strconv.ParseInt(tokens[i], 10, 64) }
+			if i+1 < len(tokens) {
+				i++
+				movetime, _ = strconv.ParseInt(tokens[i], 10, 64)
+			}
 		case "depth":
 			if i+1 < len(tokens) {
 				i++
@@ -326,10 +373,10 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 	var myTime, myInc int64
 	if p.side == White {
 		myTime = wtime
-		myInc  = winc
+		myInc = winc
 	} else {
 		myTime = btime
-		myInc  = binc
+		myInc = binc
 	}
 	if myTime < 0 {
 		return -1, maxDepth // no clock provided -> search indefinitely
@@ -362,8 +409,8 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 // e.g. "e2e4" or "e7e8q" for a queen promotion.
 func moveToStr(move int) string {
 	from := moveFrom(move)
-	to   := moveTo(move)
-	s    := []byte{
+	to := moveTo(move)
+	s := []byte{
 		byte('a' + fileOf(from)),
 		byte('1' + rankOf(from)),
 		byte('a' + fileOf(to)),
@@ -384,8 +431,8 @@ func parseMove(p *Pos, s string) int {
 		return 0
 	}
 	from := makeSquare(int(s[0]-'a'), int(s[1]-'1'))
-	to   := makeSquare(int(s[2]-'a'), int(s[3]-'1'))
-	mt   := NORMAL
+	to := makeSquare(int(s[2]-'a'), int(s[3]-'1'))
+	mt := NORMAL
 
 	switch {
 	case p.typeAt(from) == K && abs(to-from) == 2:
@@ -396,10 +443,14 @@ func parseMove(p *Pos, s string) int {
 		mt = EP_SET
 	case p.typeAt(from) == P && len(s) > 4:
 		switch s[4] {
-		case 'n': mt = N_PROM
-		case 'b': mt = B_PROM
-		case 'r': mt = R_PROM
-		case 'q': mt = Q_PROM
+		case 'n':
+			mt = N_PROM
+		case 'b':
+			mt = B_PROM
+		case 'r':
+			mt = R_PROM
+		case 'q':
+			mt = Q_PROM
 		}
 	}
 	return (mt << 12) | (to << 6) | from
@@ -445,20 +496,21 @@ func buildPV(dst, src []int, move int) {
 // published tables (e.g. the Chessprogramming Wiki).
 //
 // Expected node counts from the starting position:
-//   depth 1 ->        20
-//   depth 2 ->       400
-//   depth 3 ->     8 902
-//   depth 4 ->   197 281
-//   depth 5 -> 4 865 609
+//
+//	depth 1 ->        20
+//	depth 2 ->       400
+//	depth 3 ->     8 902
+//	depth 4 ->   197 281
+//	depth 5 -> 4 865 609
 func perft(p *Pos, depth int) uint64 {
 	if depth == 0 {
 		return 1
 	}
 
 	var list [maxMoves]int
-	capCount   := genCaptures(p, list[:])
+	capCount := genCaptures(p, list[:])
 	quietCount := genQuiet(p, list[capCount:])
-	total      := capCount + quietCount
+	total := capCount + quietCount
 
 	var n uint64
 	for i := 0; i < total; i++ {
