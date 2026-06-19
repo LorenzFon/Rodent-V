@@ -155,7 +155,11 @@ const (
 	fpMargin    = 120 // centipawns per depth for main-search move-loop futility pruning
 	fpMaxDepth  = 4   // only prune quiet moves by futility at shallow depth
 
-	useLMR = true
+	useLMR          = true
+	LMRnonImproving = true
+	lmrDivisor      = 1.8
+	lmrLinear       = 0.5
+	lmrMax          = 5
 
 	qsFpPawnMargin  = 300 // qs futility margin when capturing a pawn (passers warrant extra slack)
 	qsFpPieceMargin = 200 // qs futility margin when capturing a piece

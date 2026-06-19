@@ -138,13 +138,13 @@ func initLMRTable() {
 				continue
 			}
 
-			raw := math.Log(float64(depth)) * math.Log(float64(moveIndex)) / 1.8
-			reduction := int(raw + 0.5) // round to nearest
+			raw := math.Log(float64(depth)) * math.Log(float64(moveIndex)) / lmrDivisor
+			reduction := int(raw + lmrLinear) // round to nearest
 
 			if reduction < 1 {
 				reduction = 1
 			} else if reduction > 5 {
-				reduction = 5
+				reduction = lmrMax
 			}
 
 			lmr[depth][moveIndex] = reduction
@@ -361,68 +361,78 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		improving = staticEval > ss.evalStack[ply-4]
 	}
 
-	// --- Reverse futility pruning ---
-	// If the static eval beats beta by a depth-scaled margin, the position
-	// is already so good that a full search is unlikely to fall below beta.
-	// The mate guard prevents pruning when beta is a mate score, where the
-	// static eval is unreliable.  We return the margin-adjusted value rather
-	// than the raw static eval to avoid inflating the returned score.
+	// --- Node level pruning ---
+	// gatekeeping reverse futility pruning, razoring and null move
+	if !isPv && !nodeInCheck && !wasNull && !isMateScore(beta) {
 
-	// Use a tighter margin when improving (position is gaining ground).
-	// Wider margin when not improving avoids over-pruning a deteriorating line.
-	rfpDepthMargin := rfpMargin
-	if improving {
-		rfpDepthMargin = rfpImpMargin
-	}
-	if useRFP && !isPv && !nodeInCheck && !wasNull && p.canNullMove() && depth <= rfpMaxDepth &&
-		beta < mate-maxPly &&
-		ss.excludedMove[ply] == 0 &&
-		staticEval-rfpDepthMargin*depth >= beta {
-		return staticEval - rfpDepthMargin*depth
-	}
+		// --- Reverse futility pruning ---
+		// If the static eval beats beta by a depth-scaled margin, the position
+		// is already so good that a full search is unlikely to fall below beta.
+		// The mate guard prevents pruning when beta is a mate score, where the
+		// static eval is unreliable.  We return the margin-adjusted value rather
+		// than the raw static eval to avoid inflating the returned score.
 
-	// --- Razoring ---
-	// If static eval is far below alpha at shallow depth, the position is
-	// unlikely to improve enough with quiet moves. Drop into qsearch; if
-	// qsearch also fails low, return immediately without searching further.
-	if useRazoring && !isPv && !nodeInCheck && !wasNull && depth <= 3 &&
-		ss.excludedMove[ply] == 0 &&
-		staticEval <= alpha-razorMargin*depth {
-		s := ss.quiesce(p, ply, alpha, beta, pv)
-		if s <= alpha {
-			return s
+		// Use a tighter margin when improving (position is gaining ground).
+		// Wider margin when not improving avoids over-pruning a deteriorating line.
+		rfpDepthMargin := rfpMargin
+		if improving {
+			rfpDepthMargin = rfpImpMargin
 		}
-	}
-
-	// --- Null-move pruning ---
-	// Skip if: depth <= 1 (too shallow to be reliable), the position
-	// is already beyond beta, we are in check, or only pawns remain.
-	// Reduction = base + depth/depthDiv + min((eval-beta)/evalDiv, maxEvalBonus).
-	if useNULL && depth > 1 && !isPv && !nodeInCheck && !wasNull && p.canNullMove() && beta <= staticEval &&
-		ss.excludedMove[ply] == 0 {
-		ss.contValid[ply] = false // null move: no valid piece context for cont hist
-		reduction := nmpBaseReduction + depth/nmpDepthReduction
-		var u Undo
-		makeNullMove(p, &u)
-		var nullPv [maxPly]int
-		score = -ss.search(p, ply+1, -beta, -beta+1, depth-1-reduction, true, nullPv[:])
-		unmakeNullMove(p, &u)
-		if atomic.LoadInt32(&abortFlag) != 0 {
-			return 0
+		if useRFP && p.canNullMove() && depth <= rfpMaxDepth &&
+			beta < mate-maxPly &&
+			ss.excludedMove[ply] == 0 &&
+			staticEval-rfpDepthMargin*depth >= beta {
+			return staticEval - rfpDepthMargin*depth
 		}
 
-		// --- Null move verification DISABLED ---
+		// --- Razoring ---
+		// If static eval is far below alpha at shallow depth, the position is
+		// unlikely to improve enough with quiet moves. Drop into qsearch; if
+		// qsearch also fails low, return immediately without searching further.
+		if useRazoring && depth <= 3 &&
+			ss.excludedMove[ply] == 0 &&
+			staticEval <= alpha-razorMargin*depth {
+			s := ss.quiesce(p, ply, alpha, beta, pv)
+			if s <= alpha {
+				return s
+			}
+		}
 
-		//if depth - reduction > 5 && score >= beta {
-		//    score = search(p, ply, alpha, beta, depth - reduction - 4, true, pv);
-		//}
+		// --- Null-move pruning ---
+		// Skip if: depth <= 1 (too shallow to be reliable), the position
+		// is already beyond beta, we are in check, or only pawns remain.
+		// Reduction = base + depth/depthDiv + min((eval-beta)/evalDiv, maxEvalBonus).
+		if useNULL && depth > 1 && !isPv && p.canNullMove() && beta <= staticEval &&
+			ss.excludedMove[ply] == 0 {
+			ss.contValid[ply] = false // null move: no valid piece context for cont hist
+			reduction := nmpBaseReduction + depth/nmpDepthReduction
+			var u Undo
+			makeNullMove(p, &u)
+			var nullPv [maxPly]int
+			score = -ss.search(p, ply+1, -beta, -beta+1, depth-1-reduction, true, nullPv[:])
+			unmakeNullMove(p, &u)
+			if atomic.LoadInt32(&abortFlag) != 0 {
+				return 0
+			}
 
-		//if atomic.LoadInt32(&abortFlag) != 0 {
-		//	return 0
-		//}
+			// Do not return unproven mate scores
+			if score >= mate-maxPly {
+				score = beta
+			}
 
-		if score >= beta {
-			return score
+			// --- Null move verification DISABLED ---
+
+			//if depth - reduction > 5 && score >= beta {
+			//    score = search(p, ply, alpha, beta, depth - reduction - 4, true, pv);
+			//}
+
+			//if atomic.LoadInt32(&abortFlag) != 0 {
+			//	return 0
+			//}
+
+			if score >= beta {
+				return score
+			}
 		}
 	}
 
@@ -598,7 +608,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 					reduction++
 				}
 				// Not improving: position is trending down, reduce more aggressively.
-				if !improving {
+				if !improving && LMRnonImproving {
 					reduction++
 				}
 				if reduction > newDepth-1 {
@@ -1048,4 +1058,9 @@ func (ss *SearchState) checkTime() {
 			atomic.StoreInt32(&abortFlag, 1)
 		}
 	}
+}
+
+func isMateScore(score int) bool {
+	return (score <= -mate+maxPly ||
+		score >= mate-maxPly)
 }

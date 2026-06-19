@@ -1,6 +1,5 @@
 TODO
 
-- if null move search gives a mate score, return beta
 - no check extension if singular extension fired
 - limit check extension (pv or depth)
 - stop searching at d5 swith just one root move (not in Infinite search or while pondering)
@@ -17,6 +16,7 @@ TODO
 
 PASSED
 
+- if null move search gives a mate score, return beta
 
 FAILED
 
