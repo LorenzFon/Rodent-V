@@ -576,14 +576,16 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// or the only escape from a mating attack.
 		// When improving we allow more moves (position is trending up, so
 		// later moves are more likely to be relevant).
-		lmpThreshold := LMPnormalStep*depth + 1
-		if improving {
-			lmpThreshold = LMPimprovingStep*depth + 1
-		}
-		if useLMP && stage == StageQuiet && !isPv && !nodeInCheck && depth < 4 &&
-			quietTried > lmpThreshold && !givesCheck {
-			unmakeMove(p, move, &u)
-			continue
+		if depth < 10 { // table size limit
+			lmpThreshold := lmp[0][depth]
+			if improving {
+				lmpThreshold = lmp[1][depth]
+			}
+			if useLMP && stage == StageQuiet && !isPv && !nodeInCheck && depth < LMPdepth &&
+				quietTried > lmpThreshold && !givesCheck {
+				unmakeMove(p, move, &u)
+				continue
+			}
 		}
 
 		// Futility pruning: at shallow depth, skip late quiet moves that
@@ -601,7 +603,8 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 		// Late move reduction
 		isReduced := false
-		if useLMR && stage == StageQuiet && depth > 2 && !nodeInCheck && !givesCheck && movesTried >= 4 {
+		if useLMR && stage == StageQuiet && depth >= minLmrDepth &&
+			!nodeInCheck && !givesCheck && movesTried >= 4 {
 			reduction := lmr[min(depth, 63)][min(movesTried, 63)]
 			if reduction > 0 {
 				if !isPv {

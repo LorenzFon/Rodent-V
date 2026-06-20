@@ -132,7 +132,7 @@ const (
 
 	useNULL           = true
 	nmpBaseReduction  = 3 // base ply reduction for null-move pruning
-	nmpDepthReduction = 3 // depth divisor for depth-scaled NMP reduction
+	nmpDepthReduction = 4 // depth divisor for depth-scaled NMP reduction
 
 	useProbcut       = true
 	probcutMargin    = 120 // extra margin above beta for ProbCut verification
@@ -150,6 +150,8 @@ const (
 	useLMP           = true
 	LMPnormalStep    = 4
 	LMPimprovingStep = 6
+	LMPdepth         = 10
+	minLmrDepth      = 3
 
 	useFutility = true
 	fpMargin    = 120 // centipawns per depth for main-search move-loop futility pruning
@@ -157,15 +159,20 @@ const (
 
 	useLMR          = true
 	LMRnonImproving = true
-	lmrDivisor      = 1.8
-	lmrLinear       = 0.5
-	lmrMax          = 5
+	lmrDivisor      = 2.0
+	lmrLinear       = 1.0
+	lmrMax          = 10
 
 	qsFpPawnMargin  = 300 // qs futility margin when capturing a pawn (passers warrant extra slack)
 	qsFpPieceMargin = 200 // qs futility margin when capturing a piece
 	qsLmpLimit      = 2   // max captures tried per qs node (outside check) to cap explosion
 
 )
+
+var lmp = [2][11]int{
+	{0, 2, 3, 5, 9, 13, 18, 25, 34, 45, 55},
+	{0, 5, 6, 9, 14, 21, 30, 41, 55, 69, 84},
+}
 
 // TEST POSITION 6k1/ppp2p1p/6p1/3p4/3n4/4B2P/P1P1rPP1/3n2K1 b - - 1 20 ???
 
