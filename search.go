@@ -110,11 +110,13 @@ import (
 // Global search state — shared across all threads.
 // Per-thread state lives in SearchState (see thread.go).
 var (
-	timeLimit  int64     // allocated move time in ms (-1 = unlimited); set by UCI
-	pondering  bool      // true while in ponder mode (ignore clock)
-	rootDepth  int       // current iterative deepening depth (main thread drives)
-	abortFlag  int32     // set to 1 atomically to stop all threads
-	numThreads int   = 1 // number of search threads (1 = single-threaded)
+	useSoftTimeLimit bool  = false // do we have a right to use less than allocated time?
+	hardTimeLimit    int64         // allocated move time in ms (-1 = unlimited); set by UCI
+	softTimeLimit    int64         // time beyond which we do not start a new iterations
+	pondering        bool          // true while in ponder mode (ignore clock)
+	rootDepth        int           // current iterative deepening depth (main thread drives)
+	abortFlag        int32         // set to 1 atomically to stop all threads
+	numThreads       int   = 1     // number of search threads (1 = single-threaded)
 )
 
 // lmr[depth][moveIndex] holds the ply reduction for a quiet move tried
@@ -170,6 +172,14 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	ss := states[0]
 	ss.resetForSearch(p)
 
+	// Can we stop searching earlier?
+	// TODO: make it work with multithreading
+	if useSoftTimeLimit && numThreads == 1 {
+		softTimeLimit = hardTimeLimit / 2
+	} else {
+		softTimeLimit = hardTimeLimit
+	}
+
 	// Launch lazy SMP helper threads (depth 1..INF until abortFlag fires).
 	var wg sync.WaitGroup
 	for i := 1; i < numThreads && i < len(states); i++ {
@@ -199,9 +209,9 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 		//      typically takes longer than all prior depths combined, so
 		//      starting it when half the budget is gone almost always busts
 		//      the limit. This is the key guard against time forfeits.
-		if rootDepth > 1 && !pondering && timeLimit >= 0 {
+		if rootDepth > 1 && !pondering && hardTimeLimit >= 0 {
 			elapsed := time.Now().UnixMilli() - ss.searchStart
-			if elapsed >= timeLimit || elapsed >= timeLimit/2 {
+			if elapsed >= hardTimeLimit || elapsed >= hardTimeLimit/2 {
 				break
 			}
 		}
@@ -211,6 +221,7 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 			// Aspiration windows are unreliable at shallow depths.
 			iterScore = ss.search(p, 0, -inf, inf, rootDepth, false, pv[:])
 		} else {
+
 			// Score-adaptive initial delta: balanced positions get a tight
 			// window; large scores widen it to reduce retry churn.
 			delta := 25 + score*score/16384
@@ -240,6 +251,12 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 		if atomic.LoadInt32(&abortFlag) != 0 {
 			break
 		}
+
+		// soft time limit
+		if time.Now().UnixMilli()-ss.searchStart >= softTimeLimit {
+			break
+		}
+
 		score = iterScore
 	}
 
@@ -1056,8 +1073,8 @@ func (ss *SearchState) checkTime() {
 	if ss.nodes&1023 != 0 || rootDepth == 1 {
 		return
 	}
-	if !pondering && timeLimit >= 0 {
-		if time.Now().UnixMilli()-ss.searchStart >= timeLimit {
+	if !pondering && hardTimeLimit >= 0 {
+		if time.Now().UnixMilli()-ss.searchStart >= hardTimeLimit {
 			atomic.StoreInt32(&abortFlag, 1)
 		}
 	}

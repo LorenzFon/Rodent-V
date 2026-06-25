@@ -93,7 +93,7 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V 0021")
+			fmt.Println("id name Rodent V 0022")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
@@ -123,7 +123,7 @@ func uciLoop() {
 		case "go":
 			stopSearch()
 			mt, md := parseGoParams(tokens[1:], &p)
-			timeLimit = mt
+			hardTimeLimit = mt
 			pondering = false
 			for _, t := range tokens[1:] {
 				if t == "ponder" {
@@ -318,7 +318,7 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 	btime := int64(-1)
 	winc := int64(0)
 	binc := int64(0)
-	movestogo := int64(40)
+	movestogo := int64(16)
 	movetime := int64(-1)
 	maxDepth := maxPly - 1
 
@@ -328,40 +328,48 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 			if i+1 < len(tokens) {
 				i++
 				wtime, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "btime":
 			if i+1 < len(tokens) {
 				i++
 				btime, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "winc":
 			if i+1 < len(tokens) {
 				i++
 				winc, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "binc":
 			if i+1 < len(tokens) {
 				i++
 				binc, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "movestogo":
 			if i+1 < len(tokens) {
 				i++
 				movestogo, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "movetime":
 			if i+1 < len(tokens) {
 				i++
 				movetime, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = false
 			}
 		case "depth":
 			if i+1 < len(tokens) {
 				i++
 				if d, err := strconv.Atoi(tokens[i]); err == nil {
 					maxDepth = d
+					useSoftTimeLimit = false
 				}
 			}
 		case "infinite":
+			useSoftTimeLimit = false
 			return -1, maxPly - 1
 		}
 	}
