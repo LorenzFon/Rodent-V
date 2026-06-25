@@ -420,15 +420,15 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 				score = beta
 			}
 
-			// --- Null move verification DISABLED ---
+			// --- Null move verification CURRENTLY DISABLED ---
 
-			//if depth - reduction > 5 && score >= beta {
-			//    score = search(p, ply, alpha, beta, depth - reduction - 4, true, pv);
-			//}
+			if useVerification && depth-reduction >= minVerDepth && score >= beta {
+				score = ss.search(p, ply, alpha, beta, depth-reduction-verReduction, true, pv)
 
-			//if atomic.LoadInt32(&abortFlag) != 0 {
-			//	return 0
-			//}
+				if atomic.LoadInt32(&abortFlag) != 0 {
+					return 0
+				}
+			}
 
 			if score >= beta {
 				return score

@@ -12,7 +12,7 @@ TODO
                                         realScoreToTtScore(score, ss->mPly), 
                                         depth, 
                                         TranspositionTable::Flags::LowerBoundScore);
-- 
+- on null move cutoff, zero killers
 
 PASSED
 
