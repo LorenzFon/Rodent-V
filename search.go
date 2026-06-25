@@ -253,7 +253,7 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 		}
 
 		// soft time limit
-		if time.Now().UnixMilli()-ss.searchStart >= softTimeLimit {
+		if useSoftTimeLimit && time.Now().UnixMilli()-ss.searchStart >= softTimeLimit {
 			break
 		}
 
