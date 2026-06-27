@@ -36,8 +36,8 @@ func loadTunerFile() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	epdFile, err := os.Open("quiet-labeled.epd")
-	fmt.Printf("reading epdFile 'quiet-labeled.epd' (%v)\n", err == nil)
+	epdFile, err := os.Open("c:/lichess-quiet.epd")
+	fmt.Printf("reading epdFile 'c:/lichess-quiet.epd' (%v)\n", err == nil)
 	if err != nil {
 		fmt.Println("Epd file not found!")
 		return
@@ -141,9 +141,10 @@ func samplePositions(all []string, used []int, n int) []string {
 
 // Builds a fresh working sample for Texel fitting.
 // samplePerBucket means:
-//   samplePerBucket positions from 1-0
-//   samplePerBucket positions from 0-1
-//   samplePerBucket positions from 1/2-1/2
+//
+//	samplePerBucket positions from 1-0
+//	samplePerBucket positions from 0-1
+//	samplePerBucket positions from 1/2-1/2
 func tunerInitBatch(samplePerBucket int) {
 	loadTunerFile()
 	if !tunerLoaded {
@@ -171,7 +172,6 @@ func tunerInitBatchAll() {
 
 	fmt.Printf("loaded: W %d  L %d  D %d\n", len(epd10), len(epd01), len(epd05))
 }
-
 
 // texelSigmoid translates eval score into a winning probability
 // between 0 and 1.
@@ -248,6 +248,53 @@ func getFit() {
 	tunerInitBatchAll()
 	var bestFit = texelFit()
 	fmt.Print(bestFit)
+}
+
+func centerStats() {
+	loadTunerFile()
+	tunerInitBatchAll()
+	iteration := 0
+	kid := 0
+	french := 0
+	sicilian := 0
+	e4e5 := 0
+	d4d5 := 0
+	var p Pos
+	var e EvalData
+
+	for i := 0; i < len(epdLines); i++ {
+		iteration++
+		parseFEN(&p, epdLines[i])
+		initCenterType(&p, &e)
+		if e.center[White] == KID_high {
+			kid++
+		}
+		if e.center[White] == KID_low {
+			kid++
+		}
+		if e.center[White] == FRENCH_low {
+			french++
+		}
+		if e.center[White] == FRENCH_high {
+			french++
+		}
+		if e.center[White] == SICILIAN_high {
+			sicilian++
+		}
+		if e.center[White] == SICILIAN_low {
+			sicilian++
+		}
+		if e.center[White] == CLASSIC_e4e5 {
+			e4e5++
+		}
+		if e.center[White] == CLASSIC_d4d5 {
+			d4d5++
+		}
+	}
+
+	sum := sicilian + french + kid + e4e5 + d4d5
+	fmt.Print(iteration, " positions, ", sum, " known central pawn structures - ", sum*100/iteration, " percent\n")
+	fmt.Print(sicilian, " sicilian, ", kid, " kid, ", french, " french, ", e4e5, " e4e5, ", d4d5, " d4d5 ")
 }
 
 // tuneValue is a helper function that tries to modify a single value
@@ -509,11 +556,11 @@ func tunePerPiece2D(table *[2][6]int, tableName string, samplePerBucket int) {
 }
 
 func pstTuningSession() {
-		for i := 0; i < 100; i++ {
-			tunePST(&pstMG, "pstMG", 5000)
-			tunePST(&pstEG, "pstEG", 5000)
-			printPSTforAllPieces("pstMG", &pstMG)
-			printPSTforAllPieces("pstEG", &pstEG)
+	for i := 0; i < 100; i++ {
+		tunePST(&pstMG, "pstMG", 5000)
+		tunePST(&pstEG, "pstEG", 5000)
+		printPSTforAllPieces("pstMG", &pstMG)
+		printPSTforAllPieces("pstEG", &pstEG)
 	}
 }
 
@@ -527,8 +574,8 @@ func passerTuningSession() {
 		tunePerRank1D(&theirPasserProximityMG, "theirPasserProximityMG", 5000)
 		tunePerRank1D(&theirPasserProximityEG, "theirPasserProximityEG", 5000)
 
-		print2DTable("passedBonusMG", [][]int{ passedBonusMG[0][:], passedBonusMG[1][:],})
-		print2DTable("passedBonusEG", [][]int{ passedBonusEG[0][:], passedBonusEG[1][:],})
+		print2DTable("passedBonusMG", [][]int{passedBonusMG[0][:], passedBonusMG[1][:]})
+		print2DTable("passedBonusEG", [][]int{passedBonusEG[0][:], passedBonusEG[1][:]})
 
 		print1DTable("ourPasserProximityMG", ourPasserProximityMG[:])
 		print1DTable("ourPasserProximityEG", ourPasserProximityEG[:])
@@ -539,7 +586,7 @@ func passerTuningSession() {
 
 func threatTuningSession() {
 	for i := 0; i < 100; i++ {
-		fmt.Println( "STAGE ", i)
+		fmt.Println("STAGE ", i)
 		tunePerPiece1D(&threatByPawnMG, "threatByPawnMG", 5000)
 		tunePerPiece1D(&threatByPawnEG, "threatByPawnEG", 5000)
 
@@ -561,17 +608,17 @@ func threatTuningSession() {
 		print1DTable("threatByPawnMG", threatByPawnMG[:])
 		print1DTable("threatByPawnEG", threatByPawnEG[:])
 
-		print2DTable("threatByKnightMG", [][]int{ threatByKnightMG[0][:], threatByKnightMG[1][:],})
-		print2DTable("threatByKnightEG", [][]int{ threatByKnightEG[0][:], threatByKnightEG[1][:],})
+		print2DTable("threatByKnightMG", [][]int{threatByKnightMG[0][:], threatByKnightMG[1][:]})
+		print2DTable("threatByKnightEG", [][]int{threatByKnightEG[0][:], threatByKnightEG[1][:]})
 
-		print2DTable("threatByBishopMG", [][]int{ threatByBishopMG[0][:], threatByBishopMG[1][:],})
-		print2DTable("threatByBishopEG", [][]int{ threatByBishopEG[0][:], threatByBishopEG[1][:],})
+		print2DTable("threatByBishopMG", [][]int{threatByBishopMG[0][:], threatByBishopMG[1][:]})
+		print2DTable("threatByBishopEG", [][]int{threatByBishopEG[0][:], threatByBishopEG[1][:]})
 
-		print2DTable("threatByRookMG", [][]int{ threatByRookMG[0][:], threatByRookMG[1][:],})
-		print2DTable("threatByRookEG", [][]int{ threatByRookEG[0][:], threatByRookEG[1][:],})
+		print2DTable("threatByRookMG", [][]int{threatByRookMG[0][:], threatByRookMG[1][:]})
+		print2DTable("threatByRookEG", [][]int{threatByRookEG[0][:], threatByRookEG[1][:]})
 
-		print2DTable("threatByQueenMG", [][]int{ threatByQueenMG[0][:], threatByQueenMG[1][:],})
-		print2DTable("threatByQueenEG", [][]int{ threatByQueenEG[0][:], threatByQueenEG[1][:],})
+		print2DTable("threatByQueenMG", [][]int{threatByQueenMG[0][:], threatByQueenMG[1][:]})
+		print2DTable("threatByQueenEG", [][]int{threatByQueenEG[0][:], threatByQueenEG[1][:]})
 
 		print1DTable("threatByKingMG", threatByKingMG[:])
 		print1DTable("threatByKingEG", threatByKingEG[:])
