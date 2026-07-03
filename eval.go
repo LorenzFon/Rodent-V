@@ -147,7 +147,6 @@ func evaluate(p *Pos) int {
 		score = hceScore + nnueScore
 	}
 
-	//score := eval_internal(p, false)
 	storeEvalHash(p.key, score)
 	return score
 }

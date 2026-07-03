@@ -98,6 +98,9 @@ func uciLoop() {
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
+			fmt.Println("option name hceWeight type spin default ", hcePercentage, " min 1 max 256")
+			fmt.Println("option name nnueWeight type spin default ", nnuePercentage, " min 1 max 256")
+
 			printUciOptions()
 			fmt.Println("uciok")
 
@@ -237,6 +240,32 @@ func parseSetOption(tokens []string) {
 			}
 			numThreads = n
 		}
+		return
+
+	case strings.EqualFold(name, "nnueWeight"):
+		if n, err := strconv.Atoi(value); err == nil {
+			if n < 0 {
+				n = 0
+			}
+			if n > 256 {
+				n = 256
+			}
+			nnuePercentage = n
+		}
+
+		return
+
+	case strings.EqualFold(name, "hceWeight"):
+		if n, err := strconv.Atoi(value); err == nil {
+			if n < 0 {
+				n = 0
+			}
+			if n > 256 {
+				n = 256
+			}
+			hcePercentage = n
+		}
+
 		return
 	}
 
