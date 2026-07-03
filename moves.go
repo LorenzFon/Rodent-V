@@ -91,6 +91,13 @@ func makeMove(p *Pos, move int, u *Undo) {
 	}
 	p.colorBB[side] ^= squareBit(from) | squareBit(to)
 	p.typeBB[fromType] ^= squareBit(from) | squareBit(to)
+	if nnue.Loaded {
+		if toType != NO_TP {
+			nnueMoveCapture(p, side, fromType, from, to, opp(side), toType, to)
+		} else {
+			nnueMovePiece(p, side, fromType, from, to)
+		}
+	}
 
 	// --- Update king square ---
 	if fromType == K {
@@ -135,6 +142,9 @@ func makeMove(p *Pos, move int, u *Undo) {
 			zobPiece[makePiece(side, R)][rookTo]
 		p.colorBB[side] ^= squareBit(rookFrom) | squareBit(rookTo)
 		p.typeBB[R] ^= squareBit(rookFrom) | squareBit(rookTo)
+		if nnue.Loaded {
+			nnueMovePiece(p, side, R, rookFrom, rookTo)
+		}
 
 	case EP_CAP:
 		// The captured pawn sits one square behind "to" (XOR 8 flips rank).
@@ -145,6 +155,9 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
 		p.count[opp(side)][P]--
+		if nnue.Loaded {
+			nnueDelPiece(p, opp(side), P, capSq)
+		}
 
 	case EP_SET:
 		// Double pawn push: record the en-passant square if an enemy
@@ -167,6 +180,10 @@ func makeMove(p *Pos, move int, u *Undo) {
 		p.typeBB[fromType] ^= squareBit(to)
 		p.count[side][fromType]++
 		p.count[side][P]--
+		if nnue.Loaded {
+			nnueAddPiece(p, side, fromType, to)
+			nnueDelPiece(p, side, P, to)
+		}
 	}
 
 	p.side ^= 1
@@ -176,6 +193,7 @@ func makeMove(p *Pos, move int, u *Undo) {
 // unmakeMove restores position p to the state before move was made.
 // u must be the Undo record filled by the corresponding makeMove call.
 func unmakeMove(p *Pos, move int, u *Undo) {
+
 	side := opp(p.side) // the side that made the move
 	from := moveFrom(move)
 	to := moveTo(move)
@@ -196,6 +214,13 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 	p.board[to] = NO_PC
 	p.colorBB[side] ^= squareBit(from) | squareBit(to)
 	p.typeBB[movingType] ^= squareBit(from) | squareBit(to)
+	if nnue.Loaded {
+		if capType != NO_TP {
+			nnueMoveUncapture(p, side, movingType, from, to, opp(side), capType, to)
+		} else {
+			nnueMovePiece(p, side, movingType, to, from)
+		}
+	}
 
 	// --- Update king square ---
 	if movingType == K {
@@ -228,6 +253,9 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.board[rookFrom] = makePiece(side, R)
 		p.colorBB[side] ^= squareBit(rookFrom) | squareBit(rookTo)
 		p.typeBB[R] ^= squareBit(rookFrom) | squareBit(rookTo)
+		if nnue.Loaded {
+			nnueMovePiece(p, side, R, rookTo, rookFrom)
+		}
 
 	case EP_CAP:
 		capSq := to ^ 8
@@ -235,6 +263,9 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
 		p.count[opp(side)][P]++
+		if nnue.Loaded {
+			nnueAddPiece(p, opp(side), P, capSq)
+		}
 
 	case EP_SET:
 		// Nothing extra. epSquare was restored from u above.
@@ -247,6 +278,10 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 		p.typeBB[movingType] ^= squareBit(from)
 		p.count[side][P]++
 		p.count[side][movingType]--
+		if nnue.Loaded {
+			nnueAddPiece(p, side, P, from)
+			nnueDelPiece(p, side, movingType, from)
+		}
 	}
 
 	p.side ^= 1

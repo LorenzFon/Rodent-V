@@ -125,11 +125,29 @@ var tunerDisableMobility bool
 // perspective of the side to move.  Positive = better for the mover.
 // Before calculating eval score, it tries to find it in the eval hashtable.
 func evaluate(p *Pos) int {
+
 	if score, ok := probeEvalHash(p.key); ok {
 		return score
 	}
 
-	score := eval_internal(p, false)
+	score := 0
+
+	if !nnue.Loaded {
+		score = eval_internal(p, false)
+	} else {
+		nnueScore := 0
+		hceScore := 0
+		if nnuePercentage > 0 {
+			nnueScore = nnueEvaluate(p) * nnuePercentage / 100
+		}
+		if hcePercentage > 0 {
+			hceScore = eval_internal(p, false) * hcePercentage / 100
+		}
+
+		score = hceScore + nnueScore
+	}
+
+	//score := eval_internal(p, false)
 	storeEvalHash(p.key, score)
 	return score
 }

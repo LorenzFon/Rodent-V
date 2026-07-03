@@ -20,12 +20,19 @@ package main
 
 import "fmt"
 
+var nnuePercentage int
+var hcePercentage int
 var engineSide int
-var optionValues[2][EvalComponentN] int
+var optionValues [2][EvalComponentN]int
+
 const weightOwn = 0
 const weightOpp = 1
 
 func init() {
+
+	nnuePercentage = 80
+	hcePercentage = 0
+
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		optionValues[weightOwn][c] = 100
 		optionValues[weightOpp][c] = 100
@@ -39,7 +46,7 @@ func printUciOptions() {
 			evalComponentName[c],
 			optionValues[weightOwn][c],
 		)
-			fmt.Printf(
+		fmt.Printf(
 			"option name Opp%s type spin default %d min 0 max 500\n",
 			evalComponentName[c],
 			optionValues[weightOpp][c],

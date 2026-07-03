@@ -168,7 +168,7 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	engineSide = p.side
 	ttDate = (ttDate + 1) & 255
 	atomic.StoreInt32(&abortFlag, 0)
-
+	nnueRefresh(p)
 	ss := states[0]
 	ss.resetForSearch(p)
 

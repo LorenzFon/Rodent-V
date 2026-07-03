@@ -172,6 +172,12 @@ func uciLoop() {
 		case "eval":
 			eval_trace(&p)
 
+		case "nnue":
+			{
+				nnueRefresh(&p)
+				fmt.Print(nnueEvaluate(&p))
+			}
+
 		case "threats":
 			PrintThreatDebug(&p)
 
@@ -305,6 +311,7 @@ func parsePosition(p *Pos, tokens []string) {
 			}
 		}
 	}
+	nnueRefresh(p)
 }
 
 // ---- Time management ----
