@@ -333,8 +333,7 @@ func parsePosition(p *Pos, tokens []string) {
 			if move == 0 {
 				break
 			}
-			var u Undo
-			makeMove(p, move, &u)
+			makeMove(p, move)
 			if p.clock == 0 {
 				p.histLen = 0
 			}
@@ -547,24 +546,47 @@ func buildPV(dst, src []int, move int) {
 //	depth 4 ->   197 281
 //	depth 5 -> 4 865 609
 func perft(p *Pos, depth int) uint64 {
+	var posStack [maxPly]Pos
+	posStack[0] = *p
+
+	return perftStack(&posStack, 0, depth)
+}
+
+func perftStack(
+	posStack *[maxPly]Pos,
+	ply int,
+	depth int,
+) uint64 {
 	if depth == 0 {
 		return 1
 	}
 
+	p := &posStack[ply]
+
 	var list [maxMoves]int
+
 	capCount := genCaptures(p, list[:])
 	quietCount := genQuiet(p, list[capCount:])
 	total := capCount + quietCount
 
-	var n uint64
+	var nodes uint64
+
 	for i := 0; i < total; i++ {
 		move := list[i]
-		var u Undo
-		makeMove(p, move, &u)
-		if !p.selfInCheck() {
-			n += perft(p, depth-1)
+
+		child := &posStack[ply+1]
+		*child = *p
+
+		makeMove(child, move)
+
+		if !child.selfInCheck() {
+			nodes += perftStack(
+				posStack,
+				ply+1,
+				depth-1,
+			)
 		}
-		unmakeMove(p, move, &u)
 	}
-	return n
+
+	return nodes
 }

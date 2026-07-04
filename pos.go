@@ -63,20 +63,6 @@ type Pos struct {
 	nnueAccumulator [2][NNUEHiddenSize]int16 // nnue accumulator
 }
 
-// Undo stores the information needed to reverse a single move.
-// The fields that cannot be recovered from the board alone (captured
-// piece type, castling flags, en-passant square, 50-move clock) are
-// saved here before makeMove() modifies them.
-type Undo struct {
-	captured     int       // type of the piece that was captured (NO_TP if none)
-	castleRights int       // castleRights before the move
-	epSquare     int       // epSquare before the move
-	clock        int       // half-move clock before the move
-	key          uint64    // Zobrist key before the move
-	pawnKey      [2]uint64 // pawnKey before the move
-	nonPawnKey   [2]uint64 // nonPawnKey before the move
-}
-
 // ---- Position query helpers ----
 
 // occupied returns a bitboard of all occupied squares.

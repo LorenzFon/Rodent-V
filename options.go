@@ -30,8 +30,8 @@ const weightOpp = 1
 
 func init() {
 
-	nnuePercentage = 30
-	hcePercentage = 60
+	nnuePercentage = 80
+	hcePercentage = 0
 
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		optionValues[weightOwn][c] = 100

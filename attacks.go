@@ -166,11 +166,10 @@ func moveGivesCheck(p *Pos, move int) bool {
 	// (we make and unmake a move, as it's rare enough
 	// and writing out correct conditions would be hard)
 	if typeOfMove == CASTLE {
-		var u Undo
-		makeMove(p, move, &u)
-		isInCheck := p.inCheck()
-		unmakeMove(p, move, &u)
-		return isInCheck
+		child := *p
+		makeMove(&child, move)
+
+		return child.inCheck()
 	}
 
 	// toType is intentionally kept, even though it is no longer needed in

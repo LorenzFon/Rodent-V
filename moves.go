@@ -38,21 +38,12 @@ package main
 
 // makeMove applies move to position p.  The Undo record u must be
 // passed in so that unmakeMove() can restore the position exactly.
-func makeMove(p *Pos, move int, u *Undo) {
+func makeMove(p *Pos, move int) {
 	side := p.side
 	from := moveFrom(move)
 	to := moveTo(move)
 	fromType := p.typeAt(from)
 	toType := p.typeAt(to)
-
-	// Save fields that will be destroyed by this move.
-	u.captured = toType
-	u.castleRights = p.castleRights
-	u.epSquare = p.epSquare
-	u.clock = p.clock
-	u.key = p.key
-	u.pawnKey = p.pawnKey
-	u.nonPawnKey = p.nonPawnKey
 
 	// Append current key to the repetition history.
 	p.keyHist[p.histLen] = p.key
@@ -190,103 +181,6 @@ func makeMove(p *Pos, move int, u *Undo) {
 	p.key ^= sideKey
 }
 
-// unmakeMove restores position p to the state before move was made.
-// u must be the Undo record filled by the corresponding makeMove call.
-func unmakeMove(p *Pos, move int, u *Undo) {
-
-	side := opp(p.side) // the side that made the move
-	from := moveFrom(move)
-	to := moveTo(move)
-	movingType := p.typeAt(to) // type of piece now on "to"
-	capType := u.captured
-
-	// Restore the saved fields.
-	p.castleRights = u.castleRights
-	p.epSquare = u.epSquare
-	p.clock = u.clock
-	p.key = u.key
-	p.pawnKey = u.pawnKey
-	p.nonPawnKey = u.nonPawnKey
-	p.histLen--
-
-	// --- Move piece back: to -> from ---
-	p.board[from] = makePiece(side, movingType)
-	p.board[to] = NO_PC
-	p.colorBB[side] ^= squareBit(from) | squareBit(to)
-	p.typeBB[movingType] ^= squareBit(from) | squareBit(to)
-	if nnue.Loaded {
-		if capType != NO_TP {
-			nnueMoveUncapture(p, side, movingType, from, to, opp(side), capType, to)
-		} else {
-			nnueMovePiece(p, side, movingType, to, from)
-		}
-	}
-
-	// --- Update king square ---
-	if movingType == K {
-		p.kingSq[side] = from
-	}
-
-	// --- Restore a captured piece ---
-	if capType != NO_TP {
-		p.board[to] = makePiece(opp(side), capType)
-		p.colorBB[opp(side)] ^= squareBit(to)
-		p.typeBB[capType] ^= squareBit(to)
-		p.count[opp(side)][capType]++
-	}
-
-	// --- Reverse special move effects ---
-	switch moveType(move) {
-	case NORMAL:
-		// Nothing extra.
-
-	case CASTLE:
-		var rookFrom, rookTo int
-		if to > from {
-			rookFrom = from + 3
-			rookTo = to - 1
-		} else {
-			rookFrom = from - 4
-			rookTo = to + 1
-		}
-		p.board[rookTo] = NO_PC
-		p.board[rookFrom] = makePiece(side, R)
-		p.colorBB[side] ^= squareBit(rookFrom) | squareBit(rookTo)
-		p.typeBB[R] ^= squareBit(rookFrom) | squareBit(rookTo)
-		if nnue.Loaded {
-			nnueMovePiece(p, side, R, rookTo, rookFrom)
-		}
-
-	case EP_CAP:
-		capSq := to ^ 8
-		p.board[capSq] = makePiece(opp(side), P)
-		p.colorBB[opp(side)] ^= squareBit(capSq)
-		p.typeBB[P] ^= squareBit(capSq)
-		p.count[opp(side)][P]++
-		if nnue.Loaded {
-			nnueAddPiece(p, opp(side), P, capSq)
-		}
-
-	case EP_SET:
-		// Nothing extra. epSquare was restored from u above.
-
-	case N_PROM, B_PROM, R_PROM, Q_PROM:
-		// Restore the pawn: the piece at "from" is now the promoted
-		// piece type, so swap typeBB back.
-		p.board[from] = makePiece(side, P)
-		p.typeBB[P] ^= squareBit(from)
-		p.typeBB[movingType] ^= squareBit(from)
-		p.count[side][P]++
-		p.count[side][movingType]--
-		if nnue.Loaded {
-			nnueAddPiece(p, side, P, from)
-			nnueDelPiece(p, side, movingType, from)
-		}
-	}
-
-	p.side ^= 1
-}
-
 // ================================================================
 // NULL MOVE
 // ================================================================
@@ -302,9 +196,7 @@ func unmakeMove(p *Pos, move int, u *Undo) {
 
 // makeNullMove passes the turn without moving.  Only u.epSquare and
 // u.key are saved; the other fields are not touched.
-func makeNullMove(p *Pos, u *Undo) {
-	u.epSquare = p.epSquare
-	u.key = p.key
+func makeNullMove(p *Pos) {
 
 	p.keyHist[p.histLen] = p.key
 	p.histLen++
@@ -317,13 +209,4 @@ func makeNullMove(p *Pos, u *Undo) {
 
 	p.side ^= 1
 	p.key ^= sideKey
-}
-
-// unmakeNullMove reverses makeNullMove.
-func unmakeNullMove(p *Pos, u *Undo) {
-	p.epSquare = u.epSquare
-	p.key = u.key
-	p.histLen--
-	p.clock--
-	p.side ^= 1
 }
