@@ -194,8 +194,7 @@ func makeMove(p *Pos, move int) {
 //   rest of the position is unchanged.
 //
 
-// makeNullMove passes the turn without moving.  Only u.epSquare and
-// u.key are saved; the other fields are not touched.
+// makeNullMove passes the turn without moving.
 func makeNullMove(p *Pos) {
 
 	p.keyHist[p.histLen] = p.key

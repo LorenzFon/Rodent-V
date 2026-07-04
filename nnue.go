@@ -28,10 +28,6 @@ type NNUEState struct {
 var nnueParams NNUEParameters
 var nnue NNUEState
 
-// Add this field to Pos:
-//
-// nnueAccumulator [2][NNUEHiddenSize]int16
-
 // Clear = empty-board state = biases only.
 func nnueClear(p *Pos) {
 	a0 := &p.nnueAccumulator[0]
@@ -78,7 +74,8 @@ func nnueDelPiece(p *Pos, color, pt, sq int) {
 	}
 }
 
-// Move one piece without a capture.
+// Move one piece without a capture. Loops are expensive,
+// so we use one instead of separate addition/deletion loops.
 func nnueMovePiece(p *Pos, color, pt, from, to int) {
 	from0 := color*384 + pt*64 + from
 	to0 := color*384 + pt*64 + to
@@ -102,7 +99,7 @@ func nnueMovePiece(p *Pos, color, pt, from, to int) {
 }
 
 // Make a capture.
-//
+// Here we perform 3 actions in a loop.
 // capturedSq is normally equal to to, except for en passant.
 func nnueMoveCapture(
 	p *Pos,
@@ -131,40 +128,6 @@ func nnueMoveCapture(
 	for i := 0; i < NNUEHiddenSize; i++ {
 		a0[i] += wMTo0[i] - wMFrom0[i] - wCap0[i]
 		a1[i] += wMTo1[i] - wMFrom1[i] - wCap1[i]
-	}
-}
-
-// Unmake a capture.
-//
-// The accumulator is assumed to represent the position after the capture.
-// This moves the capturing piece back and restores the captured piece.
-func nnueMoveUncapture(
-	p *Pos,
-	moverColor, moverPT, from, to int,
-	capturedColor, capturedPT, capturedSq int,
-) {
-	mFrom0 := moverColor*384 + moverPT*64 + from
-	mTo0 := moverColor*384 + moverPT*64 + to
-	cap0 := capturedColor*384 + capturedPT*64 + capturedSq
-
-	mFrom1 := (moverColor^1)*384 + moverPT*64 + (from ^ 56)
-	mTo1 := (moverColor^1)*384 + moverPT*64 + (to ^ 56)
-	cap1 := (capturedColor^1)*384 + capturedPT*64 + (capturedSq ^ 56)
-
-	a0 := &p.nnueAccumulator[0]
-	a1 := &p.nnueAccumulator[1]
-
-	wMFrom0 := &nnueParams.InputWeights[mFrom0]
-	wMTo0 := &nnueParams.InputWeights[mTo0]
-	wCap0 := &nnueParams.InputWeights[cap0]
-
-	wMFrom1 := &nnueParams.InputWeights[mFrom1]
-	wMTo1 := &nnueParams.InputWeights[mTo1]
-	wCap1 := &nnueParams.InputWeights[cap1]
-
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += wMFrom0[i] - wMTo0[i] + wCap0[i]
-		a1[i] += wMFrom1[i] - wMTo1[i] + wCap1[i]
 	}
 }
 
