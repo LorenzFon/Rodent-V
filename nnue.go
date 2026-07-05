@@ -102,10 +102,8 @@ func nnueMovePiece(p *Pos, color, pt, from, to int) {
 // Here we perform 3 actions in a loop.
 // capturedSq is normally equal to to, except for en passant.
 func nnueMoveCapture(
-	p *Pos,
-	moverColor, moverPT, from, to int,
-	capturedColor, capturedPT, capturedSq int,
-) {
+	p *Pos, moverColor, moverPT, from, to int,
+	capturedColor, capturedPT, capturedSq int) {
 	mFrom0 := moverColor*384 + moverPT*64 + from
 	mTo0 := moverColor*384 + moverPT*64 + to
 	cap0 := capturedColor*384 + capturedPT*64 + capturedSq
