@@ -82,7 +82,7 @@ func makeMove(p *Pos, move int) {
 	}
 	p.colorBB[side] ^= squareBit(from) | squareBit(to)
 	p.typeBB[fromType] ^= squareBit(from) | squareBit(to)
-	if nnue.Loaded && nnuePercentage > 0 {
+	if nnue.Loaded && singleOptions[NnuePerc] > 0 {
 		if toType != NO_TP {
 			nnueMoveCapture(p, side, fromType, from, to, opp(side), toType, to)
 		} else {
@@ -133,7 +133,7 @@ func makeMove(p *Pos, move int) {
 			zobPiece[makePiece(side, R)][rookTo]
 		p.colorBB[side] ^= squareBit(rookFrom) | squareBit(rookTo)
 		p.typeBB[R] ^= squareBit(rookFrom) | squareBit(rookTo)
-		if nnue.Loaded && nnuePercentage > 0 {
+		if nnue.Loaded && singleOptions[NnuePerc] > 0 {
 			nnueMovePiece(p, side, R, rookFrom, rookTo)
 		}
 
@@ -146,7 +146,7 @@ func makeMove(p *Pos, move int) {
 		p.colorBB[opp(side)] ^= squareBit(capSq)
 		p.typeBB[P] ^= squareBit(capSq)
 		p.count[opp(side)][P]--
-		if nnue.Loaded && nnuePercentage > 0 {
+		if nnue.Loaded && singleOptions[NnuePerc] > 0 {
 			nnueDelPiece(p, opp(side), P, capSq)
 		}
 
@@ -171,9 +171,8 @@ func makeMove(p *Pos, move int) {
 		p.typeBB[fromType] ^= squareBit(to)
 		p.count[side][fromType]++
 		p.count[side][P]--
-		if nnue.Loaded && nnuePercentage > 0 {
-			nnueAddPiece(p, side, fromType, to)
-			nnueDelPiece(p, side, P, to)
+		if nnue.Loaded && singleOptions[NnuePerc] > 0 {
+			nnueChangePiece(p, side, P, fromType, to)
 		}
 	}
 

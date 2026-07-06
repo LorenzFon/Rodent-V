@@ -74,6 +74,30 @@ func nnueDelPiece(p *Pos, color, pt, sq int) {
 	}
 }
 
+// Change piece type on the same square.
+// Useful for promotion: pawn -> knight/bishop/rook/queen.
+func nnueChangePiece(p *Pos, color, oldPT, newPT, sq int) {
+	old0 := color*384 + oldPT*64 + sq
+	new0 := color*384 + newPT*64 + sq
+
+	old1 := (color^1)*384 + oldPT*64 + (sq ^ 56)
+	new1 := (color^1)*384 + newPT*64 + (sq ^ 56)
+
+	a0 := &p.nnueAccumulator[0]
+	a1 := &p.nnueAccumulator[1]
+
+	wOld0 := &nnueParams.InputWeights[old0]
+	wNew0 := &nnueParams.InputWeights[new0]
+
+	wOld1 := &nnueParams.InputWeights[old1]
+	wNew1 := &nnueParams.InputWeights[new1]
+
+	for i := 0; i < NNUEHiddenSize; i++ {
+		a0[i] += wNew0[i] - wOld0[i]
+		a1[i] += wNew1[i] - wOld1[i]
+	}
+}
+
 // Move one piece without a capture. Loops are expensive,
 // so we use one instead of separate addition/deletion loops.
 func nnueMovePiece(p *Pos, color, pt, from, to int) {

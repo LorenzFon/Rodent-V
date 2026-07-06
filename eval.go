@@ -137,11 +137,11 @@ func evaluate(p *Pos) int {
 	} else {
 		nnueScore := 0
 		hceScore := 0
-		if nnuePercentage > 0 {
-			nnueScore = nnueEvaluate(p) * nnuePercentage / 100
+		if singleOptions[NnuePerc] > 0 {
+			nnueScore = nnueEvaluate(p) * singleOptions[NnuePerc] / 100
 		}
-		if hcePercentage > 0 {
-			hceScore = eval_internal(p, false) * hcePercentage / 100
+		if singleOptions[HcePerc] > 0 {
+			hceScore = eval_internal(p, false) * singleOptions[HcePerc] / 100
 		}
 
 		score = hceScore + nnueScore

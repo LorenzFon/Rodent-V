@@ -16,40 +16,53 @@
 //
 //	Protocol: Universal Chess Interface (UCI)
 //	Build:    go build -o rodent-v .
+
 package main
 
 import "fmt"
 
-var nnuePercentage int
-var hcePercentage int
+type SingleOption int
+
+const (
+	HcePerc SingleOption = iota
+	NnuePerc
+	NofSingleOptions
+)
+
+var SingleOptionName = [NofSingleOptions]string{
+	HcePerc:  "hceWeight",
+	NnuePerc: "nnueWeight",
+}
+
 var engineSide int
-var optionValues [2][EvalComponentN]int
+var singleOptions [NofSingleOptions]int
+var optionPerColorValues [2][EvalComponentN]int
 
 const weightOwn = 0
 const weightOpp = 1
 
 func init() {
 
-	nnuePercentage = 30
-	hcePercentage = 60
+	singleOptions[NnuePerc] = 30
+	singleOptions[HcePerc] = 60
 
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
-		optionValues[weightOwn][c] = 100
-		optionValues[weightOpp][c] = 100
+		optionPerColorValues[weightOwn][c] = 100
+		optionPerColorValues[weightOpp][c] = 100
 	}
 }
 
-func printUciOptions() {
+func printUciOptionsPerColor() {
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		fmt.Printf(
 			"option name Own%s type spin default %d min 0 max 500\n",
 			evalComponentName[c],
-			optionValues[weightOwn][c],
+			optionPerColorValues[weightOwn][c],
 		)
 		fmt.Printf(
 			"option name Opp%s type spin default %d min 0 max 500\n",
 			evalComponentName[c],
-			optionValues[weightOpp][c],
+			optionPerColorValues[weightOpp][c],
 		)
 	}
 }
