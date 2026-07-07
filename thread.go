@@ -38,13 +38,14 @@ type SearchState struct {
 	rootHistLen int   // p.histLen when think() began (repetition detection)
 
 	// ---- Per-ply context (indexed by ply, reset each think) ----
-	posStack     [maxPly]Pos  // position for copy-make
-	evalStack    [maxPly]int  // static eval at each ply; noEval when in check
-	contSide     [maxPly]int  // side that made the move reaching this ply
-	contPiece    [maxPly]int  // piece type (0-5) of that move
-	contTo       [maxPly]int  // destination square of that move
-	contValid    [maxPly]bool // false for null moves and unvisited plies
-	excludedMove [maxPly]int  // singular extension: excluded move (0 = none)
+	posStack     [maxPly]Pos    // position for copy-make
+	updateStack  [maxPly]Update // for lazy nnue accumulator updates
+	evalStack    [maxPly]int    // static eval at each ply; noEval when in check
+	contSide     [maxPly]int    // side that made the move reaching this ply
+	contPiece    [maxPly]int    // piece type (0-5) of that move
+	contTo       [maxPly]int    // destination square of that move
+	contValid    [maxPly]bool   // false for null moves and unvisited plies
+	excludedMove [maxPly]int    // singular extension: excluded move (0 = none)
 
 	// ---- Heuristic tables (persist across moves of the same game) ----
 	histTable       [2][64][64]int          // butterfly history [side][from][to]
@@ -53,6 +54,20 @@ type SearchState struct {
 	moveBuffers     [maxPly]MovePicker      // pre-allocated pickers (one per ply)
 	corrHist        [2][corrHistSize]int    // pawn correction history
 	nonPawnCorrHist [2][2][corrHistSize]int // non-pawn correction history
+}
+
+type Update struct {
+	dirty      bool
+	color      int
+	flag       int
+	from       int
+	to         int
+	capSq      int
+	movingType int
+	captType   int
+	prom       int
+	rookFrom   int // for castling
+	rookTo     int
 }
 
 // SearchResult carries the output of a completed think() call.

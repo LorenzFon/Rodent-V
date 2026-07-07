@@ -153,6 +153,46 @@ func nnueMoveCapture(
 	}
 }
 
+func nnueApplyPending(p *Pos, u *Update) {
+
+	if !u.dirty {
+		return
+	}
+
+	switch u.flag {
+	case NORMAL, EP_SET:
+		{
+			if u.captType != NO_TP {
+				nnueMoveCapture(p, u.color, u.movingType, u.from, u.to, u.color^1, u.captType, u.capSq)
+			} else {
+				nnueMovePiece(p, u.color, u.movingType, u.from, u.to)
+			}
+		}
+
+	case EP_CAP:
+		nnueMoveCapture(p, u.color, P, u.from, u.to, u.color^1, P, u.capSq)
+
+	case CASTLE:
+		nnueMovePiece(p, u.color, K, u.from, u.to)
+		nnueMovePiece(p, u.color, R, u.rookFrom, u.rookTo)
+
+	case N_PROM, B_PROM, R_PROM, Q_PROM:
+		// Move pawn from source to destination first.
+		nnueMovePiece(p, u.color, P, u.from, u.to)
+
+		// Capture
+		if u.captType != NO_TP {
+			nnueDelPiece(p, u.color^1, u.captType, u.to)
+		}
+
+		// Replace pawn with promoted piece on destination.
+		nnueChangePiece(p, u.color, P, u.prom, u.to)
+
+	}
+
+	u.dirty = false
+}
+
 // Rebuild the accumulator from the current board.
 func nnueRefresh(p *Pos) {
 	nnueClear(p)

@@ -43,8 +43,8 @@ const weightOpp = 1
 
 func init() {
 
-	singleOptions[NnuePerc] = 30
-	singleOptions[HcePerc] = 60
+	singleOptions[NnuePerc] = 80
+	singleOptions[HcePerc] = 0
 
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		optionPerColorValues[weightOwn][c] = 100

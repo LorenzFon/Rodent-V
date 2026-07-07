@@ -333,7 +333,9 @@ func parsePosition(p *Pos, tokens []string) {
 			if move == 0 {
 				break
 			}
-			makeMove(p, move)
+			var u Update
+			makeMove(p, &u, move)
+			nnueApplyPending(p, &u)
 			if p.clock == 0 {
 				p.histLen = 0
 			}
@@ -577,7 +579,9 @@ func perftStack(
 		child := &posStack[ply+1]
 		*child = *p
 
-		makeMove(child, move)
+		var u Update
+		makeMove(child, &u, move)
+		nnueApplyPending(p, &u)
 
 		if !child.selfInCheck() {
 			nodes += perftStack(

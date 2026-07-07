@@ -166,9 +166,9 @@ func moveGivesCheck(p *Pos, move int) bool {
 	// (we make and unmake a move, as it's rare enough
 	// and writing out correct conditions would be hard)
 	if typeOfMove == CASTLE {
+		var u Update
 		child := *p
-		makeMove(&child, move)
-
+		makeMove(&child, &u, move)
 		return child.inCheck()
 	}
 

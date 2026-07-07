@@ -506,10 +506,14 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			child := &ss.posStack[ply+1]
 			*child = *p
 
-			makeMove(child, move)
+			makeMove(child, &ss.updateStack[ply], move)
 
 			if child.selfInCheck() {
 				continue
+			}
+
+			if nnue.Loaded && singleOptions[NnuePerc] > 0 {
+				nnueApplyPending(child, &ss.updateStack[ply])
 			}
 
 			score = -ss.quiesce(child, ply+1, -probcutBeta, -probcutBeta+1, probcutPv[:])
@@ -610,7 +614,8 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// This includes the NNUE accumulator.
 		child := &ss.posStack[ply+1]
 		*child = *p
-		makeMove(child, move)
+
+		makeMove(child, &ss.updateStack[ply], move)
 
 		if child.selfInCheck() {
 			continue // move left us in check - illegal
@@ -657,6 +662,12 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			staticEval+fpMargin*depth <= alpha {
 
 			continue
+		}
+
+		// Update nnue accumulator only when we know
+		// that it is not wasted on an illegal or pruned move
+		if nnue.Loaded && singleOptions[NnuePerc] > 0 {
+			nnueApplyPending(child, &ss.updateStack[ply])
 		}
 
 		// Count quiet moves
@@ -893,10 +904,15 @@ func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int 
 		child := &ss.posStack[ply+1]
 		*child = *p
 
-		makeMove(child, move)
+		makeMove(child, &ss.updateStack[ply], move)
 
 		if child.selfInCheck() {
 			continue
+		}
+
+		// Update NNUE accumulator once we know move is legal
+		if nnue.Loaded && singleOptions[NnuePerc] > 0 {
+			nnueApplyPending(child, &ss.updateStack[ply])
 		}
 
 		movesTried++
@@ -1056,7 +1072,7 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		// Copies the complete position, including NNUE accumulator.
 		*child = *p
 
-		makeMove(child, move)
+		makeMove(child, &ss.updateStack[ply], move)
 
 		if child.selfInCheck() {
 			continue
@@ -1067,9 +1083,13 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		// in pathological positions with many equal-value captures.
 		// Commented: only uncomment when testing positions like: 1b2kBbK/2BbB1B1/2B2bb1/B2b4/bbb1b3/BBb2BBB/BB3b2/BB1bb2b w - - 0 1
 		// if !inCheck && movesTried > qsLmpLimit {
-		// 	unmakeMove(p, move, &u)
 		// 	break
 		// }
+
+		// Update NNUE accumulator once we know move is legal
+		if nnue.Loaded && singleOptions[NnuePerc] > 0 {
+			nnueApplyPending(child, &ss.updateStack[ply])
+		}
 
 		score := -ss.quiesce(child, ply+1, -beta, -alpha, childPv[:])
 
