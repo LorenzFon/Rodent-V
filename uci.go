@@ -93,13 +93,14 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V 0024")
+			fmt.Println("id name Rodent V 0025")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
 			fmt.Println("option name hceWeight type spin default ", singleOptions[HcePerc], " min 0 max 256")
 			fmt.Println("option name nnueWeight type spin default ", singleOptions[NnuePerc], " min 0 max 256")
+			fmt.Println("option name NnuePath type string default", nnuePath)
 
 			printUciOptionsPerColor()
 			fmt.Println("uciok")
@@ -232,38 +233,35 @@ func parseSetOption(tokens []string) {
 
 	case strings.EqualFold(name, "Threads"):
 		if n, err := strconv.Atoi(value); err == nil {
-			if n < 1 {
-				n = 1
-			}
-			if n > 256 {
-				n = 256
-			}
-			numThreads = n
+			numThreads = limitValue(n, 1, 256)
 		}
 		return
 
 	case strings.EqualFold(name, "nnueWeight"):
 		if n, err := strconv.Atoi(value); err == nil {
-			if n < 0 {
-				n = 0
-			}
-			if n > 256 {
-				n = 256
-			}
-			singleOptions[NnuePerc] = n
+			singleOptions[NnuePerc] = limitValue(n, 0, 256)
 		}
 
 		return
 
 	case strings.EqualFold(name, "hceWeight"):
 		if n, err := strconv.Atoi(value); err == nil {
-			if n < 0 {
-				n = 0
-			}
-			if n > 256 {
-				n = 256
-			}
-			singleOptions[HcePerc] = n
+			singleOptions[HcePerc] = limitValue(n, 0, 256)
+		}
+
+		return
+
+	case strings.EqualFold(name, "nnuePath"):
+		if value == "" {
+			fmt.Println("info string NNUE file path is empty")
+			return
+		}
+
+		if nnueLoad(value) {
+			nnuePath = value // only correct values are saved
+			fmt.Printf("info string NNUE loaded: %s\n", value)
+		} else {
+			fmt.Printf("info string failed to load NNUE: %s\n", value)
 		}
 
 		return
@@ -273,25 +271,13 @@ func parseSetOption(tokens []string) {
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		if strings.EqualFold(name, "Own"+evalComponentName[c]) {
 			if v, err := strconv.Atoi(value); err == nil {
-				if v < 0 {
-					v = 0
-				}
-				if v > 500 {
-					v = 500
-				}
-				optionPerColorValues[weightOwn][c] = v
+				optionPerColorValues[weightOwn][c] = limitValue(v, 0, 500)
 			}
 			return
 		}
 		if strings.EqualFold(name, "Opp"+evalComponentName[c]) {
 			if v, err := strconv.Atoi(value); err == nil {
-				if v < 0 {
-					v = 0
-				}
-				if v > 500 {
-					v = 500
-				}
-				optionPerColorValues[weightOpp][c] = v
+				optionPerColorValues[weightOpp][c] = limitValue(v, 0, 500)
 			}
 			return
 		}
@@ -593,4 +579,14 @@ func perftStack(
 	}
 
 	return nodes
+}
+
+func limitValue(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }

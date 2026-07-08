@@ -348,8 +348,9 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	ttDepth := 0
 	score := 0
 
-	// We don't do tt cutoffs in pv nodes to avoid truncating main line
-	// (debatable).
+	// We don't do tt cutoffs in pv nodes to avoid truncating main line.
+	// This decision is debatable. If we change it, we also must guard
+	// against returning at root.
 	if probeTT(p.key, &ttMove, &score, &ttFlag, &ttDepth, alpha, beta, depth, ply) {
 		if !isPv && ss.excludedMove[ply] == 0 {
 			return score

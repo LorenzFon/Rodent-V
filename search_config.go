@@ -1,6 +1,7 @@
 package main
 
 // Search config.
+// Cost of disabling is measured by 1000 game matches at 16 + 0.16
 const (
 	useRFP       = true
 	rfpMaxDepth  = 7        //
@@ -8,7 +9,7 @@ const (
 	rfpImpMargin = 60       // centipawns per depth for reverse futility pruning (improving)
 	noEval       = -inf - 1 // sentinel: no static eval stored for this ply (in check)
 
-	useRazoring   = true
+	useRazoring   = true // cost of disabling: 4 Elo
 	maxRazorDepth = 3
 	razorMargin   = 300 // centipawns per depth for razoring
 
@@ -20,10 +21,10 @@ const (
 	minVerDepth       = 6
 	verReduction      = 4
 
-	useProbcut       = true
-	probcutMargin    = 120 // extra margin above beta for ProbCut verification
-	probcutMinDepth  = 6   // only apply ProbCut when enough depth remains
-	probcutReduction = 2   // depth reduction used by the reduced verification search
+	useProbcut       = true // cost of disabling: 0 Elo
+	probcutMargin    = 120  // extra margin above beta for ProbCut verification
+	probcutMinDepth  = 6    // only apply ProbCut when enough depth remains
+	probcutReduction = 2    // depth reduction used by the reduced verification search
 
 	useIIR      = true
 	IIRmaxDepth = 4
@@ -39,9 +40,9 @@ const (
 	LMPdepth         = 9
 	minLmrDepth      = 3
 
-	useFutility = true
-	fpMargin    = 120 // centipawns per depth for main-search move-loop futility pruning
-	fpMaxDepth  = 4   // only prune quiet moves by futility at shallow depth
+	useFutility = true // cost of disabling: 20 Elo
+	fpMargin    = 120  // centipawns per depth for main-search move-loop futility pruning
+	fpMaxDepth  = 4    // only prune quiet moves by futility at shallow depth
 
 	useLMR          = true
 	LMRnonImproving = true

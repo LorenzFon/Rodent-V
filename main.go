@@ -56,7 +56,7 @@ func main() {
 
 	var p Pos
 	parseFEN(&p, startFEN)
-	x := nnueLoad("c:/publius_net64_4.bin")
+	x := nnueLoad(nnuePath)
 	_ = x
 	if !nnue.Loaded {
 		fmt.Println("nnue not loaded")
