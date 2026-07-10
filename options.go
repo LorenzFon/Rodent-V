@@ -34,12 +34,14 @@ type SingleOption int
 const (
 	HcePerc SingleOption = iota
 	NnuePerc
+	NodesLimit
 	NofSingleOptions
 )
 
 var SingleOptionName = [NofSingleOptions]string{
-	HcePerc:  "hceWeight",
-	NnuePerc: "nnueWeight",
+	HcePerc:    "hceWeight",
+	NnuePerc:   "nnueWeight",
+	NodesLimit: "nodesLimit",
 }
 
 var singleOptions [NofSingleOptions]int
@@ -57,8 +59,19 @@ var optionPerColorValues [2][EvalComponentN]int
 func init() {
 
 	nnuePath = "nets/publius_net64_4.bin"
-	singleOptions[NnuePerc] = 80
-	singleOptions[HcePerc] = 0
+	singleOptions[NnuePerc] = 30
+	singleOptions[HcePerc] = 60
+	singleOptions[NodesLimit] = 0
+
+	// TSCP: 1600 CCRL
+	// LittleWing: 2005 CCRL
+	// Sungorus: 2268 CCRL
+
+	// 1024: 1408 CCRL (vs TSCP)
+	// 2048: 1655 CCRL (vs TSCP)
+	// 8192: 2139 (vs LilttleWing) / 2068 (vs Sungorus) CCRL = 2100
+	// 16384: 2300 (vs sungorus)
+	// 65356: 2730 (vs Fruit 2.1)
 
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		optionPerColorValues[weightOwn][c] = 100
@@ -73,6 +86,8 @@ func saveOptions(path string) error {
 	if err != nil {
 		return fmt.Errorf("create options file %q: %w", path, err)
 	}
+
+	fmt.Println("info string saving personality ", path)
 
 	writer := bufio.NewWriter(file)
 
@@ -188,6 +203,7 @@ func readOptions(path string) error {
 	return nil
 }
 
+// prints color-separated options
 func printUciOptionsPerColor() {
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		fmt.Printf(

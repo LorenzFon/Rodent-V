@@ -129,27 +129,32 @@ func init() {
 
 // initLMRTable pre-computes the reduction for every (depth, moveIndex) pair.
 // Entries where depth < 3 or moveIndex < 4 are left at zero (no reduction for
-// the first few moves or near the leaves).  All other entries use the
-// logarithmic formula log(depth)*log(moveIndex)/1.8, rounded and clamped to
-// [1, 5] so reductions stay meaningful but never collapse a search entirely.
+// the first few moves or near the leaves, where late move pruning takes over).
+// All other entries use the logarithmic formula + a linear coefficient
 func initLMRTable() {
 	for depth := 0; depth < 64; depth++ {
-		for moveIndex := 0; moveIndex < 64; moveIndex++ {
-			if depth < 3 || moveIndex < 4 {
-				lmr[depth][moveIndex] = 0
+		for moveCount := 0; moveCount < 64; moveCount++ {
+
+			// no lmr here
+			if depth < minLmrDepth || moveCount < minLmrMove {
+				lmr[depth][moveCount] = 0
 				continue
 			}
 
-			raw := math.Log(float64(depth)) * math.Log(float64(moveIndex)) / lmrDivisor
-			reduction := int(raw + lmrLinear) // round to nearest
+			// log component
+			raw := math.Log(float64(depth)) * math.Log(float64(moveCount)) / lmrDivisor
 
+			// linear component
+			reduction := int(raw + lmrLinear)
+
+			// limit lmr size
 			if reduction < 1 {
 				reduction = 1
-			} else if reduction > 5 {
+			} else if reduction > lmrMax {
 				reduction = lmrMax
 			}
 
-			lmr[depth][moveIndex] = reduction
+			lmr[depth][moveCount] = reduction
 		}
 	}
 }

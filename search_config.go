@@ -38,7 +38,6 @@ const (
 	LMPnormalStep    = 4
 	LMPimprovingStep = 6
 	LMPdepth         = 9
-	minLmrDepth      = 3
 
 	useFutility = true // cost of disabling: 20 Elo
 	fpMargin    = 120  // centipawns per depth for main-search move-loop futility pruning
@@ -49,6 +48,8 @@ const (
 	lmrDivisor      = 2.0
 	lmrLinear       = 1.0
 	lmrMax          = 10
+	minLmrDepth     = 3
+	minLmrMove      = 4
 
 	qsFpPawnMargin  = 300 // qs futility margin when capturing a pawn (passers warrant extra slack)
 	qsFpPieceMargin = 200 // qs futility margin when capturing a piece

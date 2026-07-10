@@ -93,11 +93,13 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V 0025")
+			fmt.Println("id name Rodent V s6")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
+			fmt.Println("option name Save Personality type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
+			fmt.Println("option name nodesLimit type spin default ", singleOptions[NodesLimit], " min 0 max 1000000000")
 			fmt.Println("option name hceWeight type spin default ", singleOptions[HcePerc], " min 0 max 256")
 			fmt.Println("option name nnueWeight type spin default ", singleOptions[NnuePerc], " min 0 max 256")
 			fmt.Println("option name NnuePath type string default", nnuePath)
@@ -231,6 +233,14 @@ func parseSetOption(tokens []string) {
 		clearTT()
 		return
 
+	case strings.EqualFold(name, "Save Personality"):
+		if err := saveOptions("C:/Users/Paweł/Rodent-V-search_rewrite/options.txt"); err != nil {
+			fmt.Printf("info string failed to save personality: %v\n", err)
+		} else {
+			fmt.Println("info string personality saved")
+		}
+		return
+
 	case strings.EqualFold(name, "Threads"):
 		if n, err := strconv.Atoi(value); err == nil {
 			numThreads = limitValue(n, 1, 256)
@@ -240,6 +250,13 @@ func parseSetOption(tokens []string) {
 	case strings.EqualFold(name, "nnueWeight"):
 		if n, err := strconv.Atoi(value); err == nil {
 			singleOptions[NnuePerc] = limitValue(n, 0, 256)
+		}
+
+		return
+
+	case strings.EqualFold(name, "maxNodes"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
 		}
 
 		return
@@ -567,7 +584,7 @@ func perftStack(
 
 		var u Update
 		makeMove(child, &u, move)
-		nnueApplyPending(p, &u)
+		nnueApplyPending(child, &u)
 
 		if !child.selfInCheck() {
 			nodes += perftStack(
