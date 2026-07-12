@@ -93,12 +93,18 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V 0020")
+			fmt.Println("id name Rodent V s6")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
+			fmt.Println("option name Save Personality type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
-			printUciOptions()
+			fmt.Println("option name nodesLimit type spin default ", singleOptions[NodesLimit], " min 0 max 1000000000")
+			fmt.Println("option name hceWeight type spin default ", singleOptions[HcePerc], " min 0 max 256")
+			fmt.Println("option name nnueWeight type spin default ", singleOptions[NnuePerc], " min 0 max 256")
+			fmt.Println("option name NnuePath type string default", nnuePath)
+
+			printUciOptionsPerColor()
 			fmt.Println("uciok")
 
 		case "isready":
@@ -123,7 +129,7 @@ func uciLoop() {
 		case "go":
 			stopSearch()
 			mt, md := parseGoParams(tokens[1:], &p)
-			timeLimit = mt
+			hardTimeLimit = mt
 			pondering = false
 			for _, t := range tokens[1:] {
 				if t == "ponder" {
@@ -171,6 +177,12 @@ func uciLoop() {
 
 		case "eval":
 			eval_trace(&p)
+
+		case "nnue":
+			{
+				nnueRefresh(&p)
+				fmt.Print(nnueEvaluate(&p))
+			}
 
 		case "threats":
 			PrintThreatDebug(&p)
@@ -221,16 +233,54 @@ func parseSetOption(tokens []string) {
 		clearTT()
 		return
 
+	case strings.EqualFold(name, "Save Personality"):
+		if err := saveOptions("C:/Users/Paweł/Rodent-V-search_rewrite/options.txt"); err != nil {
+			fmt.Printf("info string failed to save personality: %v\n", err)
+		} else {
+			fmt.Println("info string personality saved")
+		}
+		return
+
 	case strings.EqualFold(name, "Threads"):
 		if n, err := strconv.Atoi(value); err == nil {
-			if n < 1 {
-				n = 1
-			}
-			if n > 256 {
-				n = 256
-			}
-			numThreads = n
+			numThreads = limitValue(n, 1, 256)
 		}
+		return
+
+	case strings.EqualFold(name, "nnueWeight"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[NnuePerc] = limitValue(n, 0, 256)
+		}
+
+		return
+
+	case strings.EqualFold(name, "maxNodes"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
+		}
+
+		return
+
+	case strings.EqualFold(name, "hceWeight"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[HcePerc] = limitValue(n, 0, 256)
+		}
+
+		return
+
+	case strings.EqualFold(name, "nnuePath"):
+		if value == "" {
+			fmt.Println("info string NNUE file path is empty")
+			return
+		}
+
+		if nnueLoad(value) {
+			nnuePath = value // only correct values are saved
+			fmt.Printf("info string NNUE loaded: %s\n", value)
+		} else {
+			fmt.Printf("info string failed to load NNUE: %s\n", value)
+		}
+
 		return
 	}
 
@@ -238,25 +288,13 @@ func parseSetOption(tokens []string) {
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		if strings.EqualFold(name, "Own"+evalComponentName[c]) {
 			if v, err := strconv.Atoi(value); err == nil {
-				if v < 0 {
-					v = 0
-				}
-				if v > 500 {
-					v = 500
-				}
-				optionValues[weightOwn][c] = v
+				optionPerColorValues[weightOwn][c] = limitValue(v, 0, 500)
 			}
 			return
 		}
 		if strings.EqualFold(name, "Opp"+evalComponentName[c]) {
 			if v, err := strconv.Atoi(value); err == nil {
-				if v < 0 {
-					v = 0
-				}
-				if v > 500 {
-					v = 500
-				}
-				optionValues[weightOpp][c] = v
+				optionPerColorValues[weightOpp][c] = limitValue(v, 0, 500)
 			}
 			return
 		}
@@ -298,13 +336,15 @@ func parsePosition(p *Pos, tokens []string) {
 			if move == 0 {
 				break
 			}
-			var u Undo
-			makeMove(p, move, &u)
+			var u Update
+			makeMove(p, &u, move)
+			nnueApplyPending(p, &u)
 			if p.clock == 0 {
 				p.histLen = 0
 			}
 		}
 	}
+	nnueRefresh(p)
 }
 
 // ---- Time management ----
@@ -318,7 +358,7 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 	btime := int64(-1)
 	winc := int64(0)
 	binc := int64(0)
-	movestogo := int64(40)
+	movestogo := int64(16)
 	movetime := int64(-1)
 	maxDepth := maxPly - 1
 
@@ -328,40 +368,48 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 			if i+1 < len(tokens) {
 				i++
 				wtime, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "btime":
 			if i+1 < len(tokens) {
 				i++
 				btime, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "winc":
 			if i+1 < len(tokens) {
 				i++
 				winc, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "binc":
 			if i+1 < len(tokens) {
 				i++
 				binc, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "movestogo":
 			if i+1 < len(tokens) {
 				i++
 				movestogo, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = true
 			}
 		case "movetime":
 			if i+1 < len(tokens) {
 				i++
 				movetime, _ = strconv.ParseInt(tokens[i], 10, 64)
+				useSoftTimeLimit = false
 			}
 		case "depth":
 			if i+1 < len(tokens) {
 				i++
 				if d, err := strconv.Atoi(tokens[i]); err == nil {
 					maxDepth = d
+					useSoftTimeLimit = false
 				}
 			}
 		case "infinite":
+			useSoftTimeLimit = false
 			return -1, maxPly - 1
 		}
 	}
@@ -503,24 +551,59 @@ func buildPV(dst, src []int, move int) {
 //	depth 4 ->   197 281
 //	depth 5 -> 4 865 609
 func perft(p *Pos, depth int) uint64 {
+	var posStack [maxPly]Pos
+	posStack[0] = *p
+
+	return perftStack(&posStack, 0, depth)
+}
+
+func perftStack(
+	posStack *[maxPly]Pos,
+	ply int,
+	depth int,
+) uint64 {
 	if depth == 0 {
 		return 1
 	}
 
+	p := &posStack[ply]
+
 	var list [maxMoves]int
+
 	capCount := genCaptures(p, list[:])
 	quietCount := genQuiet(p, list[capCount:])
 	total := capCount + quietCount
 
-	var n uint64
+	var nodes uint64
+
 	for i := 0; i < total; i++ {
 		move := list[i]
-		var u Undo
-		makeMove(p, move, &u)
-		if !p.selfInCheck() {
-			n += perft(p, depth-1)
+
+		child := &posStack[ply+1]
+		*child = *p
+
+		var u Update
+		makeMove(child, &u, move)
+		nnueApplyPending(child, &u)
+
+		if !child.selfInCheck() {
+			nodes += perftStack(
+				posStack,
+				ply+1,
+				depth-1,
+			)
 		}
-		unmakeMove(p, move, &u)
 	}
-	return n
+
+	return nodes
+}
+
+func limitValue(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }

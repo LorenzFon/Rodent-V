@@ -54,6 +54,14 @@ func main() {
 		return
 	}
 
+	var p Pos
+	parseFEN(&p, startFEN)
+	x := nnueLoad(nnuePath)
+	_ = x
+	if !nnue.Loaded {
+		fmt.Println("nnue not loaded")
+	}
+
 	// Tuner workflows are opt-in only and must be explicitly requested.
 	if len(os.Args) > 1 {
 		switch os.Args[1] {

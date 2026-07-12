@@ -2,8 +2,6 @@ TODO
 
 - no check extension if singular extension fired
 - limit check extension (pv or depth)
-- stop searching at d5 swith just one root move (not in Infinite search or while pondering)
-- don't use rfp in pawn only endings (Haka)
 - no razoring with a pawn about to promote (Toga)
 - tt limits null move
 - tt save after null move (Haka)
@@ -12,12 +10,15 @@ TODO
                                         realScoreToTtScore(score, ss->mPly), 
                                         depth, 
                                         TranspositionTable::Flags::LowerBoundScore);
-- 
+- on null move cutoff, zero killers
 
 PASSED
 
 - if null move search gives a mate score, return beta
+- hard and soft time limits
+- don't use rfp in pawn only endings (Haka)
 
 FAILED
 
 - no probCut after null move
+- stop searching at d5 swith just one root move (not in Infinite search or while pondering)

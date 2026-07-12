@@ -96,9 +96,9 @@ func (e *EvalData) sumEg(side int) int {
 
 func weightsFor(side int) [EvalComponentN]int {
 	if side == engineSide {
-		return optionValues[weightOwn]
+		return optionPerColorValues[weightOwn]
 	}
-	return optionValues[weightOpp]
+	return optionPerColorValues[weightOpp]
 }
 
 func nameEvalComponent(c EvalComponent) string {
