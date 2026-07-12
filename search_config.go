@@ -3,6 +3,10 @@ package main
 // Search config.
 // Cost of disabling is measured by 1000 game matches at 16 + 0.16
 const (
+	useChecksInQs        = true
+	adjustEvalByCorrhist = true
+	adjustEvalByTT       = false
+
 	useRFP       = true
 	rfpMaxDepth  = 7        //
 	rfpMargin    = 80       // centipawns per depth for reverse futility pruning (not improving)
@@ -50,6 +54,7 @@ const (
 	lmrMax          = 10
 	minLmrDepth     = 3
 	minLmrMove      = 4
+	useLmpTable     = true
 
 	qsFpPawnMargin  = 300 // qs futility margin when capturing a pawn (passers warrant extra slack)
 	qsFpPieceMargin = 200 // qs futility margin when capturing a piece

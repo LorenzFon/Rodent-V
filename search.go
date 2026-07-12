@@ -110,13 +110,11 @@ import (
 // Global search state — shared across all threads.
 // Per-thread state lives in SearchState (see thread.go).
 var (
-	useSoftTimeLimit bool  = false // do we have a right to use less than allocated time?
-	hardTimeLimit    int64         // allocated move time in ms (-1 = unlimited); set by UCI
-	softTimeLimit    int64         // time beyond which we do not start a new iterations
-	pondering        bool          // true while in ponder mode (ignore clock)
-	rootDepth        int           // current iterative deepening depth (main thread drives)
-	abortFlag        int32         // set to 1 atomically to stop all threads
-	numThreads       int   = 1     // number of search threads (1 = single-threaded)
+	hardTimeLimit int64     // allocated move time in ms (-1 = unlimited); set by UCI
+	pondering     bool      // true while in ponder mode (ignore clock)
+	rootDepth     int       // current iterative deepening depth (main thread drives)
+	abortFlag     int32     // set to 1 atomically to stop all threads
+	numThreads    int   = 1 // number of search threads (1 = single-threaded)
 )
 
 // lmr[depth][moveIndex] holds the ply reduction for a quiet move tried
@@ -176,14 +174,6 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	nnueRefresh(p)
 	ss := states[0]
 	ss.resetForSearch(p)
-
-	// Can we stop searching earlier?
-	// TODO: make it work with multithreading
-	if useSoftTimeLimit && numThreads == 1 {
-		softTimeLimit = hardTimeLimit / 2
-	} else {
-		softTimeLimit = hardTimeLimit
-	}
 
 	// Launch lazy SMP helper threads (depth 1..INF until abortFlag fires).
 	var wg sync.WaitGroup
@@ -257,11 +247,6 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 			break
 		}
 
-		// soft time limit
-		if useSoftTimeLimit && time.Now().UnixMilli()-ss.searchStart >= softTimeLimit {
-			break
-		}
-
 		score = iterScore
 	}
 
@@ -298,7 +283,11 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 	// Quiescence search entry point
 	if depth <= 0 {
-		return ss.quiesce(p, ply, alpha, beta, pv)
+		if useChecksInQs {
+			return ss.quiesceCheck(p, ply, alpha, beta, pv)
+		} else {
+			return ss.quiesce(p, ply, alpha, beta, pv)
+		}
 	}
 
 	// Set selDepth (max distance from root
@@ -385,11 +374,35 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 	if !nodeInCheck {
 		rawEval = evaluate(p)
-		correction := ss.getCorrection(p)
+		correction := 0
+		if adjustEvalByCorrhist {
+			correction = ss.getCorrection(p)
+		}
 		staticEval = rawEval + correction
 		ss.evalStack[ply] = staticEval
 	} else {
 		ss.evalStack[ply] = noEval
+	}
+
+	// --- TT-adjusted eval ---
+	// When the TT holds a score that is consistent with the direction of the
+	// static eval's likely error, use it as a sharper proxy for the true value.
+	// A LOWER-bound score >= staticEval means the position is probably better
+	// than the static eval; an UPPER-bound score <= staticEval means it's
+	// probably worse.  Using this refined estimate makes RFP, razoring, and
+	// NMP trigger on more accurate information.
+	// Guard: only valid when not in check (staticEval is meaningless then)
+	// and when there is no excluded move (singular extension sub-search).
+	if adjustEvalByTT {
+		ttAdjustedEval := staticEval
+		if !nodeInCheck && ss.excludedMove[ply] == 0 && ttFlag != 0 {
+			if ttFlag == EXACT ||
+				(ttFlag == LOWER && ttScore >= staticEval) ||
+				(ttFlag == UPPER && ttScore <= staticEval) {
+				ttAdjustedEval = ttScore
+			}
+		}
+		staticEval = ttAdjustedEval
 	}
 
 	improving := true
@@ -650,9 +663,17 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// When improving we allow more moves (position is trending up, so
 		// later moves are more likely to be relevant).
 		if depth < 10 { // table size limit
-			lmpThreshold := lmp[0][depth]
+
+			lmpThreshold := LMPnormalStep
 			if improving {
-				lmpThreshold = lmp[1][depth]
+				lmpThreshold = LMPimprovingStep
+			}
+
+			if useLmpTable {
+				lmpThreshold = lmp[0][depth]
+				if improving {
+					lmpThreshold = lmp[1][depth]
+				}
 			}
 			if useLMP && stage == StageQuiet && !isPv && !nodeInCheck && depth < LMPdepth &&
 				quietTried > lmpThreshold && !givesCheck {

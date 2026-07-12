@@ -153,8 +153,10 @@ func nnueMoveCapture(
 	}
 }
 
+// apply full nnue accumulator update
 func nnueApplyPending(p *Pos, u *Update) {
 
+	// already applied
 	if !u.dirty {
 		return
 	}
@@ -210,6 +212,7 @@ func nnueRefresh(p *Pos) {
 	}
 }
 
+// Squared clipped ReLu
 func screluWeighted(x, w int16) int32 {
 	v := int32(x)
 

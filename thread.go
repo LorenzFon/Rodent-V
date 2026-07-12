@@ -39,7 +39,7 @@ type SearchState struct {
 
 	// ---- Per-ply context (indexed by ply, reset each think) ----
 	posStack     [maxPly]Pos    // position for copy-make
-	updateStack  [maxPly]Update // for lazy nnue accumulator updates
+	updateStack  [maxPly]Update // data for lazy nnue accumulator updates
 	evalStack    [maxPly]int    // static eval at each ply; noEval when in check
 	contSide     [maxPly]int    // side that made the move reaching this ply
 	contPiece    [maxPly]int    // piece type (0-5) of that move
