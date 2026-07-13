@@ -56,6 +56,11 @@ type SearchState struct {
 	nonPawnCorrHist [2][2][corrHistSize]int // non-pawn correction history
 }
 
+// Update contains data for, well, updating nnue accumulator.
+// Data are stored on a stack, created in makeMove() and used
+// to postpone accumulator update *within a single node*.
+// In practice it means that we can avoid the update when
+// a move is illegal (leaves us in check) or if it is pruned.
 type Update struct {
 	dirty      bool
 	color      int

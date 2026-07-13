@@ -1,21 +1,18 @@
 // ================================================================
-// S4  MAKE / UNMAKE MOVE
+// S4  MAKE MOVE (COPY-MAKE)
 // ================================================================
 //
-//   makeMove() and unmakeMove() are the engine's most critical
-//   functions.  Every field in Pos that is kept incrementally
-//   (bitboards, piece array, material, PST score, Zobrist key,
-//   castling rights, en-passant square) must be updated here.
+//   We use copy-make strategy. Each move creates a child board
+//   on the stack, whereas the board for the current node persists
+//   until overwritten by the parent. This strategy is viable
+//   as long as Pos record is sufficiently small and it avoids
+//   using a complex unmakeMove.
 //
-//   DESIGN PRINCIPLE
-//   ----------------
-//   We do NOT copy the full position before each move.  Instead,
-//   makeMove() saves just the fields that cannot be reconstructed
-//   from the move alone into an Undo struct, then unmakeMove()
-//   restores them.  This is the "incremental update" style, and it
-//   is faster than full copying because most fields (bitboards, PST
-//   scores, material) can be recomputed by reversing the same
-//   arithmetic.
+//   The most expensive part is nnue accumulator update. We try
+//   to defer it, so makeMove() only creates Update struct
+//   that remembers which accumulator fields need to be changed.
+//   This trick gains roughly 27% in terms of speed.
+//
 //
 //   MOVE TYPES
 //   ----------
@@ -36,19 +33,18 @@
 
 package main
 
-// makeMove applies move to position p.  The Update record
+// makeMove applies move to position p. The Update record
 // contains information about nnue update that should be
-// applied before executing any other move (or discarded)
-// if a move made is then pruned or discarded as illegal)
+// applied before executing any other move (or discarded
+// if a move made is pruned or proven illegal before that)
 
 func makeMove(p *Pos, u *Update, move int) {
 	side := p.side
+	u.dirty = true // accumulator update has not been applied
 	u.from = moveFrom(move)
 	u.to = moveTo(move)
 	u.movingType = p.typeAt(u.from)
 	u.captType = p.typeAt(u.to)
-
-	u.dirty = true
 	u.color = side
 	u.flag = moveType(move)
 
@@ -156,6 +152,7 @@ func makeMove(p *Pos, u *Update, move int) {
 		}
 
 	case N_PROM, B_PROM, R_PROM, Q_PROM:
+		// Promotion: change piece on target square
 		promotedType := promType(move)
 		u.prom = promotedType
 		p.board[u.to] = makePiece(side, promotedType)
@@ -183,7 +180,8 @@ func makeMove(p *Pos, u *Update, move int) {
 //   prune the branch.
 //
 //   Only the Zobrist key and en-passant state need updating; the
-//   rest of the position is unchanged.
+//   rest of the position is unchanged. Even nnue accumulator stays
+//   as is.
 //
 
 // makeNullMove passes the turn without moving.
