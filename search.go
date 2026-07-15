@@ -395,26 +395,12 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	// Guard: only valid when not in check (staticEval is meaningless then)
 	// and when there is no excluded move (singular extension sub-search).
 	if adjustEvalByTT {
-		ttAdjustedEval := staticEval
-		if !nodeInCheck && ss.excludedMove[ply] == 0 && ttFlag != 0 {
-			if ttFlag == EXACT ||
-				(ttFlag == LOWER && ttScore >= staticEval) ||
-				(ttFlag == UPPER && ttScore <= staticEval) {
-				ttAdjustedEval = ttScore
-			}
-		}
-		staticEval = ttAdjustedEval
+		staticEval = ss.adjustedStaticEval(ply, staticEval, ttScore, ttFlag, nodeInCheck)
 	}
 
-	improving := true
-
-	if nodeInCheck {
-		improving = false
-	} else if ply >= 2 && ss.evalStack[ply-2] != noEval {
-		improving = staticEval > ss.evalStack[ply-2]
-	} else if ply >= 4 && ss.evalStack[ply-4] != noEval {
-		improving = staticEval > ss.evalStack[ply-4]
-	}
+	// Set improving flag. We change some prunings and reductions
+	// based on whether position gets better.
+	improving := ss.isImproving(ply, staticEval, nodeInCheck)
 
 	// --- Node level pruning ---
 	// gatekeeping reverse futility pruning, razoring and null move
@@ -544,6 +530,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 			score = -ss.quiesce(p, ply+1, -probcutBeta, -probcutBeta+1, probcutPv[:])
 
+			// ProbCut re-search if quiesce returns good score
 			if score >= probcutBeta && probcutDepth > 0 {
 				score = -ss.search(p, ply+1, -probcutBeta, -probcutBeta+1, probcutDepth, false, probcutPv[:])
 			}
@@ -1258,6 +1245,33 @@ func (ss *SearchState) checkTime() {
 			atomic.StoreInt32(&abortFlag, 1)
 		}
 	}
+}
+
+func (ss *SearchState) adjustedStaticEval(ply, staticEval, ttScore, ttFlag int, nodeInCheck bool) int {
+	if nodeInCheck || ss.excludedMove[ply] != 0 || ttFlag == 0 {
+		return staticEval
+	}
+
+	if ttFlag == EXACT ||
+		(ttFlag == LOWER && ttScore >= staticEval) ||
+		(ttFlag == UPPER && ttScore <= staticEval) {
+		return ttScore
+	}
+
+	return staticEval
+}
+
+func (ss *SearchState) isImproving(ply, staticEval int, nodeInCheck bool) bool {
+	if nodeInCheck {
+		return false
+	}
+	if ply >= 2 && ss.evalStack[ply-2] != noEval {
+		return staticEval > ss.evalStack[ply-2]
+	}
+	if ply >= 4 && ss.evalStack[ply-4] != noEval {
+		return staticEval > ss.evalStack[ply-4]
+	}
+	return true
 }
 
 func isMateScore(score int) bool {

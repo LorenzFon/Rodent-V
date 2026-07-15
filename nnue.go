@@ -44,6 +44,7 @@ func (acc *Accumulator) clear() {
 	}
 }
 
+// Copy the accumulator
 func (acc *Accumulator) copyFrom(src *Accumulator) {
 	*acc = *src
 }
