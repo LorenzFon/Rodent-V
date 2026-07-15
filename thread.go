@@ -12,7 +12,7 @@
 //   --------
 //   One SearchState is created per thread slot and reused across
 //   moves of the same game.  Heuristic tables (history, correction)
-//   are NOT reset between moves so ordering signal accumulates.
+//   are NOT reset betwee\n moves so ordering signal accumulates.
 //   clearHistory() is called only on ucinewgame.
 //   resetForSearch() resets progress counters and per-ply context
 //   before each think() call.
@@ -31,6 +31,8 @@ import "time"
 
 // SearchState holds all per-thread mutable search context.
 type SearchState struct {
+	isUsingNNUE bool
+
 	// ---- Progress (reset each think) ----
 	nodes       int64 // nodes searched by this thread
 	selDepth    int   // maximum ply reached this search
@@ -38,7 +40,7 @@ type SearchState struct {
 	rootHistLen int   // p.histLen when think() began (repetition detection)
 
 	// ---- Per-ply context (indexed by ply, reset each think) ----
-	posStack     [maxPly]Pos    // position for copy-make
+	accStack     [maxPly]Accumulator
 	updateStack  [maxPly]Update // data for lazy nnue accumulator updates
 	evalStack    [maxPly]int    // static eval at each ply; noEval when in check
 	contSide     [maxPly]int    // side that made the move reaching this ply
@@ -62,6 +64,8 @@ type SearchState struct {
 // In practice it means that we can avoid the update when
 // a move is illegal (leaves us in check) or if it is pruned.
 type Update struct {
+
+	// Data used by NNUE accumulator.
 	dirty      bool
 	color      int
 	flag       int
@@ -73,6 +77,15 @@ type Update struct {
 	prom       int
 	rookFrom   int // for castling
 	rookTo     int
+
+	// State destroyed by makeMove.
+	oldKey          uint64
+	oldPawnKey      [2]uint64
+	oldNonPawnKey   [2]uint64
+	oldCastleRights int
+	oldEpSquare     int
+	oldClock        int
+	oldHistLen      int
 }
 
 // SearchResult carries the output of a completed think() call.
@@ -107,4 +120,5 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.rootHistLen = p.histLen
 	ss.contValid = [maxPly]bool{}
 	ss.killerMoves = [maxPly][2]int{}
+	ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
 }

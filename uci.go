@@ -180,8 +180,9 @@ func uciLoop() {
 
 		case "nnue":
 			{
-				nnueRefresh(&p)
-				fmt.Print(nnueEvaluate(&p))
+				var acc Accumulator
+				acc.refresh(&p)
+				fmt.Print(nnueEvaluate(&p, &acc))
 			}
 
 		case "threats":
@@ -309,6 +310,7 @@ func parseSetOption(tokens []string) {
 // irreversible move resets the clock, so repetition detection does
 // not look past that point.
 func parsePosition(p *Pos, tokens []string) {
+	var acc Accumulator
 	if len(tokens) == 0 {
 		return
 	}
@@ -338,13 +340,13 @@ func parsePosition(p *Pos, tokens []string) {
 			}
 			var u Update
 			makeMove(p, &u, move)
-			nnueApplyPending(p, &u)
+			acc.applyPendingChanges(&u)
 			if p.clock == 0 {
 				p.histLen = 0
 			}
 		}
 	}
-	nnueRefresh(p)
+	acc.refresh(p)
 }
 
 // ---- Time management ----
@@ -576,7 +578,7 @@ func perftStack(
 
 		var u Update
 		makeMove(child, &u, move)
-		nnueApplyPending(child, &u)
+		//nnueApplyPending(child, &u)
 
 		if !child.selfInCheck() {
 			nodes += perftStack(
