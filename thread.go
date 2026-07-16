@@ -122,3 +122,41 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.killerMoves = [maxPly][2]int{}
 	ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
 }
+
+// eval wrapper
+func (ss *SearchState) staticEval(p *Pos, ply int) int {
+	return evaluate(p, &ss.accStack[ply])
+}
+
+// doMove() is a wrapper for makemove to simplify search code
+// by hiding stacks. It also returns pointer to updateStack,
+// required by nnue accumulator.
+func (ss *SearchState) doMove(p *Pos, ply, move int) *Update {
+	u := &ss.updateStack[ply]
+	makeMove(p, u, move)
+	return u
+}
+
+// wrapper for makemove to simplify search code by hiding stacks
+func (ss *SearchState) undoMove(p *Pos, ply int) {
+	unmakeMove(p, &ss.updateStack[ply])
+}
+
+// wrapper for preparing accumulator while hiding stack from search
+func (ss *SearchState) prepareChildAccumulator(ply int) *Accumulator {
+	if !ss.isUsingNNUE {
+		return nil
+	}
+
+	child := &ss.accStack[ply+1]
+	child.copyFrom(&ss.accStack[ply])
+
+	return child
+}
+
+func (ss *SearchState) recordContHistContext(ply, side, piece, to int) {
+	ss.contSide[ply] = side
+	ss.contPiece[ply] = piece
+	ss.contTo[ply] = to
+	ss.contValid[ply] = true
+}

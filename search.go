@@ -357,7 +357,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 	// Overflow guard.
 	if plyLimitReached(ply) {
-		return evaluate(p, &ss.accStack[ply])
+		return ss.staticEval(p, ply)
 	}
 
 	// Are we in check in this node?
@@ -374,7 +374,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	rawEval := 0
 
 	if !nodeInCheck {
-		rawEval = evaluate(p, &ss.accStack[ply])
+		rawEval = ss.staticEval(p, ply)
 		correction := 0
 		if adjustEvalByCorrhist {
 			correction = ss.getCorrection(p)
@@ -452,9 +452,10 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 			reduction := nmpBaseReduction + depth/nmpDepthReduction
 
-			acc := &ss.accStack[ply]
-			nullAcc := &ss.accStack[ply+1]
-			*nullAcc = *acc
+			// we need to prepare child accumulator,
+			// but we don't need a pointer, because
+			// null move does not change accumulator state.
+			ss.prepareChildAccumulator(ply)
 
 			var nullPv [maxPly]int
 			oldEP := makeNullMove(p)
@@ -507,25 +508,22 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 				continue
 			}
 
-			// Prepare NNUE accumulator.
-			var childAcc *Accumulator
+			// We are about to move. Prepare NNUE accumulator for the next ply.
+			childAcc := ss.prepareChildAccumulator(ply)
 
-			if ss.isUsingNNUE {
-				childAcc = &ss.accStack[ply+1]
-				childAcc.copyFrom(&ss.accStack[ply])
-			}
-
-			makeMove(p, &ss.updateStack[ply], move)
+			// doMove() executes a move and creates pointer
+			// to data required by NNUE accumulator
+			u := ss.doMove(p, ply, move)
 
 			// Skip illegal move.
 			if p.selfInCheck() {
-				unmakeMove(p, &ss.updateStack[ply])
+				ss.undoMove(p, ply)
 				continue
 			}
 
 			// Update NNUE accumulator once we know that move is legal.
-			if ss.isUsingNNUE {
-				childAcc.applyPendingChanges(&ss.updateStack[ply])
+			if childAcc != nil {
+				childAcc.applyPendingChanges(u)
 			}
 
 			score = -ss.quiesce(p, ply+1, -probcutBeta, -probcutBeta+1, probcutPv[:])
@@ -535,7 +533,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 				score = -ss.search(p, ply+1, -probcutBeta, -probcutBeta+1, probcutDepth, false, probcutPv[:])
 			}
 
-			unmakeMove(p, &ss.updateStack[ply])
+			ss.undoMove(p, ply)
 
 			if isAbortingSearch() {
 				return 0
@@ -621,33 +619,27 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			}
 		}
 
-		// Capture moving piece type before makeMove — after the call
+		// Capture moving piece type before making a move — after the call
 		// the square may hold a promoted piece rather than the original pawn.
 		movedPiece := p.typeAt(moveFrom(move))
 
-		// Prepare NNUE accumulator.
-		var childAcc *Accumulator
+		// We are about to move. Prepare NNUE accumulator for the next ply.
+		childAcc := ss.prepareChildAccumulator(ply)
 
-		if ss.isUsingNNUE {
-			childAcc = &ss.accStack[ply+1]
-			childAcc.copyFrom(&ss.accStack[ply])
-		}
-
-		makeMove(p, &ss.updateStack[ply], move)
+		// doMove() executes a move and creates pointer
+		// to data required by NNUE accumulator
+		u := ss.doMove(p, ply, move)
 
 		// Skip illegal move.
 		if p.selfInCheck() {
-			unmakeMove(p, &ss.updateStack[ply])
+			ss.undoMove(p, ply)
 			continue
 		}
 
 		// Record this move in the cont hist context stack so child nodes
 		// can look it up as their "1-ply back" context.
-		// p.side has flipped after makeMove, so the mover was p.side^1.
-		ss.contSide[ply] = p.side ^ 1
-		ss.contPiece[ply] = movedPiece
-		ss.contTo[ply] = moveTo(move)
-		ss.contValid[ply] = true
+		// p.side has flipped after making a move, so the mover was p.side^1.
+		ss.recordContHistContext(ply, p.side^1, movedPiece, moveTo(move))
 
 		// Does the move give check?
 		givesCheck := p.inCheck()
@@ -679,7 +671,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			}
 			if useLMP && stage == StageQuiet && !isPv && !nodeInCheck && depth < LMPdepth &&
 				quietTried > lmpThreshold && !givesCheck {
-				unmakeMove(p, &ss.updateStack[ply])
+				ss.undoMove(p, ply)
 				continue
 			}
 		}
@@ -690,14 +682,14 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			ss.excludedMove[ply] == 0 && depth <= fpMaxDepth &&
 			quietTried > 0 && alpha < mate-maxPly &&
 			staticEval+fpMargin*depth <= alpha {
-			unmakeMove(p, &ss.updateStack[ply])
+			ss.undoMove(p, ply)
 			continue
 		}
 
 		// Update nnue accumulator now that we know
 		// that move is legal and hasn't been pruned.
 		if ss.isUsingNNUE {
-			childAcc.applyPendingChanges(&ss.updateStack[ply])
+			childAcc.applyPendingChanges(u)
 		}
 
 		// Count quiet moves
@@ -745,7 +737,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			}
 		}
 
-		unmakeMove(p, &ss.updateStack[ply])
+		ss.undoMove(p, ply)
 
 		movesTried++
 
@@ -877,7 +869,7 @@ func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int 
 
 	// Guard against search stacks overflow.
 	if plyLimitReached(ply) {
-		return evaluate(p, &ss.accStack[ply])
+		return ss.staticEval(p, ply)
 	}
 
 	// TT probe: use depth=0 for all qsearch entries.
@@ -898,7 +890,7 @@ func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int 
 	best := -inf
 
 	if !inCheck {
-		rawQEval := evaluate(p, &ss.accStack[ply])
+		rawQEval := ss.staticEval(p, ply)
 		best = rawQEval + ss.getCorrection(p)
 
 		if best >= beta {
@@ -932,32 +924,29 @@ func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int 
 			}
 		}
 
-		// Prepare NNUE accumulator.
-		var childAcc *Accumulator
+		// We are about to move. Prepare NNUE accumulator for the next ply.
+		childAcc := ss.prepareChildAccumulator(ply)
 
-		if ss.isUsingNNUE {
-			childAcc = &ss.accStack[ply+1]
-			childAcc.copyFrom(&ss.accStack[ply])
-		}
-
-		makeMove(p, &ss.updateStack[ply], move)
+		// doMove() executes a move and creates pointer
+		// to data required by NNUE accumulator
+		u := ss.doMove(p, ply, move)
 
 		// Skip illegal move.
 		if p.selfInCheck() {
-			unmakeMove(p, &ss.updateStack[ply])
+			ss.undoMove(p, ply)
 			continue
 		}
 
 		// Update NNUE accumulator once we know move is legal
-		if ss.isUsingNNUE {
-			childAcc.applyPendingChanges(&ss.updateStack[ply])
+		if childAcc != nil {
+			childAcc.applyPendingChanges(u)
 		}
 
 		movesTried++
 
 		score := -ss.quiesce(p, ply+1, -beta, -alpha, childPv[:])
 
-		unmakeMove(p, &ss.updateStack[ply])
+		ss.undoMove(p, ply)
 
 		if isAbortingSearch() {
 			return 0
@@ -1015,7 +1004,7 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 
 	// Guard against search stacks overflow.
 	if plyLimitReached(ply) {
-		return evaluate(p, &ss.accStack[ply])
+		return ss.staticEval(p, ply)
 	}
 
 	// TT probe: use depth=0 for all qsearch entries.
@@ -1037,7 +1026,7 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	best := -inf
 
 	if !inCheck {
-		rawQEval := evaluate(p, &ss.accStack[ply])
+		rawQEval := ss.staticEval(p, ply)
 		best = rawQEval + ss.getCorrection(p)
 
 		if best >= beta {
@@ -1108,19 +1097,16 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 			}
 		}
 
-		// Prepare NNUE accumulator.
-		var childAcc *Accumulator
+		// We are about to move. Prepare NNUE accumulator for the next ply.
+		childAcc := ss.prepareChildAccumulator(ply)
 
-		if ss.isUsingNNUE {
-			childAcc = &ss.accStack[ply+1]
-			childAcc.copyFrom(&ss.accStack[ply])
-		}
-
-		makeMove(p, &ss.updateStack[ply], move)
+		// doMove() executes a move and creates pointer
+		// to data required by NNUE accumulator.
+		u := ss.doMove(p, ply, move)
 
 		// Skip illegal move.
 		if p.selfInCheck() {
-			unmakeMove(p, &ss.updateStack[ply])
+			ss.undoMove(p, ply)
 			continue
 		}
 
@@ -1133,13 +1119,13 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		// }
 
 		// Update NNUE accumulator once we know move is legal
-		if ss.isUsingNNUE {
-			childAcc.applyPendingChanges(&ss.updateStack[ply])
+		if childAcc != nil {
+			childAcc.applyPendingChanges(u)
 		}
 
 		score := -ss.quiesce(p, ply+1, -beta, -alpha, childPv[:])
 
-		unmakeMove(p, &ss.updateStack[ply])
+		ss.undoMove(p, ply)
 
 		if isAbortingSearch() {
 			return 0
