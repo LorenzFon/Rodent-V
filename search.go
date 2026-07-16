@@ -173,7 +173,7 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	atomic.StoreInt32(&abortFlag, 0)
 	ss := states[0]
 	ss.resetForSearch(p)
-	ss.accStack[0].refresh(p)
+	refresh(p, &ss.accStack[0])
 
 	// Launch lazy SMP helper threads (depth 1..INF until abortFlag fires).
 	var wg sync.WaitGroup
@@ -181,7 +181,7 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 		h := states[i]
 		h.clearHistory()
 		h.resetForSearch(p)
-		h.accStack[0].refresh(p)
+		refresh(p, &h.accStack[0])
 		h.searchStart = ss.searchStart // helpers share the same clock origin
 		pCopy := *p
 		wg.Add(1)

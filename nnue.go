@@ -4,6 +4,7 @@ import (
 	"os"
 )
 
+// NNUE size and scale
 const (
 	NNUEInputSize  = 768
 	NNUEHiddenSize = 64
@@ -12,6 +13,20 @@ const (
 	NNUEL1Scale    = 64
 )
 
+// Types of NNUE updates
+type AccUpdateKind int
+
+const (
+	uNORMAL AccUpdateKind = iota
+	uCASTLE
+	uEP_CAP
+	uEP_SET
+	uCAPTURE
+	uPROMO
+	uPROMCAPT
+)
+
+// Params for NNUE evaluation
 type NNUEParameters struct {
 	InputWeights  [NNUEInputSize][NNUEHiddenSize]int16
 	InputBiases   [NNUEHiddenSize]int16
@@ -24,6 +39,27 @@ var nnue NNUEState
 
 type Accumulator struct {
 	values [2][NNUEHiddenSize]int16
+}
+
+// Update contains data for, well, updating nnue accumulator.
+// Data are stored on a stack, created in makeMove() and used
+// to postpone accumulator update *within a single node*.
+// In practice it means that we can avoid the update when
+// a move is illegal (leaves us in check) or if it is pruned.
+type Update struct {
+
+	// Data used by NNUE accumulator.
+	dirty      bool
+	color      int
+	flag       AccUpdateKind
+	from       int
+	to         int
+	capSq      int
+	movingType int
+	captType   int
+	prom       int
+	rookFrom   int // for castling
+	rookTo     int
 }
 
 // The accumulator itself now belongs to searchState.
@@ -83,33 +119,9 @@ func (acc *Accumulator) delPiece(color, pt, sq int) {
 	}
 }
 
-// Change piece type on the same square.
-// Useful for promotion: pawn -> knight/bishop/rook/queen.
-func (acc *Accumulator) changePiece(color, oldPT, newPT, sq int) {
-	old0 := color*384 + oldPT*64 + sq
-	new0 := color*384 + newPT*64 + sq
-
-	old1 := (color^1)*384 + oldPT*64 + (sq ^ 56)
-	new1 := (color^1)*384 + newPT*64 + (sq ^ 56)
-
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
-
-	wOld0 := &nnueParams.InputWeights[old0]
-	wNew0 := &nnueParams.InputWeights[new0]
-
-	wOld1 := &nnueParams.InputWeights[old1]
-	wNew1 := &nnueParams.InputWeights[new1]
-
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += wNew0[i] - wOld0[i]
-		a1[i] += wNew1[i] - wOld1[i]
-	}
-}
-
 // Move one piece without a capture. Loops are expensive,
 // so we use one instead of separate addition/deletion loops.
-func (acc *Accumulator) movePiece(color, pt, from, to int) {
+func (acc *Accumulator) move(color, pt, from, to int) {
 	from0 := color*384 + pt*64 + from
 	to0 := color*384 + pt*64 + to
 
@@ -134,7 +146,7 @@ func (acc *Accumulator) movePiece(color, pt, from, to int) {
 // Make a capture.
 // Here we perform 3 actions in a loop.
 // capturedSq is normally same as to, except for en passant.
-func (acc *Accumulator) moveAndCapture(
+func (acc *Accumulator) capture(
 	moverColor, moverPT, from, to int,
 	capturedColor, capturedPT, capturedSq int) {
 	mFrom0 := moverColor*384 + moverPT*64 + from
@@ -191,6 +203,55 @@ func (acc *Accumulator) castle(
 	}
 }
 
+func (acc *Accumulator) promotion(color, from, to, prom int) {
+	from0 := color*384 + P*64 + from
+	to0 := color*384 + prom*64 + to
+
+	from1 := (color^1)*384 + P*64 + (from ^ 56)
+	to1 := (color^1)*384 + prom*64 + (to ^ 56)
+
+	a0 := &acc.values[0]
+	a1 := &acc.values[1]
+
+	wFrom0 := &nnueParams.InputWeights[from0]
+	wTo0 := &nnueParams.InputWeights[to0]
+	wFrom1 := &nnueParams.InputWeights[from1]
+	wTo1 := &nnueParams.InputWeights[to1]
+
+	for i := 0; i < NNUEHiddenSize; i++ {
+		a0[i] += wTo0[i] - wFrom0[i]
+		a1[i] += wTo1[i] - wFrom1[i]
+	}
+}
+
+func (acc *Accumulator) promotionCapture(color, from, to, prom, captType int) {
+	enemy := color ^ 1
+
+	from0 := color*384 + P*64 + from
+	to0 := color*384 + prom*64 + to
+	cap0 := enemy*384 + captType*64 + to
+
+	from1 := enemy*384 + P*64 + (from ^ 56)
+	to1 := enemy*384 + prom*64 + (to ^ 56)
+	cap1 := color*384 + captType*64 + (to ^ 56)
+
+	a0 := &acc.values[0]
+	a1 := &acc.values[1]
+
+	wFrom0 := &nnueParams.InputWeights[from0]
+	wTo0 := &nnueParams.InputWeights[to0]
+	wCap0 := &nnueParams.InputWeights[cap0]
+
+	wFrom1 := &nnueParams.InputWeights[from1]
+	wTo1 := &nnueParams.InputWeights[to1]
+	wCap1 := &nnueParams.InputWeights[cap1]
+
+	for i := 0; i < NNUEHiddenSize; i++ {
+		a0[i] += wTo0[i] - wFrom0[i] - wCap0[i]
+		a1[i] += wTo1[i] - wFrom1[i] - wCap1[i]
+	}
+}
+
 // apply full nnue accumulator update
 func (acc *Accumulator) applyPendingChanges(u *Update) {
 
@@ -200,30 +261,23 @@ func (acc *Accumulator) applyPendingChanges(u *Update) {
 	}
 
 	switch u.flag {
-	case NORMAL, EP_SET:
-		{
-			if u.captType != NO_TP {
-				acc.moveAndCapture(u.color, u.movingType, u.from, u.to, u.color^1, u.captType, u.capSq)
-			} else {
-				acc.movePiece(u.color, u.movingType, u.from, u.to)
-			}
-		}
+	case uNORMAL, uEP_SET:
+		acc.move(u.color, u.movingType, u.from, u.to)
 
-	case EP_CAP:
-		acc.moveAndCapture(u.color, P, u.from, u.to, u.color^1, P, u.capSq)
+	case uCAPTURE:
+		acc.capture(u.color, u.movingType, u.from, u.to, u.color^1, u.captType, u.capSq)
 
-	case CASTLE:
+	case uEP_CAP:
+		acc.capture(u.color, P, u.from, u.to, u.color^1, P, u.capSq)
+
+	case uCASTLE:
 		acc.castle(u.color, u.from, u.to, u.rookFrom, u.rookTo)
 
-	case N_PROM, B_PROM, R_PROM, Q_PROM:
-		if u.captType != NO_TP {
-			acc.moveAndCapture(u.color, u.movingType, u.from, u.to, u.color^1, u.captType, u.capSq)
-		} else {
-			acc.movePiece(u.color, u.movingType, u.from, u.to)
-		}
+	case uPROMO:
+		acc.promotion(u.color, u.from, u.to, u.prom)
 
-		// Replace pawn with promoted piece on destination.
-		acc.changePiece(u.color, P, u.prom, u.to)
+	case uPROMCAPT:
+		acc.promotionCapture(u.color, u.from, u.to, u.prom, u.captType)
 
 	}
 
@@ -231,7 +285,7 @@ func (acc *Accumulator) applyPendingChanges(u *Update) {
 }
 
 // Rebuild the accumulator from the current board.
-func (acc *Accumulator) refresh(p *Pos) {
+func refresh(p *Pos, acc *Accumulator) {
 	acc.clear()
 
 	for sq := 0; sq < 64; sq++ {
@@ -260,8 +314,7 @@ func screluWeighted(x, w int16) int32 {
 }
 
 // Return the score from the perspective of the side to move.
-func nnueEvaluate(p *Pos, acc *Accumulator) int {
-	stm := p.side
+func (acc *Accumulator) getEval(stm int) int {
 
 	a0 := &acc.values[stm]
 	a1 := &acc.values[stm^1]

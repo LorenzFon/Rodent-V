@@ -181,8 +181,8 @@ func uciLoop() {
 		case "nnue":
 			{
 				var acc Accumulator
-				acc.refresh(&p)
-				fmt.Print(nnueEvaluate(&p, &acc))
+				refresh(&p, &acc)
+				fmt.Print(acc.getEval(p.side))
 			}
 
 		case "threats":
@@ -339,14 +339,15 @@ func parsePosition(p *Pos, tokens []string) {
 				break
 			}
 			var u Update
-			makeMove(p, &u, move)
+			var r Revert
+			makeMove(p, &u, &r, move)
 			acc.applyPendingChanges(&u)
 			if p.clock == 0 {
 				p.histLen = 0
 			}
 		}
 	}
-	acc.refresh(p)
+	refresh(p, &acc)
 }
 
 // ---- Time management ----
@@ -577,7 +578,8 @@ func perftStack(
 		*child = *p
 
 		var u Update
-		makeMove(child, &u, move)
+		var r Revert
+		makeMove(child, &u, &r, move)
 		//nnueApplyPending(child, &u)
 
 		if !child.selfInCheck() {

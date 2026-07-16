@@ -40,14 +40,15 @@ type SearchState struct {
 	rootHistLen int   // p.histLen when think() began (repetition detection)
 
 	// ---- Per-ply context (indexed by ply, reset each think) ----
-	accStack     [maxPly]Accumulator
-	updateStack  [maxPly]Update // data for lazy nnue accumulator updates
-	evalStack    [maxPly]int    // static eval at each ply; noEval when in check
-	contSide     [maxPly]int    // side that made the move reaching this ply
-	contPiece    [maxPly]int    // piece type (0-5) of that move
-	contTo       [maxPly]int    // destination square of that move
-	contValid    [maxPly]bool   // false for null moves and unvisited plies
-	excludedMove [maxPly]int    // singular extension: excluded move (0 = none)
+	accStack     [maxPly]Accumulator // NNUE accumulator uses copy/makes
+	updateStack  [maxPly]Update      // data for lazy nnue accumulator updates
+	revertStack  [maxPly]Revert      // data for reverting board state
+	evalStack    [maxPly]int         // static eval at each ply; noEval when in check
+	contSide     [maxPly]int         // side that made the move reaching this ply
+	contPiece    [maxPly]int         // piece type (0-5) of that move
+	contTo       [maxPly]int         // destination square of that move
+	contValid    [maxPly]bool        // false for null moves and unvisited plies
+	excludedMove [maxPly]int         // singular extension: excluded move (0 = none)
 
 	// ---- Heuristic tables (persist across moves of the same game) ----
 	histTable       [2][64][64]int          // butterfly history [side][from][to]
@@ -58,27 +59,9 @@ type SearchState struct {
 	nonPawnCorrHist [2][2][corrHistSize]int // non-pawn correction history
 }
 
-// Update contains data for, well, updating nnue accumulator.
-// Data are stored on a stack, created in makeMove() and used
-// to postpone accumulator update *within a single node*.
-// In practice it means that we can avoid the update when
-// a move is illegal (leaves us in check) or if it is pruned.
-type Update struct {
-
-	// Data used by NNUE accumulator.
-	dirty      bool
-	color      int
-	flag       int
-	from       int
-	to         int
-	capSq      int
-	movingType int
-	captType   int
-	prom       int
-	rookFrom   int // for castling
-	rookTo     int
-
-	// State destroyed by makeMove.
+// State destroyed by makeMove.
+type Revert struct {
+	flag            int
 	oldKey          uint64
 	oldPawnKey      [2]uint64
 	oldNonPawnKey   [2]uint64
@@ -133,13 +116,14 @@ func (ss *SearchState) staticEval(p *Pos, ply int) int {
 // required by nnue accumulator.
 func (ss *SearchState) doMove(p *Pos, ply, move int) *Update {
 	u := &ss.updateStack[ply]
-	makeMove(p, u, move)
+	r := &ss.revertStack[ply]
+	makeMove(p, u, r, move)
 	return u
 }
 
 // wrapper for makemove to simplify search code by hiding stacks
 func (ss *SearchState) undoMove(p *Pos, ply int) {
-	unmakeMove(p, &ss.updateStack[ply])
+	unmakeMove(p, &ss.updateStack[ply], &ss.revertStack[ply])
 }
 
 // wrapper for preparing accumulator while hiding stack from search

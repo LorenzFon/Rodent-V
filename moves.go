@@ -45,16 +45,17 @@ package main
 // if a move made is pruned or proven illegal before that)
 // plus data for unmaking a move
 
-func makeMove(p *Pos, u *Update, move int) {
+func makeMove(p *Pos, u *Update, r *Revert, move int) {
 	side := p.side
 
-	u.oldKey = p.key
-	u.oldPawnKey = p.pawnKey
-	u.oldNonPawnKey = p.nonPawnKey
-	u.oldCastleRights = p.castleRights
-	u.oldEpSquare = p.epSquare
-	u.oldClock = p.clock
-	u.oldHistLen = p.histLen
+	r.oldKey = p.key
+	r.oldPawnKey = p.pawnKey
+	r.oldNonPawnKey = p.nonPawnKey
+	r.oldCastleRights = p.castleRights
+	r.oldEpSquare = p.epSquare
+	r.oldClock = p.clock
+	r.oldHistLen = p.histLen
+	r.flag = moveType(move)
 
 	u.dirty = true // accumulator update has not been applied
 	u.from = moveFrom(move)
@@ -62,7 +63,7 @@ func makeMove(p *Pos, u *Update, move int) {
 	u.movingType = p.typeAt(u.from)
 	u.captType = p.typeAt(u.to)
 	u.color = side
-	u.flag = moveType(move)
+	u.flag = uNORMAL
 
 	// Append current key to the repetition history.
 	p.keyHist[p.histLen] = p.key
@@ -119,6 +120,11 @@ func makeMove(p *Pos, u *Update, move int) {
 		p.colorBB[opp(side)] ^= squareBit(u.to)
 		p.typeBB[u.captType] ^= squareBit(u.to)
 		p.count[opp(side)][u.captType]--
+		if isProm(move) {
+			u.flag = uPROMCAPT
+		} else {
+			u.flag = uCAPTURE
+		}
 	}
 
 	// --- Special move type handling ---
@@ -130,6 +136,7 @@ func makeMove(p *Pos, u *Update, move int) {
 		// Move the rook atomically with the king.
 		// King side: rook goes from +3 to +(-1) relative to king.
 		// Queen side: rook goes from -4 to +(+1) relative to king.
+		u.flag = uCASTLE
 		if u.to > u.from {
 			u.rookFrom = u.from + 3 // H-file rook
 			u.rookTo = u.to - 1     // F-file landing
@@ -149,6 +156,7 @@ func makeMove(p *Pos, u *Update, move int) {
 
 	case EP_CAP:
 		// The captured pawn sits one square behind "to" (XOR 8 flips rank).
+		u.flag = uEP_CAP
 		capSq := u.to ^ 8
 		u.capSq = capSq
 		p.board[capSq] = NO_PC
@@ -169,6 +177,9 @@ func makeMove(p *Pos, u *Update, move int) {
 
 	case N_PROM, B_PROM, R_PROM, Q_PROM:
 		// Promotion: change piece on target square
+		if u.flag != uPROMCAPT {
+			u.flag = uPROMO
+		}
 		promotedType := promType(move)
 		u.prom = promotedType
 		p.board[u.to] = makePiece(side, promotedType)
@@ -190,7 +201,7 @@ func isPromotionFlag(flag int) bool {
 	return (flag == Q_PROM || flag == R_PROM || flag == B_PROM || flag == N_PROM)
 }
 
-func unmakeMove(p *Pos, u *Update) {
+func unmakeMove(p *Pos, u *Update, r *Revert) {
 	side := u.color
 	enemy := opp(side)
 
@@ -203,7 +214,7 @@ func unmakeMove(p *Pos, u *Update) {
 	// The piece currently on "to" may be a promoted piece rather
 	// than the original moving pawn.
 	pieceOnTo := u.movingType
-	if isPromotionFlag(u.flag) {
+	if isPromotionFlag(r.flag) {
 		pieceOnTo = u.prom
 	}
 
@@ -266,13 +277,13 @@ func unmakeMove(p *Pos, u *Update) {
 
 	// --- Restore all scalar/hash state exactly ---
 	p.side = side
-	p.key = u.oldKey
-	p.pawnKey = u.oldPawnKey
-	p.nonPawnKey = u.oldNonPawnKey
-	p.castleRights = u.oldCastleRights
-	p.epSquare = u.oldEpSquare
-	p.clock = u.oldClock
-	p.histLen = u.oldHistLen
+	p.key = r.oldKey
+	p.pawnKey = r.oldPawnKey
+	p.nonPawnKey = r.oldNonPawnKey
+	p.castleRights = r.oldCastleRights
+	p.epSquare = r.oldEpSquare
+	p.clock = r.oldClock
+	p.histLen = r.oldHistLen
 }
 
 // ================================================================

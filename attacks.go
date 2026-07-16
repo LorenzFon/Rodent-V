@@ -167,8 +167,9 @@ func moveGivesCheck(p *Pos, move int) bool {
 	// and writing out correct conditions would be hard)
 	if typeOfMove == CASTLE {
 		var u Update
+		var r Revert
 		child := *p
-		makeMove(&child, &u, move)
+		makeMove(&child, &u, &r, move)
 		return child.inCheck()
 	}
 

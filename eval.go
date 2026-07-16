@@ -138,7 +138,7 @@ func evaluate(p *Pos, acc *Accumulator) int {
 		nnueScore := 0
 		hceScore := 0
 		if singleOptions[NnuePerc] > 0 {
-			nnueScore = nnueEvaluate(p, acc) * singleOptions[NnuePerc] / 100
+			nnueScore = acc.getEval(p.side) * singleOptions[NnuePerc] / 100
 		}
 		if singleOptions[HcePerc] > 0 {
 			hceScore = eval_internal(p, false) * singleOptions[HcePerc] / 100
