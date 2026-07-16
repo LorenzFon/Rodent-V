@@ -162,6 +162,35 @@ func (acc *Accumulator) moveAndCapture(
 	}
 }
 
+func (acc *Accumulator) castle(
+	color, kingFrom, kingTo, rookFrom, rookTo int,
+) {
+	kFrom0 := color*384 + K*64 + kingFrom
+	kTo0 := color*384 + K*64 + kingTo
+	rFrom0 := color*384 + R*64 + rookFrom
+	rTo0 := color*384 + R*64 + rookTo
+
+	kFrom1 := (color^1)*384 + K*64 + (kingFrom ^ 56)
+	kTo1 := (color^1)*384 + K*64 + (kingTo ^ 56)
+	rFrom1 := (color^1)*384 + R*64 + (rookFrom ^ 56)
+	rTo1 := (color^1)*384 + R*64 + (rookTo ^ 56)
+
+	a0 := &acc.values[0]
+	a1 := &acc.values[1]
+
+	for i := 0; i < NNUEHiddenSize; i++ {
+		a0[i] += nnueParams.InputWeights[kTo0][i] -
+			nnueParams.InputWeights[kFrom0][i] +
+			nnueParams.InputWeights[rTo0][i] -
+			nnueParams.InputWeights[rFrom0][i]
+
+		a1[i] += nnueParams.InputWeights[kTo1][i] -
+			nnueParams.InputWeights[kFrom1][i] +
+			nnueParams.InputWeights[rTo1][i] -
+			nnueParams.InputWeights[rFrom1][i]
+	}
+}
+
 // apply full nnue accumulator update
 func (acc *Accumulator) applyPendingChanges(u *Update) {
 
@@ -184,16 +213,13 @@ func (acc *Accumulator) applyPendingChanges(u *Update) {
 		acc.moveAndCapture(u.color, P, u.from, u.to, u.color^1, P, u.capSq)
 
 	case CASTLE:
-		acc.movePiece(u.color, K, u.from, u.to)
-		acc.movePiece(u.color, R, u.rookFrom, u.rookTo)
+		acc.castle(u.color, u.from, u.to, u.rookFrom, u.rookTo)
 
 	case N_PROM, B_PROM, R_PROM, Q_PROM:
-		// Move pawn from source to destination first.
-		acc.movePiece(u.color, P, u.from, u.to)
-
-		// Capture
 		if u.captType != NO_TP {
-			acc.delPiece(u.color^1, u.captType, u.to)
+			acc.moveAndCapture(u.color, u.movingType, u.from, u.to, u.color^1, u.captType, u.capSq)
+		} else {
+			acc.movePiece(u.color, u.movingType, u.from, u.to)
 		}
 
 		// Replace pawn with promoted piece on destination.
