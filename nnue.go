@@ -72,6 +72,38 @@ type NNUEState struct {
 	Loaded bool
 }
 
+type captureFunc func(
+	a0, a1 *int16,
+	wTo0, wFrom0, wCap0 *int16,
+	wTo1, wFrom1, wCap1 *int16,
+)
+
+type moveFunc func(
+	a0, a1 *int16,
+	wFrom0, wTo0 *int16,
+	wFrom1, wTo1 *int16,
+)
+
+var captureFunction captureFunc
+var moveFunction moveFunc
+
+// init() picks correct assembly for NNUE size0
+func init() {
+switch NNUEHiddenSize {
+case 64:
+	moveFunction = moveAVX2_64
+	captureFunction = captureAVX2_64
+case 128:
+	moveFunction = moveAVX2_128
+	captureFunction = captureAVX2_128
+case 256:
+	moveFunction = moveAVX2_256
+	captureFunction = captureAVX2_256
+default:
+	panic("unsupported NNUE hidden size")
+}
+}
+
 // Clear = empty-board state = biases only.
 func (acc *Accumulator) clear() {
 	a0 := &acc.values[0]
@@ -132,17 +164,17 @@ func (acc *Accumulator) move(color, pt, from, to int) {
 	from1 := (color^1)*384 + pt*64 + (from ^ 56)
 	to1 := (color^1)*384 + pt*64 + (to ^ 56)
 
-    // use moveScalar() for plain build,
-    // moveAVX2() for AVX2 build
+moveFunction(
+	&acc.values[0][0],
+	&acc.values[1][0],
 
-	moveAVX2(
-		&acc.values[0],
-		&acc.values[1],
-		&nnueParams.InputWeights[from0],
-		&nnueParams.InputWeights[to0],
-		&nnueParams.InputWeights[from1],
-		&nnueParams.InputWeights[to1],
-	)
+	&nnueParams.InputWeights[from0][0],
+	&nnueParams.InputWeights[to0][0],
+
+	&nnueParams.InputWeights[from1][0],
+	&nnueParams.InputWeights[to1][0],
+)
+
 }
 
 func (acc *Accumulator) capture(
@@ -157,19 +189,19 @@ func (acc *Accumulator) capture(
 	mTo1 := (moverColor^1)*384 + moverPT*64 + (to ^ 56)
 	cap1 := (capturedColor^1)*384 + capturedPT*64 + (capturedSq ^ 56)
 
-    // use captureScalar() for plain build,
-    // captureAVX2() for AVX2 build
+captureFunction(
+	&acc.values[0][0],
+	&acc.values[1][0],
 
-	captureAVX2(
-		&acc.values[0],
-		&acc.values[1],
-		&nnueParams.InputWeights[mTo0],
-		&nnueParams.InputWeights[mFrom0],
-		&nnueParams.InputWeights[cap0],
-		&nnueParams.InputWeights[mTo1],
-		&nnueParams.InputWeights[mFrom1],
-		&nnueParams.InputWeights[cap1],
-	)
+	&nnueParams.InputWeights[mTo0][0],
+	&nnueParams.InputWeights[mFrom0][0],
+	&nnueParams.InputWeights[cap0][0],
+
+	&nnueParams.InputWeights[mTo1][0],
+	&nnueParams.InputWeights[mFrom1][0],
+	&nnueParams.InputWeights[cap1][0],
+)
+
 }
 
 func (acc *Accumulator) castle(
@@ -188,7 +220,7 @@ func (acc *Accumulator) castle(
     // use castleScalar() for plain build,
     // castleAVX2() for AVX2 build
 
-	castleAVX2(
+	castleScalar(
 		&acc.values[0],
 		&acc.values[1],
 

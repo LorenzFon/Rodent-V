@@ -59,8 +59,8 @@ var optionPerColorValues [2][EvalComponentN]int
 func init() {
 
 	nnuePath = "nets/publius_net64_4.bin"
-	singleOptions[NnuePerc] = 60
-	singleOptions[HcePerc] = 30
+	singleOptions[NnuePerc] = 30
+	singleOptions[HcePerc] = 60
 	singleOptions[NodesLimit] = 0
 
 	// TSCP: 1600 CCRL

@@ -11,7 +11,7 @@
 //     wTo0, wFrom0, wCap0,
 //     wTo1, wFrom1, wCap1 *[64]int16,
 // )
-TEXT ·captureAVX2(SB), NOSPLIT, $0-64
+TEXT ·captureAVX2_64(SB), NOSPLIT, $0-64
 	MOVQ a0+0(FP), AX
 	MOVQ a1+8(FP), BX
 
@@ -25,7 +25,7 @@ TEXT ·captureAVX2(SB), NOSPLIT, $0-64
 
 	XORQ R10, R10
 
-loop:
+capture_64_loop:
 	// Perspective 0:
 	// a0 += wTo0 - wFrom0 - wCap0
 	VMOVDQU (AX)(R10*1), Y0
@@ -44,7 +44,7 @@ loop:
 
 	ADDQ $32, R10
 	CMPQ R10, $128
-	JB loop
+	JB capture_64_loop
 
 	VZEROUPPER
 	RET
@@ -54,7 +54,7 @@ loop:
 //     wFrom0, wTo0,
 //     wFrom1, wTo1 *[64]int16,
 // )
-TEXT ·moveAVX2(SB), NOSPLIT, $0-48
+TEXT ·moveAVX2_64(SB), NOSPLIT, $0-48
 	MOVQ a0+0(FP), AX
 	MOVQ a1+8(FP), BX
 
@@ -93,7 +93,7 @@ move_loop:
 //     wKFrom0, wKTo0, wRFrom0, wRTo0,
 //     wKFrom1, wKTo1, wRFrom1, wRTo1 *[64]int16,
 // )
-TEXT ·castleAVX2(SB), NOSPLIT, $0-80
+TEXT ·castleAVX2_64(SB), NOSPLIT, $0-80
 	MOVQ a0+0(FP), AX
 	MOVQ a1+8(FP), BX
 
@@ -131,6 +131,158 @@ castle_loop:
 	ADDQ $32, R12
 	CMPQ R12, $128
 	JB castle_loop
+
+	VZEROUPPER
+	RET
+
+// for 128 HL network
+
+TEXT ·captureAVX2_128(SB), NOSPLIT, $0-64
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+
+	MOVQ wTo0+16(FP), CX
+	MOVQ wFrom0+24(FP), DX
+	MOVQ wCap0+32(FP), SI
+
+	MOVQ wTo1+40(FP), DI
+	MOVQ wFrom1+48(FP), R8
+	MOVQ wCap1+56(FP), R9
+
+	XORQ R10, R10
+
+// loop label should be unique per file
+capture_128_loop:
+	// Perspective 0:
+	// a0 += wTo0 - wFrom0 - wCap0
+	VMOVDQU (AX)(R10*1), Y0
+	VPADDW  (CX)(R10*1), Y0, Y0
+	VPSUBW  (DX)(R10*1), Y0, Y0
+	VPSUBW  (SI)(R10*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R10*1)
+
+	// Perspective 1:
+	// a1 += wTo1 - wFrom1 - wCap1
+	VMOVDQU (BX)(R10*1), Y1
+	VPADDW  (DI)(R10*1), Y1, Y1
+	VPSUBW  (R8)(R10*1), Y1, Y1
+	VPSUBW  (R9)(R10*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R10*1)
+
+    // loop limit is 256 = 2 * number of hidden neurons
+	ADDQ $32, R10
+	CMPQ R10, $256	
+	JB capture_128_loop
+
+	VZEROUPPER
+	RET
+
+TEXT ·moveAVX2_128(SB), NOSPLIT, $0-48
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+
+	MOVQ wFrom0+16(FP), CX
+	MOVQ wTo0+24(FP), DX
+
+	MOVQ wFrom1+32(FP), SI
+	MOVQ wTo1+40(FP), DI
+
+	XORQ R8, R8
+
+move_loop_128:
+	// Perspective 0:
+	// a0 += wTo0 - wFrom0
+	VMOVDQU (AX)(R8*1), Y0
+	VPADDW  (DX)(R8*1), Y0, Y0
+	VPSUBW  (CX)(R8*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R8*1)
+
+	// Perspective 1:
+	// a1 += wTo1 - wFrom1
+	VMOVDQU (BX)(R8*1), Y1
+	VPADDW  (DI)(R8*1), Y1, Y1
+	VPSUBW  (SI)(R8*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R8*1)
+
+	ADDQ $32, R8
+	CMPQ R8, $256
+	JB move_loop_128
+
+	VZEROUPPER
+	RET
+
+// for 256 HL network
+
+TEXT ·captureAVX2_256(SB), NOSPLIT, $0-64
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+
+	MOVQ wTo0+16(FP), CX
+	MOVQ wFrom0+24(FP), DX
+	MOVQ wCap0+32(FP), SI
+
+	MOVQ wTo1+40(FP), DI
+	MOVQ wFrom1+48(FP), R8
+	MOVQ wCap1+56(FP), R9
+
+	XORQ R10, R10
+
+// loop label should be unique per file
+capture_256_loop:
+	// Perspective 0:
+	// a0 += wTo0 - wFrom0 - wCap0
+	VMOVDQU (AX)(R10*1), Y0
+	VPADDW  (CX)(R10*1), Y0, Y0
+	VPSUBW  (DX)(R10*1), Y0, Y0
+	VPSUBW  (SI)(R10*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R10*1)
+
+	// Perspective 1:
+	// a1 += wTo1 - wFrom1 - wCap1
+	VMOVDQU (BX)(R10*1), Y1
+	VPADDW  (DI)(R10*1), Y1, Y1
+	VPSUBW  (R8)(R10*1), Y1, Y1
+	VPSUBW  (R9)(R10*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R10*1)
+
+    // loop limit is 512 = 2 * number of hidden neurons
+	ADDQ $32, R10
+	CMPQ R10, $512	
+	JB capture_256_loop
+
+	VZEROUPPER
+	RET
+
+TEXT ·moveAVX2_256(SB), NOSPLIT, $0-48
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+
+	MOVQ wFrom0+16(FP), CX
+	MOVQ wTo0+24(FP), DX
+
+	MOVQ wFrom1+32(FP), SI
+	MOVQ wTo1+40(FP), DI
+
+	XORQ R8, R8
+
+move_loop_256:
+	// Perspective 0:
+	// a0 += wTo0 - wFrom0
+	VMOVDQU (AX)(R8*1), Y0
+	VPADDW  (DX)(R8*1), Y0, Y0
+	VPSUBW  (CX)(R8*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R8*1)
+
+	// Perspective 1:
+	// a1 += wTo1 - wFrom1
+	VMOVDQU (BX)(R8*1), Y1
+	VPADDW  (DI)(R8*1), Y1, Y1
+	VPSUBW  (SI)(R8*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R8*1)
+
+	ADDQ $32, R8
+	CMPQ R8, $512
+	JB move_loop_256
 
 	VZEROUPPER
 	RET
