@@ -93,7 +93,7 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V s8")
+			fmt.Println("id name Rodent V s9")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
@@ -180,8 +180,9 @@ func uciLoop() {
 
 		case "nnue":
 			{
-				nnueRefresh(&p)
-				fmt.Print(nnueEvaluate(&p))
+				var acc Accumulator
+				refresh(&p, &acc)
+				fmt.Print(acc.getEval(p.side))
 			}
 
 		case "threats":
@@ -309,6 +310,7 @@ func parseSetOption(tokens []string) {
 // irreversible move resets the clock, so repetition detection does
 // not look past that point.
 func parsePosition(p *Pos, tokens []string) {
+	var acc Accumulator
 	if len(tokens) == 0 {
 		return
 	}
@@ -337,14 +339,15 @@ func parsePosition(p *Pos, tokens []string) {
 				break
 			}
 			var u Update
-			makeMove(p, &u, move)
-			nnueApplyPending(p, &u)
+			var r Revert
+			makeMove(p, &u, &r, move)
+			acc.applyPendingChanges(&u)
 			if p.clock == 0 {
 				p.histLen = 0
 			}
 		}
 	}
-	nnueRefresh(p)
+	refresh(p, &acc)
 }
 
 // ---- Time management ----
@@ -575,8 +578,9 @@ func perftStack(
 		*child = *p
 
 		var u Update
-		makeMove(child, &u, move)
-		nnueApplyPending(child, &u)
+		var r Revert
+		makeMove(child, &u, &r, move)
+		//nnueApplyPending(child, &u)
 
 		if !child.selfInCheck() {
 			nodes += perftStack(

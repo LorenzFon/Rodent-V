@@ -1,18 +1,24 @@
 // ================================================================
-// S4  MAKE MOVE (COPY-MAKE)
+// S4  MAKE / UNMAKE MOVE
 // ================================================================
 //
-//   We use copy-make strategy. Each move creates a child board
-//   on the stack, whereas the board for the current node persists
-//   until overwritten by the parent. This strategy is viable
-//   as long as Pos record is sufficiently small and it avoids
-//   using a complex unmakeMove.
+//   makeMove() and unmakeMove() are the engine's most critical
+//   functions.  Every field in Pos that is kept incrementally
+//   (bitboards, piece array, material, PST score, Zobrist key,
+//   castling rights, en-passant square) must be updated here.
 //
-//   The most expensive part is nnue accumulator update. We try
-//   to defer it, so makeMove() only creates Update struct
-//   that remembers which accumulator fields need to be changed.
-//   This trick gains roughly 27% in terms of speed.
+//   DESIGN PRINCIPLE
+//   ----------------
+//   We do NOT copy the full position before each move.  Instead,
+//   makeMove() saves just the fields that cannot be reconstructed
+//   from the move alone into an Undo struct, then unmakeMove()
+//   restores them.  This is the "incremental update" style, and it
+//   is faster than full copying because most fields (bitboards, PST
+//   scores, material) can be recomputed by reversing the same
+//   arithmetic.
 //
+//   NNUE accumulator, on the other hand, is updated on making a move
+//   and copied on unmaking.
 //
 //   MOVE TYPES
 //   ----------
@@ -37,16 +43,27 @@ package main
 // contains information about nnue update that should be
 // applied before executing any other move (or discarded
 // if a move made is pruned or proven illegal before that)
+// plus data for unmaking a move
 
-func makeMove(p *Pos, u *Update, move int) {
+func makeMove(p *Pos, u *Update, r *Revert, move int) {
 	side := p.side
+
+	r.oldKey = p.key
+	r.oldPawnKey = p.pawnKey
+	r.oldNonPawnKey = p.nonPawnKey
+	r.oldCastleRights = p.castleRights
+	r.oldEpSquare = p.epSquare
+	r.oldClock = p.clock
+	r.oldHistLen = p.histLen
+	r.flag = moveType(move)
+
 	u.dirty = true // accumulator update has not been applied
 	u.from = moveFrom(move)
 	u.to = moveTo(move)
 	u.movingType = p.typeAt(u.from)
 	u.captType = p.typeAt(u.to)
 	u.color = side
-	u.flag = moveType(move)
+	u.flag = uNORMAL
 
 	// Append current key to the repetition history.
 	p.keyHist[p.histLen] = p.key
@@ -103,6 +120,11 @@ func makeMove(p *Pos, u *Update, move int) {
 		p.colorBB[opp(side)] ^= squareBit(u.to)
 		p.typeBB[u.captType] ^= squareBit(u.to)
 		p.count[opp(side)][u.captType]--
+		if isProm(move) {
+			u.flag = uPROMCAPT
+		} else {
+			u.flag = uCAPTURE
+		}
 	}
 
 	// --- Special move type handling ---
@@ -114,6 +136,7 @@ func makeMove(p *Pos, u *Update, move int) {
 		// Move the rook atomically with the king.
 		// King side: rook goes from +3 to +(-1) relative to king.
 		// Queen side: rook goes from -4 to +(+1) relative to king.
+		u.flag = uCASTLE
 		if u.to > u.from {
 			u.rookFrom = u.from + 3 // H-file rook
 			u.rookTo = u.to - 1     // F-file landing
@@ -133,6 +156,7 @@ func makeMove(p *Pos, u *Update, move int) {
 
 	case EP_CAP:
 		// The captured pawn sits one square behind "to" (XOR 8 flips rank).
+		u.flag = uEP_CAP
 		capSq := u.to ^ 8
 		u.capSq = capSq
 		p.board[capSq] = NO_PC
@@ -153,6 +177,9 @@ func makeMove(p *Pos, u *Update, move int) {
 
 	case N_PROM, B_PROM, R_PROM, Q_PROM:
 		// Promotion: change piece on target square
+		if u.flag != uPROMCAPT {
+			u.flag = uPROMO
+		}
 		promotedType := promType(move)
 		u.prom = promotedType
 		p.board[u.to] = makePiece(side, promotedType)
@@ -170,6 +197,95 @@ func makeMove(p *Pos, u *Update, move int) {
 	p.key ^= sideKey
 }
 
+func isPromotionFlag(flag int) bool {
+	return (flag == Q_PROM || flag == R_PROM || flag == B_PROM || flag == N_PROM)
+}
+
+func unmakeMove(p *Pos, u *Update, r *Revert) {
+	side := u.color
+	enemy := opp(side)
+
+	from := u.from
+	to := u.to
+
+	fromBB := squareBit(from)
+	toBB := squareBit(to)
+
+	// The piece currently on "to" may be a promoted piece rather
+	// than the original moving pawn.
+	pieceOnTo := u.movingType
+	if isPromotionFlag(r.flag) {
+		pieceOnTo = u.prom
+	}
+
+	// --- Undo castling rook move first ---
+	if u.flag == CASTLE {
+		rookFromBB := squareBit(u.rookFrom)
+		rookToBB := squareBit(u.rookTo)
+
+		p.board[u.rookTo] = NO_PC
+		p.board[u.rookFrom] = makePiece(side, R)
+
+		p.colorBB[side] ^= rookFromBB | rookToBB
+		p.typeBB[R] ^= rookFromBB | rookToBB
+	}
+
+	// --- Remove moved piece from "to", restore original piece on "from" ---
+	p.board[from] = makePiece(side, u.movingType)
+
+	p.colorBB[side] ^= fromBB | toBB
+
+	if pieceOnTo == u.movingType {
+		p.typeBB[u.movingType] ^= fromBB | toBB
+	} else {
+		// Promotion: remove promoted piece from "to" and restore pawn on "from".
+		p.typeBB[pieceOnTo] ^= toBB
+		p.typeBB[u.movingType] ^= fromBB
+
+		p.count[side][pieceOnTo]--
+		p.count[side][P]++
+	}
+
+	if u.movingType == K {
+		p.kingSq[side] = from
+	}
+
+	// --- Restore destination/captured piece ---
+	switch u.flag {
+	case EP_CAP:
+		// Destination was empty before the move.
+		p.board[to] = NO_PC
+
+		capSq := u.capSq
+		capBB := squareBit(capSq)
+
+		p.board[capSq] = makePiece(enemy, P)
+		p.colorBB[enemy] ^= capBB
+		p.typeBB[P] ^= capBB
+		p.count[enemy][P]++
+
+	default:
+		if u.captType != NO_TP {
+			p.board[to] = makePiece(enemy, u.captType)
+			p.colorBB[enemy] ^= toBB
+			p.typeBB[u.captType] ^= toBB
+			p.count[enemy][u.captType]++
+		} else {
+			p.board[to] = NO_PC
+		}
+	}
+
+	// --- Restore all scalar/hash state exactly ---
+	p.side = side
+	p.key = r.oldKey
+	p.pawnKey = r.oldPawnKey
+	p.nonPawnKey = r.oldNonPawnKey
+	p.castleRights = r.oldCastleRights
+	p.epSquare = r.oldEpSquare
+	p.clock = r.oldClock
+	p.histLen = r.oldHistLen
+}
+
 // ================================================================
 // NULL MOVE
 // ================================================================
@@ -185,17 +301,33 @@ func makeMove(p *Pos, u *Update, move int) {
 //
 
 // makeNullMove passes the turn without moving.
-func makeNullMove(p *Pos) {
+func makeNullMove(p *Pos) int {
+	oldEP := p.epSquare
 
 	p.keyHist[p.histLen] = p.key
 	p.histLen++
-	p.clock++ // null moves advance the 50-move clock
+	p.clock++
 
-	if p.epSquare != NO_SQ {
-		p.key ^= zobEP[fileOf(p.epSquare)]
+	if oldEP != NO_SQ {
+		p.key ^= zobEP[fileOf(oldEP)]
 		p.epSquare = NO_SQ
 	}
 
 	p.side ^= 1
 	p.key ^= sideKey
+
+	return oldEP
+}
+
+func unmakeNullMove(p *Pos, oldEP int) {
+	p.side ^= 1
+	p.key ^= sideKey
+
+	if oldEP != NO_SQ {
+		p.epSquare = oldEP
+		p.key ^= zobEP[fileOf(oldEP)]
+	}
+
+	p.clock--
+	p.histLen--
 }

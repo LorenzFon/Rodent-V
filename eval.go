@@ -124,7 +124,7 @@ var tunerDisableMobility bool
 // evaluate returns the static score for the current position from the
 // perspective of the side to move.  Positive = better for the mover.
 // Before calculating eval score, it tries to find it in the eval hashtable.
-func evaluate(p *Pos) int {
+func evaluate(p *Pos, acc *Accumulator) int {
 
 	if score, ok := probeEvalHash(p.key); ok {
 		return score
@@ -138,7 +138,7 @@ func evaluate(p *Pos) int {
 		nnueScore := 0
 		hceScore := 0
 		if singleOptions[NnuePerc] > 0 {
-			nnueScore = nnueEvaluate(p) * singleOptions[NnuePerc] / 100
+			nnueScore = acc.getEval(p.side) * singleOptions[NnuePerc] / 100
 		}
 		if singleOptions[HcePerc] > 0 {
 			hceScore = eval_internal(p, false) * singleOptions[HcePerc] / 100

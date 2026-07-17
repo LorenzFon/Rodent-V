@@ -12,7 +12,7 @@
 //   --------
 //   One SearchState is created per thread slot and reused across
 //   moves of the same game.  Heuristic tables (history, correction)
-//   are NOT reset between moves so ordering signal accumulates.
+//   are NOT reset betwee\n moves so ordering signal accumulates.
 //   clearHistory() is called only on ucinewgame.
 //   resetForSearch() resets progress counters and per-ply context
 //   before each think() call.
@@ -31,6 +31,8 @@ import "time"
 
 // SearchState holds all per-thread mutable search context.
 type SearchState struct {
+	isUsingNNUE bool
+
 	// ---- Progress (reset each think) ----
 	nodes       int64 // nodes searched by this thread
 	selDepth    int   // maximum ply reached this search
@@ -38,14 +40,15 @@ type SearchState struct {
 	rootHistLen int   // p.histLen when think() began (repetition detection)
 
 	// ---- Per-ply context (indexed by ply, reset each think) ----
-	posStack     [maxPly]Pos    // position for copy-make
-	updateStack  [maxPly]Update // data for lazy nnue accumulator updates
-	evalStack    [maxPly]int    // static eval at each ply; noEval when in check
-	contSide     [maxPly]int    // side that made the move reaching this ply
-	contPiece    [maxPly]int    // piece type (0-5) of that move
-	contTo       [maxPly]int    // destination square of that move
-	contValid    [maxPly]bool   // false for null moves and unvisited plies
-	excludedMove [maxPly]int    // singular extension: excluded move (0 = none)
+	accStack     [maxPly]Accumulator // NNUE accumulator uses copy/makes
+	updateStack  [maxPly]Update      // data for lazy nnue accumulator updates
+	revertStack  [maxPly]Revert      // data for reverting board state
+	evalStack    [maxPly]int         // static eval at each ply; noEval when in check
+	contSide     [maxPly]int         // side that made the move reaching this ply
+	contPiece    [maxPly]int         // piece type (0-5) of that move
+	contTo       [maxPly]int         // destination square of that move
+	contValid    [maxPly]bool        // false for null moves and unvisited plies
+	excludedMove [maxPly]int         // singular extension: excluded move (0 = none)
 
 	// ---- Heuristic tables (persist across moves of the same game) ----
 	histTable       [2][64][64]int          // butterfly history [side][from][to]
@@ -56,23 +59,16 @@ type SearchState struct {
 	nonPawnCorrHist [2][2][corrHistSize]int // non-pawn correction history
 }
 
-// Update contains data for, well, updating nnue accumulator.
-// Data are stored on a stack, created in makeMove() and used
-// to postpone accumulator update *within a single node*.
-// In practice it means that we can avoid the update when
-// a move is illegal (leaves us in check) or if it is pruned.
-type Update struct {
-	dirty      bool
-	color      int
-	flag       int
-	from       int
-	to         int
-	capSq      int
-	movingType int
-	captType   int
-	prom       int
-	rookFrom   int // for castling
-	rookTo     int
+// State destroyed by makeMove.
+type Revert struct {
+	flag            int
+	oldKey          uint64
+	oldPawnKey      [2]uint64
+	oldNonPawnKey   [2]uint64
+	oldCastleRights int
+	oldEpSquare     int
+	oldClock        int
+	oldHistLen      int
 }
 
 // SearchResult carries the output of a completed think() call.
@@ -107,4 +103,44 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.rootHistLen = p.histLen
 	ss.contValid = [maxPly]bool{}
 	ss.killerMoves = [maxPly][2]int{}
+	ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
+}
+
+// eval wrapper
+func (ss *SearchState) staticEval(p *Pos, ply int) int {
+	return evaluate(p, &ss.accStack[ply])
+}
+
+// doMove() is a wrapper for makemove to simplify search code
+// by hiding stacks. It also returns pointer to updateStack,
+// required by nnue accumulator.
+func (ss *SearchState) doMove(p *Pos, ply, move int) *Update {
+	u := &ss.updateStack[ply]
+	r := &ss.revertStack[ply]
+	makeMove(p, u, r, move)
+	return u
+}
+
+// wrapper for makemove to simplify search code by hiding stacks
+func (ss *SearchState) undoMove(p *Pos, ply int) {
+	unmakeMove(p, &ss.updateStack[ply], &ss.revertStack[ply])
+}
+
+// wrapper for preparing accumulator while hiding stack from search
+func (ss *SearchState) prepareChildAccumulator(ply int) *Accumulator {
+	if !ss.isUsingNNUE {
+		return nil
+	}
+
+	child := &ss.accStack[ply+1]
+	child.copyFrom(&ss.accStack[ply])
+
+	return child
+}
+
+func (ss *SearchState) recordContHistContext(ply, side, piece, to int) {
+	ss.contSide[ply] = side
+	ss.contPiece[ply] = piece
+	ss.contTo[ply] = to
+	ss.contValid[ply] = true
 }

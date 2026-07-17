@@ -46,21 +46,20 @@ import "fmt"
 // Every field can be derived from the board array alone, but the
 // redundant fields are maintained incrementally for speed.
 type Pos struct {
-	colorBB         [2]uint64                // colorBB[c]: bitboard of all pieces of color c
-	typeBB          [6]uint64                // typeBB[t]: bitboard of all pieces of type t
-	board           [64]int                  // board[sq]: piece on that square, or NO_PC
-	kingSq          [2]int                   // kingSq[c]: square of the king of color c
-	count           [2][6]int                // count[c][t] count of pieces of color c and type t
-	side            int                      // side to move: White or Black
-	castleRights    int                      // castling availability: bit0=WK, bit1=WQ, bit2=BK, bit3=BQ
-	epSquare        int                      // en-passant target square, or NO_SQ
-	clock           int                      // half-move clock for the 50-move rule
-	histLen         int                      // number of keys stored in keyHist
-	key             uint64                   // Zobrist hash of the current position
-	pawnKey         [2]uint64                // Zobrist hash of pawn position (per side)
-	nonPawnKey      [2]uint64                // Zobrist hash of non-pawn pieces (per color)
-	keyHist         [256]uint64              // hash keys since last irreversible move
-	nnueAccumulator [2][NNUEHiddenSize]int16 // nnue accumulator
+	colorBB      [2]uint64   // colorBB[c]: bitboard of all pieces of color c
+	typeBB       [6]uint64   // typeBB[t]: bitboard of all pieces of type t
+	board        [64]int     // board[sq]: piece on that square, or NO_PC
+	kingSq       [2]int      // kingSq[c]: square of the king of color c
+	count        [2][6]int   // count[c][t] count of pieces of color c and type t
+	side         int         // side to move: White or Black
+	castleRights int         // castling availability: bit0=WK, bit1=WQ, bit2=BK, bit3=BQ
+	epSquare     int         // en-passant target square, or NO_SQ
+	clock        int         // half-move clock for the 50-move rule
+	histLen      int         // number of keys stored in keyHist
+	key          uint64      // Zobrist hash of the current position
+	pawnKey      [2]uint64   // Zobrist hash of pawn position (per side)
+	nonPawnKey   [2]uint64   // Zobrist hash of non-pawn pieces (per color)
+	keyHist      [256]uint64 // hash keys since last irreversible move
 }
 
 // ---- Position query helpers ----
