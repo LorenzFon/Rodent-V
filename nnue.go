@@ -4,6 +4,10 @@ import (
 	"os"
 )
 
+// build command for AVX2 version
+// set GOAMD64=v3
+// go build
+
 // NNUE size and scale
 const (
 	NNUEInputSize  = 768
@@ -128,27 +132,23 @@ func (acc *Accumulator) move(color, pt, from, to int) {
 	from1 := (color^1)*384 + pt*64 + (from ^ 56)
 	to1 := (color^1)*384 + pt*64 + (to ^ 56)
 
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
+    // use moveScalar() for plain build,
+    // moveAVX2() for AVX2 build
 
-	wFrom0 := &nnueParams.InputWeights[from0]
-	wTo0 := &nnueParams.InputWeights[to0]
-
-	wFrom1 := &nnueParams.InputWeights[from1]
-	wTo1 := &nnueParams.InputWeights[to1]
-
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += wTo0[i] - wFrom0[i]
-		a1[i] += wTo1[i] - wFrom1[i]
-	}
+	moveAVX2(
+		&acc.values[0],
+		&acc.values[1],
+		&nnueParams.InputWeights[from0],
+		&nnueParams.InputWeights[to0],
+		&nnueParams.InputWeights[from1],
+		&nnueParams.InputWeights[to1],
+	)
 }
 
-// Make a capture.
-// Here we perform 3 actions in a loop.
-// capturedSq is normally same as to, except for en passant.
 func (acc *Accumulator) capture(
 	moverColor, moverPT, from, to int,
-	capturedColor, capturedPT, capturedSq int) {
+	capturedColor, capturedPT, capturedSq int,
+) {
 	mFrom0 := moverColor*384 + moverPT*64 + from
 	mTo0 := moverColor*384 + moverPT*64 + to
 	cap0 := capturedColor*384 + capturedPT*64 + capturedSq
@@ -157,21 +157,19 @@ func (acc *Accumulator) capture(
 	mTo1 := (moverColor^1)*384 + moverPT*64 + (to ^ 56)
 	cap1 := (capturedColor^1)*384 + capturedPT*64 + (capturedSq ^ 56)
 
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
+    // use captureScalar() for plain build,
+    // captureAVX2() for AVX2 build
 
-	wMFrom0 := &nnueParams.InputWeights[mFrom0]
-	wMTo0 := &nnueParams.InputWeights[mTo0]
-	wCap0 := &nnueParams.InputWeights[cap0]
-
-	wMFrom1 := &nnueParams.InputWeights[mFrom1]
-	wMTo1 := &nnueParams.InputWeights[mTo1]
-	wCap1 := &nnueParams.InputWeights[cap1]
-
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += wMTo0[i] - wMFrom0[i] - wCap0[i]
-		a1[i] += wMTo1[i] - wMFrom1[i] - wCap1[i]
-	}
+	captureAVX2(
+		&acc.values[0],
+		&acc.values[1],
+		&nnueParams.InputWeights[mTo0],
+		&nnueParams.InputWeights[mFrom0],
+		&nnueParams.InputWeights[cap0],
+		&nnueParams.InputWeights[mTo1],
+		&nnueParams.InputWeights[mFrom1],
+		&nnueParams.InputWeights[cap1],
+	)
 }
 
 func (acc *Accumulator) castle(
@@ -187,20 +185,23 @@ func (acc *Accumulator) castle(
 	rFrom1 := (color^1)*384 + R*64 + (rookFrom ^ 56)
 	rTo1 := (color^1)*384 + R*64 + (rookTo ^ 56)
 
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
+    // use castleScalar() for plain build,
+    // castleAVX2() for AVX2 build
 
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += nnueParams.InputWeights[kTo0][i] -
-			nnueParams.InputWeights[kFrom0][i] +
-			nnueParams.InputWeights[rTo0][i] -
-			nnueParams.InputWeights[rFrom0][i]
+	castleAVX2(
+		&acc.values[0],
+		&acc.values[1],
 
-		a1[i] += nnueParams.InputWeights[kTo1][i] -
-			nnueParams.InputWeights[kFrom1][i] +
-			nnueParams.InputWeights[rTo1][i] -
-			nnueParams.InputWeights[rFrom1][i]
-	}
+		&nnueParams.InputWeights[kFrom0],
+		&nnueParams.InputWeights[kTo0],
+		&nnueParams.InputWeights[rFrom0],
+		&nnueParams.InputWeights[rTo0],
+
+		&nnueParams.InputWeights[kFrom1],
+		&nnueParams.InputWeights[kTo1],
+		&nnueParams.InputWeights[rFrom1],
+		&nnueParams.InputWeights[rTo1],
+	)
 }
 
 func (acc *Accumulator) promotion(color, from, to, prom int) {
