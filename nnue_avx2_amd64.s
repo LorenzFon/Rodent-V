@@ -286,3 +286,313 @@ move_loop_256:
 
 	VZEROUPPER
 	RET
+
+// func getEvalAVX2_64(
+//     a0, a1 *int16,
+//     w0, w1 *int16,
+//     sum *int32,
+// )
+//
+// 64 int16 neurons = 128 bytes.
+// Each loop iteration processes 16 neurons = 32 bytes.
+TEXT ·getEvalAVX2_64(SB), NOSPLIT, $0-40
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+	MOVQ w0+16(FP), CX
+	MOVQ w1+24(FP), DX
+	MOVQ sum+32(FP), SI
+
+	// Y14 = sixteen int16 zeros.
+	VPXOR Y14, Y14, Y14
+
+	// Y15 = sixteen int16 values equal to 255.
+	MOVL $255, R8
+	VMOVD R8, X15
+	VPBROADCASTW X15, Y15
+
+	// Eight int32 partial sums.
+	VPXOR Y8, Y8, Y8
+
+	XORQ R9, R9
+
+geteval_64_loop:
+	// Perspective 0.
+	VMOVDQU (AX)(R9*1), Y0
+	VMOVDQU (CX)(R9*1), Y1
+
+	// Clamp accumulator values to [0, 255].
+	VPMAXSW Y14, Y0, Y0
+	VPMINSW Y15, Y0, Y0
+
+	// Lower eight values.
+	VPMOVSXWD X0, Y2
+	VPMOVSXWD X1, Y3
+	VPMULLD Y2, Y2, Y2
+	VPMULLD Y3, Y2, Y2
+	VPADDD Y2, Y8, Y8
+
+	// Upper eight values.
+	VEXTRACTI128 $1, Y0, X4
+	VEXTRACTI128 $1, Y1, X5
+	VPMOVSXWD X4, Y4
+	VPMOVSXWD X5, Y5
+	VPMULLD Y4, Y4, Y4
+	VPMULLD Y5, Y4, Y4
+	VPADDD Y4, Y8, Y8
+
+	// Perspective 1.
+	VMOVDQU (BX)(R9*1), Y0
+	VMOVDQU (DX)(R9*1), Y1
+
+	VPMAXSW Y14, Y0, Y0
+	VPMINSW Y15, Y0, Y0
+
+	// Lower eight values.
+	VPMOVSXWD X0, Y2
+	VPMOVSXWD X1, Y3
+	VPMULLD Y2, Y2, Y2
+	VPMULLD Y3, Y2, Y2
+	VPADDD Y2, Y8, Y8
+
+	// Upper eight values.
+	VEXTRACTI128 $1, Y0, X4
+	VEXTRACTI128 $1, Y1, X5
+	VPMOVSXWD X4, Y4
+	VPMOVSXWD X5, Y5
+	VPMULLD Y4, Y4, Y4
+	VPMULLD Y5, Y4, Y4
+	VPADDD Y4, Y8, Y8
+
+	ADDQ $32, R9
+	CMPQ R9, $128
+	JB geteval_64_loop
+
+	// Reduce eight int32 lanes to one.
+	VEXTRACTI128 $1, Y8, X1
+	VPADDD X1, X8, X8
+
+	VPSHUFD $0x4E, X8, X1
+	VPADDD X1, X8, X8
+
+	VPSHUFD $0xB1, X8, X1
+	VPADDD X1, X8, X8
+
+	VMOVD X8, R8
+	MOVL R8, (SI)
+
+	VZEROUPPER
+	RET
+
+	// func getEvalAVX2_128(
+//     a0, a1 *int16,
+//     w0, w1 *int16,
+//     sum *int32,
+// )
+//
+// 128 int16 neurons = 256 bytes.
+// Each loop iteration processes 16 neurons = 32 bytes.
+TEXT ·getEvalAVX2_128(SB), NOSPLIT, $0-40
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+	MOVQ w0+16(FP), CX
+	MOVQ w1+24(FP), DX
+	MOVQ sum+32(FP), SI
+
+	// Y14 = sixteen int16 zeros.
+	VPXOR Y14, Y14, Y14
+
+	// Y15 = sixteen int16 values equal to 255.
+	MOVL $255, R8
+	VMOVD R8, X15
+	VPBROADCASTW X15, Y15
+
+	// Eight int32 partial sums.
+	VPXOR Y8, Y8, Y8
+
+	XORQ R9, R9
+
+geteval_128_loop:
+	// Perspective 0.
+	VMOVDQU (AX)(R9*1), Y0
+	VMOVDQU (CX)(R9*1), Y1
+
+	// Clamp accumulator values to [0, 255].
+	VPMAXSW Y14, Y0, Y0
+	VPMINSW Y15, Y0, Y0
+
+	// Lower eight values.
+	VPMOVSXWD X0, Y2
+	VPMOVSXWD X1, Y3
+	VPMULLD Y2, Y2, Y2
+	VPMULLD Y3, Y2, Y2
+	VPADDD Y2, Y8, Y8
+
+	// Upper eight values.
+	VEXTRACTI128 $1, Y0, X4
+	VEXTRACTI128 $1, Y1, X5
+	VPMOVSXWD X4, Y4
+	VPMOVSXWD X5, Y5
+	VPMULLD Y4, Y4, Y4
+	VPMULLD Y5, Y4, Y4
+	VPADDD Y4, Y8, Y8
+
+	// Perspective 1.
+	VMOVDQU (BX)(R9*1), Y0
+	VMOVDQU (DX)(R9*1), Y1
+
+	VPMAXSW Y14, Y0, Y0
+	VPMINSW Y15, Y0, Y0
+
+	// Lower eight values.
+	VPMOVSXWD X0, Y2
+	VPMOVSXWD X1, Y3
+	VPMULLD Y2, Y2, Y2
+	VPMULLD Y3, Y2, Y2
+	VPADDD Y2, Y8, Y8
+
+	// Upper eight values.
+	VEXTRACTI128 $1, Y0, X4
+	VEXTRACTI128 $1, Y1, X5
+	VPMOVSXWD X4, Y4
+	VPMOVSXWD X5, Y5
+	VPMULLD Y4, Y4, Y4
+	VPMULLD Y5, Y4, Y4
+	VPADDD Y4, Y8, Y8
+
+	ADDQ $32, R9
+	CMPQ R9, $256
+	JB geteval_128_loop
+
+	// Reduce eight int32 lanes to one.
+	VEXTRACTI128 $1, Y8, X1
+	VPADDD X1, X8, X8
+
+	VPSHUFD $0x4E, X8, X1
+	VPADDD X1, X8, X8
+
+	VPSHUFD $0xB1, X8, X1
+	VPADDD X1, X8, X8
+
+	VMOVD X8, R8
+	MOVL R8, (SI)
+
+	VZEROUPPER
+	RET
+
+// func getEvalAVX2_256(
+//     a0, a1 *int16,
+//     w0, w1 *int16,
+//     sum *int32,
+// )
+//
+// For every neuron:
+//
+//     v = clamp(acc, 0, 255)
+//     sum += v * v * weight
+//
+// 256 int16 neurons = 512 bytes.
+// Each loop iteration processes 16 neurons.
+TEXT ·getEvalAVX2_256(SB), NOSPLIT, $0-40
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+	MOVQ w0+16(FP), CX
+	MOVQ w1+24(FP), DX
+	MOVQ sum+32(FP), SI
+
+	// Y14 = sixteen int16 zeros.
+	VPXOR Y14, Y14, Y14
+
+	// Y15 = sixteen int16 values equal to 255.
+	MOVL $255, R8
+	VMOVD R8, X15
+	VPBROADCASTW X15, Y15
+
+	// Y8 accumulates eight int32 partial sums.
+	VPXOR Y8, Y8, Y8
+
+	XORQ R9, R9
+
+geteval_256_loop:
+	// ------------------------------------------------------------
+	// Perspective 0
+	// ------------------------------------------------------------
+
+	// Load 16 accumulator values and 16 signed weights.
+	VMOVDQU (AX)(R9*1), Y0
+	VMOVDQU (CX)(R9*1), Y1
+
+	// SCReLU clipping: max(x, 0), then min(x, 255).
+	VPMAXSW Y14, Y0, Y0
+	VPMINSW Y15, Y0, Y0
+
+	// Lower eight int16 values -> eight int32 values.
+	VPMOVSXWD X0, Y2
+	VPMOVSXWD X1, Y3
+
+	// v * v * weight.
+	VPMULLD Y2, Y2, Y2
+	VPMULLD Y3, Y2, Y2
+	VPADDD Y2, Y8, Y8
+
+	// Upper eight values.
+	VEXTRACTI128 $1, Y0, X4
+	VEXTRACTI128 $1, Y1, X5
+
+	VPMOVSXWD X4, Y4
+	VPMOVSXWD X5, Y5
+
+	VPMULLD Y4, Y4, Y4
+	VPMULLD Y5, Y4, Y4
+	VPADDD Y4, Y8, Y8
+
+	// ------------------------------------------------------------
+	// Perspective 1
+	// ------------------------------------------------------------
+
+	VMOVDQU (BX)(R9*1), Y0
+	VMOVDQU (DX)(R9*1), Y1
+
+	VPMAXSW Y14, Y0, Y0
+	VPMINSW Y15, Y0, Y0
+
+	// Lower eight values.
+	VPMOVSXWD X0, Y2
+	VPMOVSXWD X1, Y3
+
+	VPMULLD Y2, Y2, Y2
+	VPMULLD Y3, Y2, Y2
+	VPADDD Y2, Y8, Y8
+
+	// Upper eight values.
+	VEXTRACTI128 $1, Y0, X4
+	VEXTRACTI128 $1, Y1, X5
+
+	VPMOVSXWD X4, Y4
+	VPMOVSXWD X5, Y5
+
+	VPMULLD Y4, Y4, Y4
+	VPMULLD Y5, Y4, Y4
+	VPADDD Y4, Y8, Y8
+
+	ADDQ $32, R9
+	CMPQ R9, $512
+	JB geteval_256_loop
+
+	// Horizontally reduce eight int32 lanes to one int32.
+	VEXTRACTI128 $1, Y8, X1
+	VPADDD X1, X8, X8
+
+	// [a,b,c,d] + [c,d,a,b]
+	VPSHUFD $0x4E, X8, X1
+	VPADDD X1, X8, X8
+
+	// [a,b,...] + [b,a,...]
+	VPSHUFD $0xB1, X8, X1
+	VPADDD X1, X8, X8
+
+	// Store the low int32 result.
+	VMOVD X8, R8
+	MOVL R8, (SI)
+
+	VZEROUPPER
+	RET

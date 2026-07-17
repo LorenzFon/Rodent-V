@@ -8,6 +8,9 @@ import (
 // set GOAMD64=v3
 // go build
 
+// info depth 25 seldepth 37 time 33427 nodes 18719251 nps 560003 hashfull 1000 score cp 67 pv d2d4 d7d5 c2c4 e7e6 g1f3 g8f6 e2e3 c7c5 c4d5 e6d5 f1b5 c8d7 b5d7 d8d7 e1g1 b8c6 b2b3 c5d4 f3d4 f8e7 c1b2 e8g8 b1c3 f8e8 c3e2 h7h6
+// info depth 25 seldepth 37 time 15354 nodes 18719251 nps 1219177 hashfull 1000 score cp 67 pv d2d4 d7d5 c2c4 e7e6 g1f3 g8f6 e2e3 c7c5 c4d5 e6d5 f1b5 c8d7 b5d7 d8d7 e1g1 b8c6 b2b3 c5d4 f3d4 f8e7 c1b2 e8g8 b1c3 f8e8 c3e2 h7h6
+
 // NNUE size and scale
 const (
 	NNUEInputSize  = 768
@@ -84,8 +87,15 @@ type moveFunc func(
 	wFrom1, wTo1 *int16,
 )
 
+type evalFunc func(
+	a0, a1 *int16,
+	w0, w1 *int16,
+	sum *int32,
+)
+
 var captureFunction captureFunc
 var moveFunction moveFunc
+var evalFunction evalFunc
 
 // init() picks correct assembly for NNUE size0
 func init() {
@@ -93,12 +103,15 @@ switch NNUEHiddenSize {
 case 64:
 	moveFunction = moveAVX2_64
 	captureFunction = captureAVX2_64
+	evalFunction = getEvalAVX2_64
 case 128:
 	moveFunction = moveAVX2_128
 	captureFunction = captureAVX2_128
+	evalFunction = getEvalAVX2_128
 case 256:
 	moveFunction = moveAVX2_256
 	captureFunction = captureAVX2_256
+	evalFunction = getEvalAVX2_256
 default:
 	panic("unsupported NNUE hidden size")
 }
@@ -346,35 +359,17 @@ func screluWeighted(x, w int16) int32 {
 	return v * v * int32(w)
 }
 
-// Return the score from the perspective of the side to move.
 func (acc *Accumulator) getEval(stm int) int {
+	var sum int32
 
-	a0 := &acc.values[stm]
-	a1 := &acc.values[stm^1]
+	evalFunction(
+		&acc.values[stm][0],
+		&acc.values[stm^1][0],
+		&nnueParams.OutputWeights[0][0],
+		&nnueParams.OutputWeights[1][0],
+		&sum,
+	)
 
-	w0 := &nnueParams.OutputWeights[0]
-	w1 := &nnueParams.OutputWeights[1]
-
-	var sum0 int32
-	var sum1 int32
-	var sum2 int32
-	var sum3 int32
-
-	for i := 0; i < NNUEHiddenSize; i += 4 {
-		sum0 += screluWeighted(a0[i+0], w0[i+0]) +
-			screluWeighted(a1[i+0], w1[i+0])
-
-		sum1 += screluWeighted(a0[i+1], w0[i+1]) +
-			screluWeighted(a1[i+1], w1[i+1])
-
-		sum2 += screluWeighted(a0[i+2], w0[i+2]) +
-			screluWeighted(a1[i+2], w1[i+2])
-
-		sum3 += screluWeighted(a0[i+3], w0[i+3]) +
-			screluWeighted(a1[i+3], w1[i+3])
-	}
-
-	sum := sum0 + sum1 + sum2 + sum3
 	sum = sum/NNUEL0Scale + int32(nnueParams.OutputBias)
 
 	return int(sum * NNUEEvalScale /
