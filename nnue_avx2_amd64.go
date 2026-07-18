@@ -25,6 +25,15 @@ func captureAVX2_256(
 	wTo1, wFrom1, wCap1 *int16,
 )
 
+//go:noescape
+func captureAVX2_512(
+	a0, a1 *int16,
+	wTo0, wFrom0, wCap0 *int16,
+	wTo1, wFrom1, wCap1 *int16,
+)
+
+
+
 // MOVE
 
 //go:noescape
@@ -43,6 +52,13 @@ func moveAVX2_128(
 
 //go:noescape
 func moveAVX2_256(
+	a0, a1 *int16,
+	wFrom0, wTo0 *int16,
+	wFrom1, wTo1 *int16,
+)
+
+//go:noescape
+func moveAVX2_512(
 	a0, a1 *int16,
 	wFrom0, wTo0 *int16,
 	wFrom1, wTo1 *int16,
@@ -75,6 +91,13 @@ func getEvalAVX2_128(
 
 //go:noescape
 func getEvalAVX2_256(
+	a0, a1 *int16,
+	w0, w1 *int16,
+	sum *int32,
+)
+
+//go:noescape
+func getEvalAVX2_512(
 	a0, a1 *int16,
 	w0, w1 *int16,
 	sum *int32,

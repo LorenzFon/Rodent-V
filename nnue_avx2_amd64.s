@@ -287,6 +287,84 @@ move_loop_256:
 	VZEROUPPER
 	RET
 
+// for 512 HL
+
+TEXT ·captureAVX2_512(SB), NOSPLIT, $0-64
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+
+	MOVQ wTo0+16(FP), CX
+	MOVQ wFrom0+24(FP), DX
+	MOVQ wCap0+32(FP), SI
+
+	MOVQ wTo1+40(FP), DI
+	MOVQ wFrom1+48(FP), R8
+	MOVQ wCap1+56(FP), R9
+
+	XORQ R10, R10
+
+// loop label should be unique per file
+capture_512_loop:
+	// Perspective 0:
+	// a0 += wTo0 - wFrom0 - wCap0
+	VMOVDQU (AX)(R10*1), Y0
+	VPADDW  (CX)(R10*1), Y0, Y0
+	VPSUBW  (DX)(R10*1), Y0, Y0
+	VPSUBW  (SI)(R10*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R10*1)
+
+	// Perspective 1:
+	// a1 += wTo1 - wFrom1 - wCap1
+	VMOVDQU (BX)(R10*1), Y1
+	VPADDW  (DI)(R10*1), Y1, Y1
+	VPSUBW  (R8)(R10*1), Y1, Y1
+	VPSUBW  (R9)(R10*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R10*1)
+
+    // loop limit is 1024 = 2 * number of hidden neurons
+	ADDQ $32, R10
+	CMPQ R10, $1024	
+	JB capture_512_loop
+
+	VZEROUPPER
+	RET
+
+TEXT ·moveAVX2_512(SB), NOSPLIT, $0-48
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+
+	MOVQ wFrom0+16(FP), CX
+	MOVQ wTo0+24(FP), DX
+
+	MOVQ wFrom1+32(FP), SI
+	MOVQ wTo1+40(FP), DI
+
+	XORQ R8, R8
+
+move_loop_512:
+	// Perspective 0:
+	// a0 += wTo0 - wFrom0
+	VMOVDQU (AX)(R8*1), Y0
+	VPADDW  (DX)(R8*1), Y0, Y0
+	VPSUBW  (CX)(R8*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R8*1)
+
+	// Perspective 1:
+	// a1 += wTo1 - wFrom1
+	VMOVDQU (BX)(R8*1), Y1
+	VPADDW  (DI)(R8*1), Y1, Y1
+	VPSUBW  (SI)(R8*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R8*1)
+
+	ADDQ $32, R8
+	CMPQ R8, $1024
+	JB move_loop_512
+
+	VZEROUPPER
+	RET
+
+// EVAL
+
 // func getEvalAVX2_64(
 //     a0, a1 *int16,
 //     w0, w1 *int16,
@@ -596,3 +674,122 @@ geteval_256_loop:
 
 	VZEROUPPER
 	RET
+
+// func getEvalAVX2_512(
+//     a0, a1 *int16,
+//     w0, w1 *int16,
+//     sum *int32,
+// )
+TEXT ·getEvalAVX2_512(SB), NOSPLIT, $0-40
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+	MOVQ w0+16(FP), CX
+	MOVQ w1+24(FP), DX
+	MOVQ sum+32(FP), SI
+
+	// Y14 = zero
+	VPXOR Y14, Y14, Y14
+
+	// Y15 = sixteen int16 values containing 255
+	MOVL $255, R8
+	VMOVD R8, X15
+	VPBROADCASTW X15, Y15
+
+	// Y8 = int32 accumulation
+	VPXOR Y8, Y8, Y8
+
+	XORQ R9, R9
+
+eval512_loop:
+	// ------------------------------------------------------------
+	// Perspective 0, lower eight neurons
+	// ------------------------------------------------------------
+
+	VMOVDQU (AX)(R9*1), Y0
+	VMOVDQU (CX)(R9*1), Y1
+
+	// clamp accumulator to [0, 255]
+	VPMAXSW Y14, Y0, Y0
+	VPMINSW Y15, Y0, Y0
+
+	// lower 8 x int16 -> int32
+	VPMOVSXWD X0, Y2
+	VPMOVSXWD X1, Y3
+
+	// x² * weight
+	VPMULLD Y2, Y2, Y2
+	VPMULLD Y3, Y2, Y2
+
+	VPADDD Y2, Y8, Y8
+
+	// ------------------------------------------------------------
+	// Perspective 0, upper eight neurons
+	// ------------------------------------------------------------
+
+	VEXTRACTI128 $1, Y0, X4
+	VEXTRACTI128 $1, Y1, X5
+
+	VPMOVSXWD X4, Y4
+	VPMOVSXWD X5, Y5
+
+	VPMULLD Y4, Y4, Y4
+	VPMULLD Y5, Y4, Y4
+
+	VPADDD Y4, Y8, Y8
+
+	// ------------------------------------------------------------
+	// Perspective 1, lower eight neurons
+	// ------------------------------------------------------------
+
+	VMOVDQU (BX)(R9*1), Y0
+	VMOVDQU (DX)(R9*1), Y1
+
+	VPMAXSW Y14, Y0, Y0
+	VPMINSW Y15, Y0, Y0
+
+	VPMOVSXWD X0, Y2
+	VPMOVSXWD X1, Y3
+
+	VPMULLD Y2, Y2, Y2
+	VPMULLD Y3, Y2, Y2
+
+	VPADDD Y2, Y8, Y8
+
+	// ------------------------------------------------------------
+	// Perspective 1, upper eight neurons
+	// ------------------------------------------------------------
+
+	VEXTRACTI128 $1, Y0, X4
+	VEXTRACTI128 $1, Y1, X5
+
+	VPMOVSXWD X4, Y4
+	VPMOVSXWD X5, Y5
+
+	VPMULLD Y4, Y4, Y4
+	VPMULLD Y5, Y4, Y4
+
+	VPADDD Y4, Y8, Y8
+
+	// 16 int16 neurons = 32 bytes
+	ADDQ $32, R9
+
+	// 512 int16 neurons = 1024 bytes
+	CMPQ R9, $1024
+	JL eval512_loop
+
+	// Horizontal sum of eight int32 lanes in Y8.
+	VEXTRACTI128 $1, Y8, X1
+	VPADDD X1, X8, X8
+
+	VPSHUFD $0x4E, X8, X1
+	VPADDD X1, X8, X8
+
+	VPSHUFD $0xB1, X8, X1
+	VPADDD X1, X8, X8
+
+	VMOVD X8, R8
+	MOVL R8, (SI)
+
+	VZEROUPPER
+	RET
+	

@@ -8,10 +8,14 @@ import (
 // set GOAMD64=v3
 // go build
 
-// info depth 25 seldepth 37 time 33427 nodes 18719251 nps 560003 hashfull 1000 score cp 67 pv d2d4 d7d5 c2c4 e7e6 g1f3 g8f6 e2e3 c7c5 c4d5 e6d5 f1b5 c8d7 b5d7 d8d7 e1g1 b8c6 b2b3 c5d4 f3d4 f8e7 c1b2 e8g8 b1c3 f8e8 c3e2 h7h6
-// info depth 25 seldepth 37 time 15354 nodes 18719251 nps 1219177 hashfull 1000 score cp 67 pv d2d4 d7d5 c2c4 e7e6 g1f3 g8f6 e2e3 c7c5 c4d5 e6d5 f1b5 c8d7 b5d7 d8d7 e1g1 b8c6 b2b3 c5d4 f3d4 f8e7 c1b2 e8g8 b1c3 f8e8 c3e2 h7h6
+/*
+Rodent supports networks trained by bullet simple.rs.
+The net architecture is 768 -> (N)x2 -> 1, allowing
+some variance of N.
+*/
 
-// NNUE size and scale
+// NNUE size and scale. AVX2 code supports following net sizes:
+// 64, 128, 256, 512
 const (
 	NNUEInputSize  = 768
 	NNUEHiddenSize = 64
@@ -75,6 +79,8 @@ type NNUEState struct {
 	Loaded bool
 }
 
+// Interface to cater for assembly code for various net sizes.
+
 type captureFunc func(
 	a0, a1 *int16,
 	wTo0, wFrom0, wCap0 *int16,
@@ -97,7 +103,7 @@ var captureFunction captureFunc
 var moveFunction moveFunc
 var evalFunction evalFunc
 
-// init() picks correct assembly for NNUE size0
+// init() picks correct assembly for NNUE size
 func init() {
 switch NNUEHiddenSize {
 case 64:
@@ -112,9 +118,14 @@ case 256:
 	moveFunction = moveAVX2_256
 	captureFunction = captureAVX2_256
 	evalFunction = getEvalAVX2_256
+case 512:
+	moveFunction = moveAVX2_512
+	captureFunction = captureAVX2_512
+	evalFunction = getEvalAVX2_512
 default:
 	panic("unsupported NNUE hidden size")
 }
+
 }
 
 // Clear = empty-board state = biases only.
