@@ -68,9 +68,30 @@ func moveAVX2_512(
 
 //go:noescape
 func castleAVX2_64(
-	a0, a1 *[NNUEHiddenSize]int16,
-	wKFrom0, wKTo0, wRFrom0, wRTo0 *[NNUEHiddenSize]int16,
-	wKFrom1, wKTo1, wRFrom1, wRTo1 *[NNUEHiddenSize]int16,
+	a0, a1 *int16,
+	wKFrom0, wKTo0, wRFrom0, wRTo0 *int16,
+	wKFrom1, wKTo1, wRFrom1, wRTo1 *int16,
+)
+
+//go:noescape
+func castleAVX2_128(
+	a0, a1 *int16,
+	wKFrom0, wKTo0, wRFrom0, wRTo0 *int16,
+	wKFrom1, wKTo1, wRFrom1, wRTo1 *int16,
+)
+
+//go:noescape
+func castleAVX2_256(
+	a0, a1 *int16,
+	wKFrom0, wKTo0, wRFrom0, wRTo0 *int16,
+	wKFrom1, wKTo1, wRFrom1, wRTo1 *int16,
+)
+
+//go:noescape
+func castleAVX2_512(
+	a0, a1 *int16,
+	wKFrom0, wKTo0, wRFrom0, wRTo0 *int16,
+	wKFrom1, wKTo1, wRFrom1, wRTo1 *int16,
 )
 
 // EVAL

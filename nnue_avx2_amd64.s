@@ -109,7 +109,7 @@ TEXT ·castleAVX2_64(SB), NOSPLIT, $0-80
 
 	XORQ R12, R12
 
-castle_loop:
+castle_64_loop:
 	// Perspective 0:
 	// a0 += kingTo - kingFrom + rookTo - rookFrom
 	VMOVDQU (AX)(R12*1), Y0
@@ -130,7 +130,7 @@ castle_loop:
 
 	ADDQ $32, R12
 	CMPQ R12, $128
-	JB castle_loop
+	JB castle_64_loop
 
 	VZEROUPPER
 	RET
@@ -211,6 +211,48 @@ move_loop_128:
 	VZEROUPPER
 	RET
 
+	TEXT ·castleAVX2_128(SB), NOSPLIT, $0-80
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+
+	MOVQ wKFrom0+16(FP), CX
+	MOVQ wKTo0+24(FP), DX
+	MOVQ wRFrom0+32(FP), SI
+	MOVQ wRTo0+40(FP), DI
+
+	MOVQ wKFrom1+48(FP), R8
+	MOVQ wKTo1+56(FP), R9
+	MOVQ wRFrom1+64(FP), R10
+	MOVQ wRTo1+72(FP), R11
+
+	XORQ R12, R12
+
+castle_128_loop:
+	// Perspective 0:
+	// a0 += kingTo - kingFrom + rookTo - rookFrom
+	VMOVDQU (AX)(R12*1), Y0
+	VPADDW  (DX)(R12*1), Y0, Y0
+	VPSUBW  (CX)(R12*1), Y0, Y0
+	VPADDW  (DI)(R12*1), Y0, Y0
+	VPSUBW  (SI)(R12*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R12*1)
+
+	// Perspective 1:
+	// a1 += kingTo - kingFrom + rookTo - rookFrom
+	VMOVDQU (BX)(R12*1), Y1
+	VPADDW  (R9)(R12*1), Y1, Y1
+	VPSUBW  (R8)(R12*1), Y1, Y1
+	VPADDW  (R11)(R12*1), Y1, Y1
+	VPSUBW  (R10)(R12*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R12*1)
+
+	ADDQ $32, R12
+	CMPQ R12, $256
+	JB castle_128_loop
+
+	VZEROUPPER
+	RET
+
 // for 256 HL network
 
 TEXT ·captureAVX2_256(SB), NOSPLIT, $0-64
@@ -287,6 +329,50 @@ move_loop_256:
 	VZEROUPPER
 	RET
 
+	TEXT ·castleAVX2_256(SB), NOSPLIT, $0-80
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+
+	MOVQ wKFrom0+16(FP), CX
+	MOVQ wKTo0+24(FP), DX
+	MOVQ wRFrom0+32(FP), SI
+	MOVQ wRTo0+40(FP), DI
+
+	MOVQ wKFrom1+48(FP), R8
+	MOVQ wKTo1+56(FP), R9
+	MOVQ wRFrom1+64(FP), R10
+	MOVQ wRTo1+72(FP), R11
+
+	XORQ R12, R12
+
+castle_256_loop:
+	// Perspective 0:
+	// a0 += kingTo - kingFrom + rookTo - rookFrom
+	VMOVDQU (AX)(R12*1), Y0
+	VPADDW  (DX)(R12*1), Y0, Y0
+	VPSUBW  (CX)(R12*1), Y0, Y0
+	VPADDW  (DI)(R12*1), Y0, Y0
+	VPSUBW  (SI)(R12*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R12*1)
+
+	// Perspective 1:
+	// a1 += kingTo - kingFrom + rookTo - rookFrom
+	VMOVDQU (BX)(R12*1), Y1
+	VPADDW  (R9)(R12*1), Y1, Y1
+	VPSUBW  (R8)(R12*1), Y1, Y1
+	VPADDW  (R11)(R12*1), Y1, Y1
+	VPSUBW  (R10)(R12*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R12*1)
+
+	ADDQ $32, R12
+
+	// 256 int16 neurons = 512 bytes
+	CMPQ R12, $512
+	JB castle_256_loop
+
+	VZEROUPPER
+	RET
+
 // for 512 HL
 
 TEXT ·captureAVX2_512(SB), NOSPLIT, $0-64
@@ -359,6 +445,50 @@ move_loop_512:
 	ADDQ $32, R8
 	CMPQ R8, $1024
 	JB move_loop_512
+
+	VZEROUPPER
+	RET
+
+TEXT ·castleAVX2_512(SB), NOSPLIT, $0-80
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+
+	MOVQ wKFrom0+16(FP), CX
+	MOVQ wKTo0+24(FP), DX
+	MOVQ wRFrom0+32(FP), SI
+	MOVQ wRTo0+40(FP), DI
+
+	MOVQ wKFrom1+48(FP), R8
+	MOVQ wKTo1+56(FP), R9
+	MOVQ wRFrom1+64(FP), R10
+	MOVQ wRTo1+72(FP), R11
+
+	XORQ R12, R12
+
+castle_512_loop:
+	// Perspective 0:
+	// a0 += kingTo - kingFrom + rookTo - rookFrom
+	VMOVDQU (AX)(R12*1), Y0
+	VPADDW  (DX)(R12*1), Y0, Y0
+	VPSUBW  (CX)(R12*1), Y0, Y0
+	VPADDW  (DI)(R12*1), Y0, Y0
+	VPSUBW  (SI)(R12*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R12*1)
+
+	// Perspective 1:
+	// a1 += kingTo - kingFrom + rookTo - rookFrom
+	VMOVDQU (BX)(R12*1), Y1
+	VPADDW  (R9)(R12*1), Y1, Y1
+	VPSUBW  (R8)(R12*1), Y1, Y1
+	VPADDW  (R11)(R12*1), Y1, Y1
+	VPSUBW  (R10)(R12*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R12*1)
+
+	ADDQ $32, R12
+
+	// 512 int16 neurons = 1024 bytes
+	CMPQ R12, $1024
+	JB castle_512_loop
 
 	VZEROUPPER
 	RET
@@ -792,4 +922,3 @@ eval512_loop:
 
 	VZEROUPPER
 	RET
-	

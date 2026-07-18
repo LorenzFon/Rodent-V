@@ -93,6 +93,12 @@ type moveFunc func(
 	wFrom1, wTo1 *int16,
 )
 
+type castleFunc func(
+	a0, a1 *int16,
+	wKFrom0, wKTo0, wRFrom0, wRTo0 *int16,
+	wKFrom1, wKTo1, wRFrom1, wRTo1 *int16,
+)
+
 type evalFunc func(
 	a0, a1 *int16,
 	w0, w1 *int16,
@@ -101,31 +107,39 @@ type evalFunc func(
 
 var captureFunction captureFunc
 var moveFunction moveFunc
+var castleFunction castleFunc
 var evalFunction evalFunc
 
-// init() picks correct assembly for NNUE size
+// init picks the correct assembly routines for the configured NNUE size.
 func init() {
-switch NNUEHiddenSize {
-case 64:
-	moveFunction = moveAVX2_64
-	captureFunction = captureAVX2_64
-	evalFunction = getEvalAVX2_64
-case 128:
-	moveFunction = moveAVX2_128
-	captureFunction = captureAVX2_128
-	evalFunction = getEvalAVX2_128
-case 256:
-	moveFunction = moveAVX2_256
-	captureFunction = captureAVX2_256
-	evalFunction = getEvalAVX2_256
-case 512:
-	moveFunction = moveAVX2_512
-	captureFunction = captureAVX2_512
-	evalFunction = getEvalAVX2_512
-default:
-	panic("unsupported NNUE hidden size")
-}
+	switch NNUEHiddenSize {
+	case 64:
+		moveFunction = moveAVX2_64
+		captureFunction = captureAVX2_64
+		castleFunction = castleAVX2_64
+		evalFunction = getEvalAVX2_64
 
+	case 128:
+		moveFunction = moveAVX2_128
+		captureFunction = captureAVX2_128
+		castleFunction = castleAVX2_128
+		evalFunction = getEvalAVX2_128
+
+	case 256:
+		moveFunction = moveAVX2_256
+		captureFunction = captureAVX2_256
+		castleFunction = castleAVX2_256
+		evalFunction = getEvalAVX2_256
+
+	case 512:
+		moveFunction = moveAVX2_512
+		captureFunction = captureAVX2_512
+		castleFunction = castleAVX2_512
+		evalFunction = getEvalAVX2_512
+
+	default:
+		panic("unsupported NNUE hidden size")
+	}
 }
 
 // Clear = empty-board state = biases only.
@@ -241,23 +255,20 @@ func (acc *Accumulator) castle(
 	rFrom1 := (color^1)*384 + R*64 + (rookFrom ^ 56)
 	rTo1 := (color^1)*384 + R*64 + (rookTo ^ 56)
 
-    // use castleScalar() for plain build,
-    // castleAVX2() for AVX2 build
+castleFunction(
+	&acc.values[0][0],
+	&acc.values[1][0],
 
-	castleScalar(
-		&acc.values[0],
-		&acc.values[1],
+	&nnueParams.InputWeights[kFrom0][0],
+	&nnueParams.InputWeights[kTo0][0],
+	&nnueParams.InputWeights[rFrom0][0],
+	&nnueParams.InputWeights[rTo0][0],
 
-		&nnueParams.InputWeights[kFrom0],
-		&nnueParams.InputWeights[kTo0],
-		&nnueParams.InputWeights[rFrom0],
-		&nnueParams.InputWeights[rTo0],
-
-		&nnueParams.InputWeights[kFrom1],
-		&nnueParams.InputWeights[kTo1],
-		&nnueParams.InputWeights[rFrom1],
-		&nnueParams.InputWeights[rTo1],
-	)
+	&nnueParams.InputWeights[kFrom1][0],
+	&nnueParams.InputWeights[kTo1][0],
+	&nnueParams.InputWeights[rFrom1][0],
+	&nnueParams.InputWeights[rTo1][0],
+)
 }
 
 func (acc *Accumulator) promotion(color, from, to, prom int) {
