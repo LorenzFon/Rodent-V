@@ -35,6 +35,7 @@ type SearchState struct {
 
 	// ---- Progress (reset each think) ----
 	nodes       int64 // nodes searched by this thread
+	nodesLimit  int64 // max nodes to search before aborting (0 = no limit)
 	selDepth    int   // maximum ply reached this search
 	searchStart int64 // Unix ms at the start of think()
 	rootHistLen int   // p.histLen when think() began (repetition detection)

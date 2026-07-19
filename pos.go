@@ -40,7 +40,11 @@
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 // Pos holds the complete, self-consistent state of a chess position.
 // Every field can be derived from the board array alone, but the
@@ -420,4 +424,74 @@ func PrintBoardAscii(p *Pos) {
 	)
 
 	fmt.Println("--------------------------------------------")
+}
+
+// generateFen converts the position into a standard FEN string.
+func (p *Pos) generateFen() string {
+	var sb strings.Builder
+	for rank := 7; rank >= 0; rank-- {
+		empty := 0
+		for file := 0; file < 8; file++ {
+			sq := rank*8 + file
+			pc := p.board[sq]
+			if pc == NO_PC {
+				empty++
+			} else {
+				if empty > 0 {
+					sb.WriteByte(byte('0' + empty))
+					empty = 0
+				}
+				const pieceChars = "PpNnBbRrQqKk"
+				sb.WriteByte(pieceChars[pc])
+			}
+		}
+		if empty > 0 {
+			sb.WriteByte(byte('0' + empty))
+		}
+		if rank > 0 {
+			sb.WriteByte('/')
+		}
+	}
+
+	sb.WriteByte(' ')
+	if p.side == White {
+		sb.WriteByte('w')
+	} else {
+		sb.WriteByte('b')
+	}
+
+	sb.WriteByte(' ')
+	if p.castleRights == 0 {
+		sb.WriteByte('-')
+	} else {
+		if (p.castleRights & 1) != 0 {
+			sb.WriteByte('K')
+		}
+		if (p.castleRights & 2) != 0 {
+			sb.WriteByte('Q')
+		}
+		if (p.castleRights & 4) != 0 {
+			sb.WriteByte('k')
+		}
+		if (p.castleRights & 8) != 0 {
+			sb.WriteByte('q')
+		}
+	}
+
+	sb.WriteByte(' ')
+	if p.epSquare == NO_SQ {
+		sb.WriteByte('-')
+	} else {
+		f := fileOf(p.epSquare)
+		r := rankOf(p.epSquare)
+		sb.WriteByte(byte('a' + f))
+		sb.WriteByte(byte('1' + r))
+	}
+
+	sb.WriteByte(' ')
+	sb.WriteString(strconv.Itoa(p.clock))
+	sb.WriteByte(' ')
+	sb.WriteString("1") // fullmove clock
+
+	return sb.String()
 }

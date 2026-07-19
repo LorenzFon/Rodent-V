@@ -226,7 +226,7 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 
 			for {
 				iterScore = ss.search(p, 0, alpha, beta, rootDepth, false, pv[:])
-				if isAbortingSearch() {
+				if ss.isAbortingSearch() {
 					break
 				}
 				if iterScore <= alpha {
@@ -244,7 +244,7 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 			}
 		}
 
-		if isAbortingSearch() {
+		if ss.isAbortingSearch() {
 			break
 		}
 
@@ -300,7 +300,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 	// Check for timeout
 	ss.checkTime()
-	if isAbortingSearch() {
+	if ss.isAbortingSearch() {
 		return 0
 	}
 
@@ -462,7 +462,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			score = -ss.search(p, ply+1, -beta, -beta+1, depth-1-reduction, true, nullPv[:])
 			unmakeNullMove(p, oldEP)
 
-			if isAbortingSearch() {
+			if ss.isAbortingSearch() {
 				return 0
 			}
 
@@ -476,7 +476,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			if useVerification && depth-reduction >= minVerDepth && score >= beta {
 				score = ss.search(p, ply, alpha, beta, depth-reduction-verReduction, true, pv)
 
-				if isAbortingSearch() {
+				if ss.isAbortingSearch() {
 					return 0
 				}
 			}
@@ -535,7 +535,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 			ss.undoMove(p, ply)
 
-			if isAbortingSearch() {
+			if ss.isAbortingSearch() {
 				return 0
 			}
 
@@ -741,7 +741,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 		movesTried++
 
-		if isAbortingSearch() {
+		if ss.isAbortingSearch() {
 			return 0
 		}
 
@@ -857,7 +857,7 @@ func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int 
 	}
 
 	ss.checkTime()
-	if isAbortingSearch() {
+	if ss.isAbortingSearch() {
 		return 0
 	}
 
@@ -948,7 +948,7 @@ func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int 
 
 		ss.undoMove(p, ply)
 
-		if isAbortingSearch() {
+		if ss.isAbortingSearch() {
 			return 0
 		}
 
@@ -991,7 +991,7 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 
 	// Test for timeout.
 	ss.checkTime()
-	if isAbortingSearch() {
+	if ss.isAbortingSearch() {
 		return 0
 	}
 
@@ -1127,7 +1127,7 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 
 		ss.undoMove(p, ply)
 
-		if isAbortingSearch() {
+		if ss.isAbortingSearch() {
 			return 0
 		}
 
@@ -1193,6 +1193,9 @@ func (ss *SearchState) reportInfo(score int, pv []int) {
 	// If we are approaching checkmate for either side, calculate
 	// distance to checkmate; in the normal scenario, switch to
 	// centipawns.
+	if datagenMode {
+		return
+	}
 	scoreType := "mate"
 	if score < -maxEval {
 		score = (-mate - score) / 2
@@ -1223,6 +1226,9 @@ func (ss *SearchState) reportInfo(score int, pv []int) {
 // search unwinds cleanly.  Skipped during depth-1 searches (the
 // engine must always return at least one move) and when pondering.
 func (ss *SearchState) checkTime() {
+	if datagenMode {
+		return
+	}
 	if ss.nodes&1023 != 0 || rootDepth == 1 {
 		return
 	}
@@ -1265,7 +1271,10 @@ func isMateScore(score int) bool {
 		score >= mate-maxPly)
 }
 
-func isAbortingSearch() bool {
+func (ss *SearchState) isAbortingSearch() bool {
+	if ss.nodesLimit > 0 && ss.nodes >= ss.nodesLimit {
+		return true
+	}
 	return atomic.LoadInt32(&abortFlag) != 0
 }
 
