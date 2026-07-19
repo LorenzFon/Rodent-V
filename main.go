@@ -40,6 +40,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // init() is guaranteed to run before main()
@@ -75,6 +76,21 @@ func main() {
 			}
 			tv2Tune(os.Args[2], 5000, 1.0)
 			return
+		case "datagen":
+			if len(os.Args) < 5 {
+				fmt.Println("usage: rodent-v datagen <target_positions> <threads> <nodes_per_move> [book_file]")
+				return
+			}
+			target, _ := strconv.Atoi(os.Args[2])
+			threads, _ := strconv.Atoi(os.Args[3])
+			nodesPerMove, _ := strconv.Atoi(os.Args[4])
+			bookFile := "UHO_Lichess_4852_v1.epd"
+			if len(os.Args) > 5 {
+				bookFile = os.Args[5]
+			}
+			runDatagen(target, threads, nodesPerMove, bookFile)
+			return
+
 			// case "loadsnapshot":
 			// 	if len(os.Args) < 3 {
 			// 		fmt.Println("usage: rodent-v loadsnapshot <snapshot-file>")
