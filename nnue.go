@@ -1,13 +1,28 @@
 package main
 
+// if you miss cpu detection, run: go get golang.org/x/sys/cpu
+
 import (
 	"os"
+
+	"golang.org/x/sys/cpu"
 )
 
-// NNUE size and scale
+// build command for AVX2 version
+// set GOAMD64=v3
+// go build
+
+/*
+Rodent supports networks trained by bullet simple.rs.
+The net architecture is 768 -> (N)x2 -> 1, allowing
+some variance of N.
+*/
+
+// NNUE size and scale. AVX2 code supports following net sizes:
+// 64, 128, 256, 512
 const (
 	NNUEInputSize  = 768
-	NNUEHiddenSize = 64
+	NNUEHiddenSize = 512
 	NNUEEvalScale  = 400
 	NNUEL0Scale    = 255
 	NNUEL1Scale    = 64
@@ -66,6 +81,79 @@ type Update struct {
 // This state contains only information shared by the engine.
 type NNUEState struct {
 	Loaded bool
+}
+
+// Interface to cater for assembly code for various net sizes.
+
+type captureFunc func(
+	a0, a1 *int16,
+	wTo0, wFrom0, wCap0 *int16,
+	wTo1, wFrom1, wCap1 *int16,
+)
+
+type moveFunc func(
+	a0, a1 *int16,
+	wFrom0, wTo0 *int16,
+	wFrom1, wTo1 *int16,
+)
+
+type castleFunc func(
+	a0, a1 *int16,
+	wKFrom0, wKTo0, wRFrom0, wRTo0 *int16,
+	wKFrom1, wKTo1, wRFrom1, wRTo1 *int16,
+)
+
+type evalFunc func(
+	a0, a1 *int16,
+	w0, w1 *int16,
+	sum *int32,
+)
+
+var captureFunction captureFunc
+var moveFunction moveFunc
+var castleFunction castleFunc
+var evalFunction evalFunc
+
+// init picks the correct assembly routines for the configured NNUE size.
+func init() {
+	// Safe fallback.
+	moveFunction = moveScalar
+	captureFunction = captureScalar
+	castleFunction = castleScalar
+	evalFunction = evalScalar
+
+	if !cpu.X86.HasAVX2 {
+		return
+	}
+
+	switch NNUEHiddenSize {
+	case 64:
+		moveFunction = moveAVX2_64
+		captureFunction = captureAVX2_64
+		castleFunction = castleAVX2_64
+		evalFunction = getEvalAVX2_64
+
+	case 128:
+		moveFunction = moveAVX2_128
+		captureFunction = captureAVX2_128
+		castleFunction = castleAVX2_128
+		evalFunction = getEvalAVX2_128
+
+	case 256:
+		moveFunction = moveAVX2_256
+		captureFunction = captureAVX2_256
+		castleFunction = castleAVX2_256
+		evalFunction = getEvalAVX2_256
+
+	case 512:
+		moveFunction = moveAVX2_512
+		captureFunction = captureAVX2_512
+		castleFunction = castleAVX2_512
+		evalFunction = getEvalAVX2_512
+
+	default:
+		panic("unsupported NNUE hidden size")
+	}
 }
 
 // Clear = empty-board state = biases only.
@@ -128,27 +216,23 @@ func (acc *Accumulator) move(color, pt, from, to int) {
 	from1 := (color^1)*384 + pt*64 + (from ^ 56)
 	to1 := (color^1)*384 + pt*64 + (to ^ 56)
 
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
+moveFunction(
+	&acc.values[0][0],
+	&acc.values[1][0],
 
-	wFrom0 := &nnueParams.InputWeights[from0]
-	wTo0 := &nnueParams.InputWeights[to0]
+	&nnueParams.InputWeights[from0][0],
+	&nnueParams.InputWeights[to0][0],
 
-	wFrom1 := &nnueParams.InputWeights[from1]
-	wTo1 := &nnueParams.InputWeights[to1]
+	&nnueParams.InputWeights[from1][0],
+	&nnueParams.InputWeights[to1][0],
+)
 
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += wTo0[i] - wFrom0[i]
-		a1[i] += wTo1[i] - wFrom1[i]
-	}
 }
 
-// Make a capture.
-// Here we perform 3 actions in a loop.
-// capturedSq is normally same as to, except for en passant.
 func (acc *Accumulator) capture(
 	moverColor, moverPT, from, to int,
-	capturedColor, capturedPT, capturedSq int) {
+	capturedColor, capturedPT, capturedSq int,
+) {
 	mFrom0 := moverColor*384 + moverPT*64 + from
 	mTo0 := moverColor*384 + moverPT*64 + to
 	cap0 := capturedColor*384 + capturedPT*64 + capturedSq
@@ -157,21 +241,19 @@ func (acc *Accumulator) capture(
 	mTo1 := (moverColor^1)*384 + moverPT*64 + (to ^ 56)
 	cap1 := (capturedColor^1)*384 + capturedPT*64 + (capturedSq ^ 56)
 
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
+captureFunction(
+	&acc.values[0][0],
+	&acc.values[1][0],
 
-	wMFrom0 := &nnueParams.InputWeights[mFrom0]
-	wMTo0 := &nnueParams.InputWeights[mTo0]
-	wCap0 := &nnueParams.InputWeights[cap0]
+	&nnueParams.InputWeights[mTo0][0],
+	&nnueParams.InputWeights[mFrom0][0],
+	&nnueParams.InputWeights[cap0][0],
 
-	wMFrom1 := &nnueParams.InputWeights[mFrom1]
-	wMTo1 := &nnueParams.InputWeights[mTo1]
-	wCap1 := &nnueParams.InputWeights[cap1]
+	&nnueParams.InputWeights[mTo1][0],
+	&nnueParams.InputWeights[mFrom1][0],
+	&nnueParams.InputWeights[cap1][0],
+)
 
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += wMTo0[i] - wMFrom0[i] - wCap0[i]
-		a1[i] += wMTo1[i] - wMFrom1[i] - wCap1[i]
-	}
 }
 
 func (acc *Accumulator) castle(
@@ -187,20 +269,20 @@ func (acc *Accumulator) castle(
 	rFrom1 := (color^1)*384 + R*64 + (rookFrom ^ 56)
 	rTo1 := (color^1)*384 + R*64 + (rookTo ^ 56)
 
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
+castleFunction(
+	&acc.values[0][0],
+	&acc.values[1][0],
 
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += nnueParams.InputWeights[kTo0][i] -
-			nnueParams.InputWeights[kFrom0][i] +
-			nnueParams.InputWeights[rTo0][i] -
-			nnueParams.InputWeights[rFrom0][i]
+	&nnueParams.InputWeights[kFrom0][0],
+	&nnueParams.InputWeights[kTo0][0],
+	&nnueParams.InputWeights[rFrom0][0],
+	&nnueParams.InputWeights[rTo0][0],
 
-		a1[i] += nnueParams.InputWeights[kTo1][i] -
-			nnueParams.InputWeights[kFrom1][i] +
-			nnueParams.InputWeights[rTo1][i] -
-			nnueParams.InputWeights[rFrom1][i]
-	}
+	&nnueParams.InputWeights[kFrom1][0],
+	&nnueParams.InputWeights[kTo1][0],
+	&nnueParams.InputWeights[rFrom1][0],
+	&nnueParams.InputWeights[rTo1][0],
+)
 }
 
 func (acc *Accumulator) promotion(color, from, to, prom int) {
@@ -313,35 +395,17 @@ func screluWeighted(x, w int16) int32 {
 	return v * v * int32(w)
 }
 
-// Return the score from the perspective of the side to move.
 func (acc *Accumulator) getEval(stm int) int {
+	var sum int32
 
-	a0 := &acc.values[stm]
-	a1 := &acc.values[stm^1]
+	evalFunction(
+		&acc.values[stm][0],
+		&acc.values[stm^1][0],
+		&nnueParams.OutputWeights[0][0],
+		&nnueParams.OutputWeights[1][0],
+		&sum,
+	)
 
-	w0 := &nnueParams.OutputWeights[0]
-	w1 := &nnueParams.OutputWeights[1]
-
-	var sum0 int32
-	var sum1 int32
-	var sum2 int32
-	var sum3 int32
-
-	for i := 0; i < NNUEHiddenSize; i += 4 {
-		sum0 += screluWeighted(a0[i+0], w0[i+0]) +
-			screluWeighted(a1[i+0], w1[i+0])
-
-		sum1 += screluWeighted(a0[i+1], w0[i+1]) +
-			screluWeighted(a1[i+1], w1[i+1])
-
-		sum2 += screluWeighted(a0[i+2], w0[i+2]) +
-			screluWeighted(a1[i+2], w1[i+2])
-
-		sum3 += screluWeighted(a0[i+3], w0[i+3]) +
-			screluWeighted(a1[i+3], w1[i+3])
-	}
-
-	sum := sum0 + sum1 + sum2 + sum3
 	sum = sum/NNUEL0Scale + int32(nnueParams.OutputBias)
 
 	return int(sum * NNUEEvalScale /
