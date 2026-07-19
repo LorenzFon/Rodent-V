@@ -1,7 +1,11 @@
 package main
 
+// if you miss cpu detection, run: go get golang.org/x/sys/cpu
+
 import (
 	"os"
+
+	"golang.org/x/sys/cpu"
 )
 
 // build command for AVX2 version
@@ -18,7 +22,7 @@ some variance of N.
 // 64, 128, 256, 512
 const (
 	NNUEInputSize  = 768
-	NNUEHiddenSize = 64
+	NNUEHiddenSize = 512
 	NNUEEvalScale  = 400
 	NNUEL0Scale    = 255
 	NNUEL1Scale    = 64
@@ -112,6 +116,16 @@ var evalFunction evalFunc
 
 // init picks the correct assembly routines for the configured NNUE size.
 func init() {
+	// Safe fallback.
+	moveFunction = moveScalar
+	captureFunction = captureScalar
+	castleFunction = castleScalar
+	evalFunction = evalScalar
+
+	if !cpu.X86.HasAVX2 {
+		return
+	}
+
 	switch NNUEHiddenSize {
 	case 64:
 		moveFunction = moveAVX2_64
