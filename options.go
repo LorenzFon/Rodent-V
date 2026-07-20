@@ -58,9 +58,9 @@ var optionPerColorValues [2][EvalComponentN]int
 // default settings
 func init() {
 
-	nnuePath = "nets/solo512.brain"
-	singleOptions[NnuePerc] = 80
-	singleOptions[HcePerc] = 0
+	nnuePath = "nets/publius_net64_4.bin"
+	singleOptions[NnuePerc] = 30
+	singleOptions[HcePerc] = 60
 	singleOptions[NodesLimit] = 0
 
 	// TSCP: 1600 CCRL

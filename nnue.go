@@ -1,6 +1,28 @@
 package main
 
-// if you miss cpu detection, run: go get golang.org/x/sys/cpu
+/*
+
+Rodent supports networks trained by bullet simple.rs.
+The net architecture is 768 -> (N)x2 -> 1, allowing
+some variance of N.
+
+Code is optimized and tries to run SIMD version if possible;
+if not, it defaults to much slower scalar code. State of the
+network is kept in the "accumulator", kept on accStack
+within the search state. Updates are following copy-make
+principle: old accumulator is copied to the child node
+and modified there; trying a new move requires copying
+the accumulator yet again. Within the parent node, accumulator
+update is delayed as much as possible, and not performed
+on illegal or pruned moves.
+
+ build command for AVX2 version
+ set GOAMD64=v3
+ go build
+
+// If you want to build a portable version, avoid setting GOAMD64=v3
+   If you miss cpu detection, run: go get golang.org/x/sys/cpu
+*/
 
 import (
 	"os"
@@ -8,21 +30,11 @@ import (
 	"golang.org/x/sys/cpu"
 )
 
-// build command for AVX2 version
-// set GOAMD64=v3
-// go build
-
-/*
-Rodent supports networks trained by bullet simple.rs.
-The net architecture is 768 -> (N)x2 -> 1, allowing
-some variance of N.
-*/
-
 // NNUE size and scale. AVX2 code supports following net sizes:
 // 64, 128, 256, 512
 const (
 	NNUEInputSize  = 768
-	NNUEHiddenSize = 512
+	NNUEHiddenSize = 64
 	NNUEEvalScale  = 400
 	NNUEL0Scale    = 255
 	NNUEL1Scale    = 64
@@ -216,16 +228,16 @@ func (acc *Accumulator) move(color, pt, from, to int) {
 	from1 := (color^1)*384 + pt*64 + (from ^ 56)
 	to1 := (color^1)*384 + pt*64 + (to ^ 56)
 
-moveFunction(
-	&acc.values[0][0],
-	&acc.values[1][0],
+	moveFunction(
+		&acc.values[0][0],
+		&acc.values[1][0],
 
-	&nnueParams.InputWeights[from0][0],
-	&nnueParams.InputWeights[to0][0],
+		&nnueParams.InputWeights[from0][0],
+		&nnueParams.InputWeights[to0][0],
 
-	&nnueParams.InputWeights[from1][0],
-	&nnueParams.InputWeights[to1][0],
-)
+		&nnueParams.InputWeights[from1][0],
+		&nnueParams.InputWeights[to1][0],
+	)
 
 }
 
@@ -241,18 +253,18 @@ func (acc *Accumulator) capture(
 	mTo1 := (moverColor^1)*384 + moverPT*64 + (to ^ 56)
 	cap1 := (capturedColor^1)*384 + capturedPT*64 + (capturedSq ^ 56)
 
-captureFunction(
-	&acc.values[0][0],
-	&acc.values[1][0],
+	captureFunction(
+		&acc.values[0][0],
+		&acc.values[1][0],
 
-	&nnueParams.InputWeights[mTo0][0],
-	&nnueParams.InputWeights[mFrom0][0],
-	&nnueParams.InputWeights[cap0][0],
+		&nnueParams.InputWeights[mTo0][0],
+		&nnueParams.InputWeights[mFrom0][0],
+		&nnueParams.InputWeights[cap0][0],
 
-	&nnueParams.InputWeights[mTo1][0],
-	&nnueParams.InputWeights[mFrom1][0],
-	&nnueParams.InputWeights[cap1][0],
-)
+		&nnueParams.InputWeights[mTo1][0],
+		&nnueParams.InputWeights[mFrom1][0],
+		&nnueParams.InputWeights[cap1][0],
+	)
 
 }
 
@@ -269,20 +281,20 @@ func (acc *Accumulator) castle(
 	rFrom1 := (color^1)*384 + R*64 + (rookFrom ^ 56)
 	rTo1 := (color^1)*384 + R*64 + (rookTo ^ 56)
 
-castleFunction(
-	&acc.values[0][0],
-	&acc.values[1][0],
+	castleFunction(
+		&acc.values[0][0],
+		&acc.values[1][0],
 
-	&nnueParams.InputWeights[kFrom0][0],
-	&nnueParams.InputWeights[kTo0][0],
-	&nnueParams.InputWeights[rFrom0][0],
-	&nnueParams.InputWeights[rTo0][0],
+		&nnueParams.InputWeights[kFrom0][0],
+		&nnueParams.InputWeights[kTo0][0],
+		&nnueParams.InputWeights[rFrom0][0],
+		&nnueParams.InputWeights[rTo0][0],
 
-	&nnueParams.InputWeights[kFrom1][0],
-	&nnueParams.InputWeights[kTo1][0],
-	&nnueParams.InputWeights[rFrom1][0],
-	&nnueParams.InputWeights[rTo1][0],
-)
+		&nnueParams.InputWeights[kFrom1][0],
+		&nnueParams.InputWeights[kTo1][0],
+		&nnueParams.InputWeights[rFrom1][0],
+		&nnueParams.InputWeights[rTo1][0],
+	)
 }
 
 func (acc *Accumulator) promotion(color, from, to, prom int) {

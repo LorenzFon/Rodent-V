@@ -102,6 +102,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -213,6 +214,8 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 		}
 		var iterScore int
 
+		//printMemory(rootDepth)
+
 		if rootDepth < 5 {
 			// Aspiration windows are unreliable at shallow depths.
 			iterScore = ss.search(p, 0, -inf, inf, rootDepth, false, pv[:])
@@ -266,6 +269,19 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	} else {
 		fmt.Println("bestmove 0000")
 	}
+}
+
+func printMemory(depth int) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	fmt.Printf(
+		"info string depth %d heap=%dMB sys=%dMB allocs=%d\n",
+		depth,
+		m.HeapAlloc/(1024*1024),
+		m.Sys/(1024*1024),
+		m.Mallocs-m.Frees,
+	)
 }
 
 // search is the recursive alpha-beta negamax function.
@@ -404,7 +420,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 	// --- Node level pruning ---
 	// gatekeeping reverse futility pruning, razoring and null move
-	if !isPv && !nodeInCheck && !wasNull && !isMateScore(beta) {
+	if !isPv && !nodeInCheck && !wasNull && !isMateScore(beta) && ss.excludedMove[ply] == 0 {
 
 		// --- Reverse futility pruning ---
 		// If the static eval beats beta by a depth-scaled margin, the position
@@ -422,7 +438,6 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 		if useRFP && p.canNullMove() && depth <= rfpMaxDepth &&
 			beta < mate-maxPly &&
-			ss.excludedMove[ply] == 0 &&
 			staticEval-rfpDepthMargin*depth >= beta {
 
 			return staticEval - rfpDepthMargin*depth
@@ -433,7 +448,6 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// unlikely to improve enough with quiet moves. Drop into qsearch; if
 		// qsearch also fails low, return immediately without searching further.
 		if useRazoring && depth <= maxRazorDepth &&
-			ss.excludedMove[ply] == 0 &&
 			staticEval <= alpha-razorMargin*depth {
 			s := ss.quiesce(p, ply, alpha, beta, pv)
 			if s <= alpha {
@@ -445,8 +459,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// Skip if: depth <= 1 (too shallow to be reliable), the position
 		// is already beyond beta, we are in check, or only pawns remain.
 		// Reduction = base + depth/depthDiv + min((eval-beta)/evalDiv, maxEvalBonus).
-		if useNULL && depth >= nmpMinDepth && !isPv && p.canNullMove() && beta <= staticEval &&
-			ss.excludedMove[ply] == 0 {
+		if useNULL && depth >= nmpMinDepth && !isPv && p.canNullMove() && beta <= staticEval {
 
 			ss.contValid[ply] = false
 

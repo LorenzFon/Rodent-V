@@ -57,7 +57,7 @@
 ## Milestone: Asymmetric Eval + Personalities
 
 - [x] Separate options for own vs. opponent attack and mobility weights
-- [ ] Define basic option list accessible for personality tuning
+- [x] Define basic option list accessible for personality tuning
 - [ ] Load personalities from a text file at startup
 
 ---
@@ -83,7 +83,7 @@
 - [x] continuation history
 - [x] correction history if does not fail
 - [x] singular extensions
-- [ ] multi-threading (lazy SMP)
+- [x] multi-threading (lazy SMP)
 
 ---
 
@@ -107,7 +107,7 @@
 - [ ] Pawn in front of a minor piece
 - [x] Drawish endgames
 - [ ] Material imbalances
-- [ ] Phalanx pawns
+- [x] Phalanx pawns
 - [ ] Defended pawns
 
 ## Milestone: user-facing functionalities
@@ -119,10 +119,11 @@
 
 ## Milestone: beyond standard eval
 
-- [ ] Piece/square tables depending on central pawn structure
+- [x] Piece/square tables depending on central pawn structure
 - [ ] two-loop pawn pairs evaluation
 
 ## Longer term
 
-- NNUE auxiliary network for strength boost alongside HCE
-- Online play integration (Go's HTTP support makes this natural)
+- [x] NNUE auxiliary network for strength boost alongside HCE
+- [x] AVX-2 instructions for faster NNUE
+- [ ] Online play integration (Go's HTTP support makes this natural)
