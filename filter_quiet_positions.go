@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
 
@@ -13,18 +14,15 @@ const (
 	progressInterval    = 50000
 )
 
-// filterQuietBulletFile copies only positions that are not in check and
-// satisfy abs(static evaluation - quiescence score) < 50.
-//
-// Input and output use the old bullet format:
-//
-//	FEN | evaluation | result
-//
-// Accepted lines are written unchanged.
-func filterQuietBulletFile(
-	inputPath string,
-	outputPath string,
-) error {
+type filterResult uint8
+
+const (
+	filterAccepted filterResult = iota
+	filterInCheck
+	filterNoisy
+)
+
+func filterQuietBulletFile(inputPath string, outputPath string) error {
 	in, err := os.Open(inputPath)
 	if err != nil {
 		return fmt.Errorf("open input: %w", err)
@@ -42,133 +40,103 @@ func filterQuietBulletFile(
 
 	writer := bufio.NewWriter(out)
 
-	lineNumber := 0
-	positionCount := 0
-	acceptedCount := 0
-	inCheckCount := 0
-	noisyCount := 0
+	type job struct {
+		line string
+	}
+	type result struct {
+		line   string
+		status filterResult
+	}
 
-	for scanner.Scan() {
-		lineNumber++
-		line := scanner.Text()
+	jobs := make(chan job, 10000)
+	results := make(chan result, 10000)
 
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
+	var wg sync.WaitGroup
+	numWorkers := 16 // parallelize 16x
 
-		fields := strings.Split(line, "|")
-		if len(fields) < 3 {
-			return fmt.Errorf(
-				"line %d: expected at least three pipe-separated fields: %q",
-				lineNumber,
-				line,
-			)
-		}
-
-		fen := strings.TrimSpace(fields[0])
-
-		result, err := testQuietPosition(fen)
-		if err != nil {
-			return fmt.Errorf(
-				"line %d, FEN %q: %w",
-				lineNumber,
-				fen,
-				err,
-			)
-		}
-
-		positionCount++
-
-		switch result {
-		case filterAccepted:
-			if _, err := fmt.Fprintln(writer, line); err != nil {
-				return fmt.Errorf("write line %d: %w", lineNumber, err)
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var ss SearchState
+			var p Pos
+			for j := range jobs {
+				res := result{line: j.line, status: filterNoisy}
+				fields := strings.Split(j.line, "|")
+				if len(fields) >= 3 {
+					fen := strings.TrimSpace(fields[0])
+					status, _ := testQuietPositionWithState(fen, &p, &ss)
+					res.status = status
+				}
+				results <- res
 			}
-			acceptedCount++
+		}()
+	}
 
+	var totalPositions int64
+	var acceptedCount int64
+	var inCheckCount int64
+	var noisyCount int64
+
+	// read lines
+	go func() {
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			jobs <- job{line: line}
+		}
+		close(jobs)
+		wg.Wait()
+		close(results)
+	}()
+
+	// process results
+	for r := range results {
+		totalPositions++
+		switch r.status {
+		case filterAccepted:
+			fmt.Fprintln(writer, r.line)
+			acceptedCount++
 		case filterInCheck:
 			inCheckCount++
-
 		case filterNoisy:
 			noisyCount++
 		}
 
-		if positionCount%progressInterval == 0 {
-			if err := writer.Flush(); err != nil {
-				return fmt.Errorf(
-					"flush after %d positions: %w",
-					positionCount,
-					err,
-				)
-			}
-
-			fmt.Printf(
-				"checked %d, accepted %d (%.1f%%), noisy %d, in check %d\n",
-				positionCount,
-				acceptedCount,
-				percentage(acceptedCount, positionCount),
-				noisyCount,
-				inCheckCount,
-			)
+		if totalPositions%progressInterval == 0 {
+			writer.Flush()
+			fmt.Printf("checked %d, accepted %d (%.1f%%), noisy %d, in check %d\n",
+				totalPositions, acceptedCount, percentage(int(acceptedCount), int(totalPositions)), noisyCount, inCheckCount)
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scan input: %w", err)
-	}
-
-	if err := writer.Flush(); err != nil {
-		return fmt.Errorf("flush output: %w", err)
-	}
-
-	fmt.Printf(
-		"filter complete: checked %d, accepted %d (%.1f%%), noisy %d, in check %d\n",
-		positionCount,
-		acceptedCount,
-		percentage(acceptedCount, positionCount),
-		noisyCount,
-		inCheckCount,
-	)
+	writer.Flush()
+	fmt.Printf("filter complete: checked %d, accepted %d (%.1f%%), noisy %d, in check %d\n",
+		totalPositions, acceptedCount, percentage(int(acceptedCount), int(totalPositions)), noisyCount, inCheckCount)
 
 	return nil
 }
 
-type filterResult uint8
+func testQuietPositionWithState(fen string, p *Pos, ss *SearchState) (filterResult, error) {
+	parseFEN(p, fen)
 
-const (
-	filterAccepted filterResult = iota
-	filterInCheck
-	filterNoisy
-)
-
-func testQuietPosition(fen string) (filterResult, error) {
-	var p Pos
-	parseFEN(&p, fen)
-
-	// Static evaluation is not meaningful for this filter while the side
-	// to move is in check.
 	if p.inCheck() {
 		return filterInCheck, nil
 	}
 
-	var ss SearchState
-	ss.resetForSearch(&p)
-	refresh(&p, &ss.accStack[0])
+	ss.resetForSearch(p)
+	refresh(p, &ss.accStack[0])
 
 	atomic.StoreInt32(&abortFlag, 0)
 	hardTimeLimit = -1
 	singleOptions[NodesLimit] = 0
 
-	staticScore := evaluate(&p, &ss.accStack[0])
+	staticScore := evaluate(p, &ss.accStack[0])
 
 	var pv [maxPly]int
-	qsScore := ss.quiesce(
-		&p,
-		0,
-		-inf,
-		inf,
-		pv[:],
-	)
+	qsScore := ss.quiesce(p, 0, -inf, inf, pv[:])
 
 	if absInt(staticScore-qsScore) >= maxEvalQSDifference {
 		return filterNoisy, nil

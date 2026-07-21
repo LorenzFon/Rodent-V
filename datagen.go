@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -84,7 +83,7 @@ func runDatagen(targetPositions, threads, nodesPerMove int, bookFile string) {
 				g := totalGames
 				fileMutex.Unlock()
 				elapsed := time.Since(startTime).Seconds()
-				posPerSec := float64(p - startPositions) / elapsed
+				posPerSec := float64(p-startPositions) / elapsed
 				if elapsed == 0 {
 					posPerSec = 0
 				}
@@ -158,7 +157,7 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 		capCount := genCaptures(&p, list[:])
 		quietCount := genQuiet(&p, list[capCount:])
 		total := capCount + quietCount
-		
+
 		var legals []int
 		for j := 0; j < total; j++ {
 			move := list[j]
@@ -195,7 +194,7 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 		capCount := genCaptures(&p, list[:])
 		quietCount := genQuiet(&p, list[capCount:])
 		total := capCount + quietCount
-		
+
 		hasLegal := false
 		for j := 0; j < total; j++ {
 			move := list[j]
@@ -235,13 +234,10 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 		if p.inCheck() || isMateScore(score) {
 			isQuiet = false
 		} else {
-			atomic.StoreInt32(&abortFlag, 0)
-			ss.nodesLimit = 0
-			
 			staticScore := evaluate(&p, &ss.accStack[0])
 			var pv [maxPly]int
 			qsScore := ss.quiesce(&p, 0, -inf, inf, pv[:])
-			
+
 			diff := staticScore - qsScore
 			if diff < 0 {
 				diff = -diff
@@ -282,7 +278,7 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 		}
 		refresh(&p, &ss.accStack[0])
 	}
-	
+
 	for i := range entries {
 		entries[i].score = result
 	}
@@ -303,28 +299,39 @@ func isRepetitionDG(p *Pos) bool {
 	return false
 }
 
-func runDatagenSearch(p *Pos, ss *SearchState, nodesLimit int) (int, int) {
+func runDatagenSearch(p *Pos, ss *SearchState, softNodesLimit int) (int, int) {
 	ss.resetForSearch(p)
-	ss.nodesLimit = int64(nodesLimit)
-	refresh(p, &ss.accStack[0])
 	
+	// HARD nodes limit checked mid-search (8 million nodes)
+	ss.nodesLimit = 8000000
+	refresh(p, &ss.accStack[0])
+
 	var pv [maxPly]int
 	score := 0
 	bestMove := 0
-	
+
 	for d := 1; d < 100; d++ {
 		iterScore := ss.search(p, 0, -inf, inf, d, false, pv[:])
+		
+		// If we hit the 8M hard limit mid-search, we discard this depth's result
 		if ss.isAbortingSearch() {
 			break
 		}
+		
 		if pv[0] != 0 {
 			score = iterScore
 			bestMove = pv[0]
 		}
-		if ss.nodes >= int64(nodesLimit) {
+		
+		// SOFT nodes limit checked only AFTER an iteration finishes
+		if ss.nodes >= int64(softNodesLimit) {
 			break
 		}
 	}
+	
+	// Reset the nodes limit to 0 so the subsequent quiesce filter doesn't instantly abort
+	ss.nodesLimit = 0
+	
 	return bestMove, score
 }
 
