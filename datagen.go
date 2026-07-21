@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -142,39 +143,42 @@ func runDatagen(targetPositions, threads, nodesPerMove int, bookFile string) {
 func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []string) ([]dgEntry, bool) {
 	var p Pos
 
+	numRandom := 0
 	if len(bookFENs) > 0 {
 		fen := bookFENs[rng.Intn(len(bookFENs))]
 		parseFEN(&p, fen)
+		numRandom = rng.Intn(10) // 0 to 9 random moves from book pos
 	} else {
 		parseFEN(&p, startFEN)
-		numRandom := 8 + rng.Intn(3)
-		for i := 0; i < numRandom; i++ {
-			var list [maxMoves]int
-			capCount := genCaptures(&p, list[:])
-			quietCount := genQuiet(&p, list[capCount:])
-			total := capCount + quietCount
-			
-			var legals []int
-			for j := 0; j < total; j++ {
-				move := list[j]
-				var child Pos = p
-				var u Update
-				var r Revert
-				makeMove(&child, &u, &r, move)
-				if !child.selfInCheck() {
-					legals = append(legals, move)
-				}
-			}
-			if len(legals) == 0 {
-				return nil, false
-			}
-			move := legals[rng.Intn(len(legals))]
+		numRandom = 8 + rng.Intn(3) // 8 to 10 random moves from start pos
+	}
+
+	for i := 0; i < numRandom; i++ {
+		var list [maxMoves]int
+		capCount := genCaptures(&p, list[:])
+		quietCount := genQuiet(&p, list[capCount:])
+		total := capCount + quietCount
+		
+		var legals []int
+		for j := 0; j < total; j++ {
+			move := list[j]
+			var child Pos = p
 			var u Update
 			var r Revert
-			makeMove(&p, &u, &r, move)
-			if p.clock == 0 {
-				p.histLen = 0
+			makeMove(&child, &u, &r, move)
+			if !child.selfInCheck() {
+				legals = append(legals, move)
 			}
+		}
+		if len(legals) == 0 {
+			return nil, false
+		}
+		move := legals[rng.Intn(len(legals))]
+		var u Update
+		var r Revert
+		makeMove(&p, &u, &r, move)
+		if p.clock == 0 {
+			p.histLen = 0
 		}
 	}
 
@@ -226,16 +230,39 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 			break
 		}
 
-		whiteScore := score
-		if p.side == Black {
-			whiteScore = -score
+		// FILTER QUIET POSITIONS
+		isQuiet := true
+		if p.inCheck() {
+			isQuiet = false
+		} else {
+			atomic.StoreInt32(&abortFlag, 0)
+			ss.nodesLimit = 0
+			
+			staticScore := evaluate(&p, &ss.accStack[0])
+			var pv [maxPly]int
+			qsScore := ss.quiesce(&p, 0, -inf, inf, pv[:])
+			
+			diff := staticScore - qsScore
+			if diff < 0 {
+				diff = -diff
+			}
+			if diff >= 50 {
+				isQuiet = false
+			}
 		}
 
-		entries = append(entries, dgEntry{
-			fen:   p.generateFen(),
-			eval:  whiteScore,
-			score: 0,
-		})
+		if isQuiet {
+			whiteScore := score
+			if p.side == Black {
+				whiteScore = -score
+			}
+
+			entries = append(entries, dgEntry{
+				fen:   p.generateFen(),
+				eval:  whiteScore,
+				score: 0,
+			})
+		}
 
 		if score >= -10 && score <= 10 {
 			drawCount++

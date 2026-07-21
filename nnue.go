@@ -34,10 +34,10 @@ import (
 // 64, 128, 256, 512
 const (
 	NNUEInputSize  = 768
-	NNUEHiddenSize = 64
+	NNUEHiddenSize = 128
 	NNUEEvalScale  = 400
 	NNUEL0Scale    = 255
-	NNUEL1Scale    = 64
+	NNUEL1Scale    = 128
 )
 
 // Types of NNUE updates
