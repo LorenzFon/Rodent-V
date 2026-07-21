@@ -232,7 +232,7 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 
 		// FILTER QUIET POSITIONS
 		isQuiet := true
-		if p.inCheck() {
+		if p.inCheck() || isMateScore(score) {
 			isQuiet = false
 		} else {
 			atomic.StoreInt32(&abortFlag, 0)
