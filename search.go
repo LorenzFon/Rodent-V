@@ -712,6 +712,8 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 		// --- Late move reduction ---
 		isReduced := false
+	
+		// LMR of quiet nodes
 		if useLMR && stage == StageQuiet && depth >= minLmrDepth &&
 			!nodeInCheck && !givesCheck && movesTried >= 4 {
 			reduction := lmr[min(depth, 63)][min(movesTried, 63)]
@@ -723,6 +725,27 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 				if !improving && LMRnonImproving {
 					reduction++
 				}
+				if reduction > newDepth-1 {
+					reduction = newDepth - 1
+				}
+
+				score = -ss.search(p, ply+1, -alpha-1, -alpha, newDepth-reduction, false, childPv[:])
+
+				if score <= alpha {
+					isReduced = true
+				}
+			}
+		}
+
+		// LMR of bad captures
+		if useLMR && stage == StageBadCaptures && depth >= minLmrDepth &&
+			!nodeInCheck && !givesCheck && movesTried >= 4 {
+			reduction := 1
+			if reduction > 0 {
+				if !isPv {
+					reduction++
+				}
+
 				if reduction > newDepth-1 {
 					reduction = newDepth - 1
 				}
