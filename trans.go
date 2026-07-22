@@ -72,12 +72,14 @@ type Entry struct {
 }
 
 // Global TT state.
-var (
-	tt     []Entry // the flat entry array
-	ttSize int     // total number of entries (power of 2)
-	ttMask int     // index mask = ttSize - 4 (aligned buckets)
-	ttDate int     // current search generation (0-255)
-)
+type TTable struct {
+	entries []Entry
+	size    int
+	mask    int
+	date    int
+}
+
+var mainTT TTable
 
 // ---- Bit packing helpers ----
 
@@ -113,44 +115,48 @@ func storeEntry(e *Entry, key, data uint64) {
 
 // ---- TT management ----
 
-// allocTT allocates a transposition table of approximately mbSize
+// alloc allocates a transposition table of approximately mbSize
 // megabytes.  The size is rounded down to the nearest power of 2
 // so that the index mask trick works.  Always clears the table.
-func allocTT(mbSize int) {
+func (t *TTable) alloc(mbSize int) {
 	size := 2
 	for size <= mbSize {
 		size *= 2
 	}
 	// Each entry is 16 bytes; allocate (size/2) MiB worth.
-	ttSize = ((size / 2) << 20) / 16
-	ttMask = ttSize - 4
-	tt = make([]Entry, ttSize)
-	clearTT()
+	t.size = ((size / 2) << 20) / 16
+	t.mask = t.size - 4
+	t.entries = make([]Entry, t.size)
+	t.clear()
 }
 
-// clearTT zeroes the table and resets the date counter.
+// clear zeroes the table and resets the date counter.
 // Called at the start of a new game (ucinewgame).
-func clearTT() {
-	ttDate = 0
-	for i := range tt {
-		tt[i] = Entry{}
+func (t *TTable) clear() {
+	t.date = 0
+	for i := range t.entries {
+		t.entries[i] = Entry{}
 	}
 }
 
-// ttHashfull returns TT utilization in UCI hashfull units (permille).
-func ttHashfull() int {
-	if ttSize <= 0 {
+func (t *TTable) newDate() {
+	t.date = (t.date + 1) & 255
+}
+
+// hashfull returns TT utilization in UCI hashfull units (permille).
+func (t *TTable) hashfull() int {
+	if t.size <= 0 {
 		return 0
 	}
-	sampleSize := min(ttSize, 1000)
+	sampleSize := min(t.size, 1000)
 	active := 0
 	for i := 0; i < sampleSize; i++ {
-		d := atomic.LoadUint64(&tt[i].data)
+		d := atomic.LoadUint64(&t.entries[i].data)
 		if d == 0 {
 			continue
 		}
 		_, _, _, _, date := unpackTTData(d)
-		age := (ttDate - date) & 255
+		age := (t.date - date) & 255
 		if age <= 1 {
 			active++
 		}
@@ -158,18 +164,22 @@ func ttHashfull() int {
 	return (active * 1000) / sampleSize
 }
 
+func allocTT(mbSize int) { mainTT.alloc(mbSize) }
+func clearTT()           { mainTT.clear() }
+func ttHashfull() int    { return mainTT.hashfull() }
+
 // ---- TT probe and store ----
 
-// probeTT looks up a position in the transposition table.
+// probe looks up a position in the transposition table.
 //
 // If a matching entry is found, *move is set to the stored best move
 // and *score is set to the stored score.  Returns true only when the
 // score can be used directly as a cutoff (depth sufficient + bound
 // matches window).  The move hint is always returned on a key match
 // so the search can try it first regardless of depth.
-func probeTT(key uint64, move *int, score *int, flag *int, ttDepth *int, alpha, beta, depth, ply int) bool {
-	base := int(key) & ttMask
-	bucket := tt[base : base+4]
+func (t *TTable) probe(key uint64, move *int, score *int, flag *int, ttDepth *int, alpha, beta, depth, ply int) bool {
+	base := int(key) & t.mask
+	bucket := t.entries[base : base+4]
 	for i := range bucket {
 		e := &bucket[i]
 		data, hash := loadEntry(e)
@@ -202,11 +212,11 @@ func probeTT(key uint64, move *int, score *int, flag *int, ttDepth *int, alpha, 
 	return false
 }
 
-// storeTT writes a search result to the transposition table.
+// store writes a search result to the transposition table.
 // If the position's key already occupies a slot it is reused
 // (preserving the move hint when the new search has none).
 // Otherwise the oldest/shallowest entry is evicted.
-func storeTT(key uint64, move, score, bound, depth, ply int) {
+func (t *TTable) store(key uint64, move, score, bound, depth, ply int) {
 	// Adjust mate scores to be position-relative.
 	if score < -maxEval {
 		score -= ply
@@ -214,8 +224,8 @@ func storeTT(key uint64, move, score, bound, depth, ply int) {
 		score += ply
 	}
 
-	base := int(key) & ttMask
-	bucket := tt[base : base+4]
+	base := int(key) & t.mask
+	bucket := t.entries[base : base+4]
 	var replace *Entry
 	oldest := -1
 
@@ -232,7 +242,7 @@ func storeTT(key uint64, move, score, bound, depth, ply int) {
 			break
 		}
 		_, _, dp, _, dt := unpackTTData(data)
-		age := ((ttDate-dt)&255)*256 + (255 - dp)
+		age := ((t.date-dt)&255)*256 + (255 - dp)
 		if age > oldest {
 			oldest = age
 			replace = e
@@ -242,6 +252,6 @@ func storeTT(key uint64, move, score, bound, depth, ply int) {
 		replace = &bucket[0]
 	}
 
-	d := packTTData(move, score, depth, bound, ttDate)
+	d := packTTData(move, score, depth, bound, t.date)
 	storeEntry(replace, key, d)
 }

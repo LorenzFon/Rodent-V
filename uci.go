@@ -67,6 +67,7 @@ func uciLoop() {
 	states := make([]*SearchState, maxAllowedThreads)
 	for i := range states {
 		states[i] = new(SearchState)
+		states[i].tt = &mainTT
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)

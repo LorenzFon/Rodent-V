@@ -59,6 +59,7 @@ func filterQuietBulletFile(inputPath string, outputPath string) error {
 		go func() {
 			defer wg.Done()
 			var ss SearchState
+			ss.tt = &mainTT
 			var p Pos
 			for j := range jobs {
 				res := result{line: j.line, status: filterNoisy}
