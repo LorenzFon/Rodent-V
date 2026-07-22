@@ -91,6 +91,18 @@ func main() {
 			runDatagen(target, threads, nodesPerMove, bookFile)
 			return
 
+		case "filter":
+			if len(os.Args) < 4 {
+				fmt.Println("usage: rodent-v filter <input.txt> <output.txt>")
+				return
+			}
+			allocTT(16)
+			err := filterQuietBulletFile(os.Args[2], os.Args[3])
+			if err != nil {
+				fmt.Println("Error:", err)
+			}
+			return
+
 			// case "loadsnapshot":
 			// 	if len(os.Args) < 3 {
 			// 		fmt.Println("usage: rodent-v loadsnapshot <snapshot-file>")

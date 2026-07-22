@@ -43,3 +43,7 @@ go.work.sum
 # .vscode/
 Rodent-V-kingsafety/
 bullet\
+nets\
+*.ps1
+*.md
+*.bin
