@@ -459,15 +459,14 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// Skip if: depth <= 1 (too shallow to be reliable), the position
 		// is already beyond beta, we are in check, or only pawns remain.
 		// Reduction = base + depth/depthDiv + min((eval-beta)/evalDiv, maxEvalBonus).
-		if useNULL && depth >= nmpMinDepth && !isPv && p.canNullMove() && beta <= staticEval {
+		if useNULL && depth >= nmpMinDepth && p.canNullMove() && beta <= staticEval {
 
 			ss.contValid[ply] = false
 
 			reduction := nmpBaseReduction + depth/nmpDepthReduction
 
-			// we need to prepare child accumulator,
-			// but we don't need a pointer, because
-			// null move does not change accumulator state.
+			// We need to prepare child accumulator, but we don't need a pointer, 
+			// because null move does not change accumulator state.
 			ss.prepareChildAccumulator(ply)
 
 			var nullPv [maxPly]int
@@ -715,9 +714,11 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	
 		// LMR of quiet nodes
 		if useLMR && stage == StageQuiet && depth >= minLmrDepth &&
-			!nodeInCheck && !givesCheck && movesTried >= 4 {
+			!nodeInCheck && movesTried >= 4 {
+			// Read base reduction value.
 			reduction := lmr[min(depth, 63)][min(movesTried, 63)]
 			if reduction > 0 {
+				// Reduce more in zero window nodes.
 				if !isPv {
 					reduction++
 				}
@@ -725,6 +726,11 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 				if !improving && LMRnonImproving {
 					reduction++
 				}
+				// Moves that give check are reduced half the amount.
+				if givesCheck {
+					reduction /= 2
+				}
+				// Reduction cannot exceed actual depth.
 				if reduction > newDepth-1 {
 					reduction = newDepth - 1
 				}
