@@ -324,11 +324,14 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	// because we need to return a move after search
 	isRoot := ply == 0
 
-	// Check for draw (50 move rule is tested later)
+	// Check for draw
 	if !isRoot {
 		pv[0] = 0
 
-		if ss.isRepetition(p) || p.isInsufficientMaterial() {
+		// Check all draw conditions before generating any moves so that
+		// pv[0] == 0 is guaranteed when we return, preventing the PV from
+		// extending past a drawing position.
+		if ss.isDraw(p) {
 			ss.checkTime() // sets abort flag - helps in case of many draws in a row
 			return 0
 		}
@@ -849,12 +852,6 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		return 0 // stalemate
 	}
 
-	// 50-move rule: only reached when there are legal moves, so checkmate
-	// and stalemate have already been handled above and take priority.
-	if !isRoot && p.clock >= 100 {
-		return 0
-	}
-
 	// Store the result in the TT with the appropriate bound type.
 	// Skip during singular extension sub-searches: their partial results
 	// (with one move excluded) must not corrupt the main TT entries.
@@ -905,7 +902,8 @@ func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int 
 
 	pv[0] = 0
 
-	if ss.isRepetition(p) || p.clock >= 100 || p.isInsufficientMaterial() {
+	// Draw.
+	if ss.isDraw(p) {
 		return 0
 	}
 
@@ -1040,7 +1038,7 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	pv[0] = 0
 
 	// Draw.
-	if ss.isRepetition(p) || p.clock >= 100 || p.isInsufficientMaterial() {
+	if ss.isDraw(p) {
 		return 0
 	}
 
@@ -1194,6 +1192,11 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	return best
 }
 
+// isDraw detects draws in search
+func (ss *SearchState) isDraw(p *Pos) bool {
+	return ss.isRepetition(p) || p.isInsufficientMaterial() || p.clock >= 100
+}
+
 // isRepetition returns true if the current position is a draw by repetition.
 //
 // Two rules apply depending on where the prior occurrence lives:
@@ -1232,12 +1235,15 @@ func (ss *SearchState) isRepetition(p *Pos) bool {
 // reportInfo outputs a UCI "info" line for the current iteration.
 // Mate scores are converted to "moves to mate" format.
 func (ss *SearchState) reportInfo(score int, pv []int) {
-	// If we are approaching checkmate for either side, calculate
-	// distance to checkmate; in the normal scenario, switch to
-	// centipawns.
+
+	// Keeping screen clean in datagen mode.
 	if datagenMode {
 		return
 	}
+
+	// If we are approaching checkmate for either side, calculate
+	// distance to checkmate; in the normal scenario, switch to
+	// centipawns.
 	scoreType := "mate"
 	if score < -maxEval {
 		score = (-mate - score) / 2
@@ -1263,17 +1269,20 @@ func (ss *SearchState) reportInfo(score int, pv []int) {
 		rootDepth, ss.selDepth, elapsed, ss.nodes, nps, hashfull, scoreType, score, pvString(pv))
 }
 
-// checkTime is called periodically (every 4096 nodes) to see whether
+// checkTime tests periodically (every 1024 nodes) whether
 // the allocated time has expired.  If so, it sets abortFlag so the
 // search unwinds cleanly.  Skipped during depth-1 searches (the
 // engine must always return at least one move) and when pondering.
 func (ss *SearchState) checkTime() {
+
 	if datagenMode {
 		return
 	}
+
 	if ss.nodes&1023 != 0 || rootDepth == 1 {
 		return
 	}
+
 	if !pondering && hardTimeLimit >= 0 {
 		if time.Now().UnixMilli()-ss.searchStart >= hardTimeLimit {
 			atomic.StoreInt32(&abortFlag, 1)
