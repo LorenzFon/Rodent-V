@@ -170,9 +170,9 @@ func initLMRTable() {
 // each failure (smoother than doubling) until the window opens fully.
 func think(p *Pos, states []*SearchState, maxDepth int) {
 	engineSide = p.side
-	ttDate = (ttDate + 1) & 255
 	atomic.StoreInt32(&abortFlag, 0)
 	ss := states[0]
+	ss.tt.newDate()
 	ss.resetForSearch(p)
 	refresh(p, &ss.accStack[0])
 
@@ -362,7 +362,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	// We don't do tt cutoffs in pv nodes to avoid truncating main line.
 	// This decision is debatable. If we change it, we also must guard
 	// against returning at root.
-	if probeTT(p.key, &ttMove, &score, &ttFlag, &ttDepth, alpha, beta, depth, ply) {
+	if ss.tt.probe(p.key, &ttMove, &score, &ttFlag, &ttDepth, alpha, beta, depth, ply) {
 		if !isPv && ss.excludedMove[ply] == 0 {
 			return score
 		}
@@ -791,7 +791,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			}
 
 			if ss.excludedMove[ply] == 0 {
-				storeTT(p.key, move, score, LOWER, depth, ply)
+				ss.tt.store(p.key, move, score, LOWER, depth, ply)
 			}
 
 			if !nodeInCheck && isQuiet(p, move) && score > staticEval {
@@ -862,9 +862,9 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 				ss.updateHistory(p, bestMove, depth, ply, nil)
 			}
 
-			storeTT(p.key, bestMove, bestScore, EXACT, depth, ply)
+			ss.tt.store(p.key, bestMove, bestScore, EXACT, depth, ply)
 		} else {
-			storeTT(p.key, 0, bestScore, UPPER, depth, ply)
+			ss.tt.store(p.key, 0, bestScore, UPPER, depth, ply)
 		}
 	}
 
@@ -914,7 +914,7 @@ func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int 
 	ttFlag := 0
 	ttDepth := 0
 
-	if probeTT(p.key, &ttMove, &ttScore, &ttFlag, &ttDepth, alpha, beta, 0, ply) {
+	if ss.tt.probe(p.key, &ttMove, &ttScore, &ttFlag, &ttDepth, alpha, beta, 0, ply) {
 		return ttScore
 	}
 
@@ -930,7 +930,7 @@ func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int 
 		best = rawQEval + ss.getCorrection(p)
 
 		if best >= beta {
-			storeTT(p.key, 0, best, LOWER, 0, ply)
+			ss.tt.store(p.key, 0, best, LOWER, 0, ply)
 			return best
 		}
 
@@ -1049,7 +1049,7 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 	ttFlag := 0
 	ttDepth := 0
 
-	if probeTT(p.key, &ttMove, &ttScore, &ttFlag, &ttDepth, alpha, beta, 0, ply) {
+	if ss.tt.probe(p.key, &ttMove, &ttScore, &ttFlag, &ttDepth, alpha, beta, 0, ply) {
 		return ttScore
 	}
 
@@ -1066,7 +1066,7 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 		best = rawQEval + ss.getCorrection(p)
 
 		if best >= beta {
-			storeTT(p.key, 0, best, LOWER, 0, ply)
+			ss.tt.store(p.key, 0, best, LOWER, 0, ply)
 			return best
 		}
 

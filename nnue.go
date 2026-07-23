@@ -25,19 +25,24 @@ on illegal or pruned moves.
 */
 
 import (
+	_ "embed"
 	"os"
+	"unsafe"
 
 	"golang.org/x/sys/cpu"
 )
+
+//go:embed nets/rodent_v_256hl_3.bin
+var embeddedNet []byte
 
 // NNUE size and scale. AVX2 code supports following net sizes:
 // 64, 128, 256, 512
 const (
 	NNUEInputSize  = 768
-	NNUEHiddenSize = 128
+	NNUEHiddenSize = 256
 	NNUEEvalScale  = 400
 	NNUEL0Scale    = 255
-	NNUEL1Scale    = 128
+	NNUEL1Scale    = 64
 )
 
 // Types of NNUE updates
@@ -61,7 +66,7 @@ type NNUEParameters struct {
 	OutputBias    int16
 }
 
-var nnueParams NNUEParameters
+var nnueParams = &NNUEParameters{}
 var nnue NNUEState
 
 type Accumulator struct {
@@ -424,6 +429,22 @@ func (acc *Accumulator) getEval(stm int) int {
 		(NNUEL0Scale * NNUEL1Scale))
 }
 
+func nnueInitEmbedded() bool {
+	need := int(unsafe.Sizeof(NNUEParameters{}))
+	if len(embeddedNet) < need {
+		return false
+	}
+
+	base := unsafe.Pointer(&embeddedNet[0])
+	if uintptr(base)%unsafe.Alignof(NNUEParameters{}) != 0 {
+		panic("embedded net is misaligned")
+	}
+
+	nnueParams = (*NNUEParameters)(base)
+	nnue.Loaded = true
+	return true
+}
+
 // Load a raw Bullet-compatible parameter blob.
 func nnueLoad(path string) bool {
 	data, err := os.ReadFile(path)
@@ -433,6 +454,8 @@ func nnueLoad(path string) bool {
 	}
 
 	offset := 0
+
+	nnueParams = new(NNUEParameters)
 
 	readI16 := func() int16 {
 		value := int16(

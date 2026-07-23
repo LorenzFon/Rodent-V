@@ -67,6 +67,7 @@ func uciLoop() {
 	states := make([]*SearchState, maxAllowedThreads)
 	for i := range states {
 		states[i] = new(SearchState)
+		states[i].tt = &mainTT
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -95,6 +96,9 @@ func uciLoop() {
 		case "uci":
 			fmt.Println("id name Rodent V s9")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
+			if nnue.Loaded {
+				fmt.Printf("info string Loaded NNUE network: %s\n", nnuePath)
+			}
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
 			fmt.Println("option name Save Personality type button")

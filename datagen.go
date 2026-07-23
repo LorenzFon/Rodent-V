@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -42,54 +43,39 @@ func runDatagen(targetPositions, threads, nodesPerMove int, bookFile string) {
 		}
 	}
 
-	filename := "data.txt"
-	var totalPositions int64
-
-	if _, err := os.Stat(filename); err == nil {
-		fmt.Printf("Found existing %s, counting positions to resume...\n", filename)
-		count, _ := countLines(filename)
-		totalPositions = count
-		fmt.Printf("Resuming from %d positions.\n", totalPositions)
-	}
-
-	if totalPositions >= int64(targetPositions) {
-		fmt.Println("Target positions already reached!")
-		return
-	}
-
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	filename := fmt.Sprintf("data_%d.vf", time.Now().UnixNano())
+	file, err := os.Create(filename)
 	if err != nil {
-		fmt.Printf("Error opening output file: %v\n", err)
+		fmt.Println("Error creating file:", err)
 		return
 	}
 	defer file.Close()
 
+	var totalPositions int64 = 0
+	var totalGames int64 = 0
 	var fileMutex sync.Mutex
-	var totalGames int64
-	startPositions := totalPositions
-	startTime := time.Now()
 	var wg sync.WaitGroup
+	startTime := time.Now()
 
-	// Progress monitor
-	done := make(chan struct{})
+	fmt.Printf("Writing viriformat binary to %s\n", filename)
+
+	done := make(chan bool)
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
+			case <-done:
+				return
 			case <-ticker.C:
-				fileMutex.Lock()
-				p := totalPositions
-				g := totalGames
-				fileMutex.Unlock()
+				p := atomic.LoadInt64(&totalPositions)
+				g := atomic.LoadInt64(&totalGames)
 				elapsed := time.Since(startTime).Seconds()
-				posPerSec := float64(p-startPositions) / elapsed
+				posPerSec := float64(p) / elapsed
 				if elapsed == 0 {
 					posPerSec = 0
 				}
 				fmt.Printf("Progress: %d / %d positions, %d games, %.0f pos/sec\n", p, targetPositions, g, posPerSec)
-			case <-done:
-				return
 			}
 		}
 	}()
@@ -100,35 +86,25 @@ func runDatagen(targetPositions, threads, nodesPerMove int, bookFile string) {
 			defer wg.Done()
 			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(threadID)))
 			ss := new(SearchState)
+			ss.tt = new(TTable)
+			ss.tt.alloc(1)
 			ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
 
 			for {
-				fileMutex.Lock()
-				currentTotal := totalPositions
-				fileMutex.Unlock()
-
-				if currentTotal >= int64(targetPositions) {
+				if atomic.LoadInt64(&totalPositions) >= int64(targetPositions) {
 					return
 				}
 
-				entries, played := dgPlayGame(rng, ss, nodesPerMove, bookFENs)
-				if !played || len(entries) == 0 {
+				vb, posCount, played := dgPlayGame(rng, ss, nodesPerMove, bookFENs)
+				if !played || posCount == 0 {
 					continue
 				}
 
+				atomic.AddInt64(&totalPositions, int64(posCount))
+				atomic.AddInt64(&totalGames, 1)
+
 				fileMutex.Lock()
-				for _, e := range entries {
-					resStr := "0.5"
-					if e.score > 0.9 {
-						resStr = "1.0"
-					} else if e.score < 0.1 {
-						resStr = "0.0"
-					}
-					// FEN | eval | result
-					file.WriteString(fmt.Sprintf("%s | %d | %s\n", e.fen, e.eval, resStr))
-				}
-				totalPositions += int64(len(entries))
-				totalGames++
+				file.Write(vb.buf)
 				fileMutex.Unlock()
 			}
 		}(i)
@@ -136,10 +112,10 @@ func runDatagen(targetPositions, threads, nodesPerMove int, bookFile string) {
 
 	wg.Wait()
 	close(done)
-	fmt.Printf("Datagen complete. Total games: %d, Total positions: %d\n", totalGames, totalPositions)
+	fmt.Printf("Datagen complete. Total games: %d, Total positions: %d\n", atomic.LoadInt64(&totalGames), atomic.LoadInt64(&totalPositions))
 }
 
-func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []string) ([]dgEntry, bool) {
+func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []string) (ViriBuffer, int, bool) {
 	var p Pos
 
 	numRandom := 0
@@ -170,7 +146,7 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 			}
 		}
 		if len(legals) == 0 {
-			return nil, false
+			return ViriBuffer{}, 0, false
 		}
 		move := legals[rng.Intn(len(legals))]
 		var u Update
@@ -183,9 +159,11 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 
 	// Make sure NNUE is ready
 	refresh(&p, &ss.accStack[0])
-	ss.clearHistory()
 
-	var entries []dgEntry
+	var vb ViriBuffer
+	vb.WriteBoard(&p, p.clock, 1)
+
+	var numEntries int
 	drawCount := 0
 	var result float64 = 0.5 // 0.5 for draw, 1.0 for White win, 0.0 for Black win
 
@@ -229,45 +207,23 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 			break
 		}
 
-		// FILTER QUIET POSITIONS
-		isQuiet := true
-		if p.inCheck() || isMateScore(score) {
-			isQuiet = false
-		} else {
-			staticScore := evaluate(&p, &ss.accStack[0])
-			var pv [maxPly]int
-			qsScore := ss.quiesce(&p, 0, -inf, inf, pv[:])
-
-			diff := staticScore - qsScore
-			if diff < 0 {
-				diff = -diff
-			}
-			if diff >= 50 {
-				isQuiet = false
-			}
+		whiteScore := score
+		if p.side == Black {
+			whiteScore = -score
 		}
+		vb.WriteMoveEval(bestMove, whiteScore)
+		numEntries++
 
-		if isQuiet {
-			whiteScore := score
-			if p.side == Black {
-				whiteScore = -score
+		if score > -30000 && score < 30000 {
+			if score > -10 && score < 10 {
+				drawCount++
+			} else {
+				drawCount = 0
 			}
-
-			entries = append(entries, dgEntry{
-				fen:   p.generateFen(),
-				eval:  whiteScore,
-				score: 0,
-			})
-		}
-
-		if score >= -10 && score <= 10 {
-			drawCount++
-		} else {
-			drawCount = 0
-		}
-		if ply >= 40 && drawCount >= 10 {
-			result = 0.5
-			break
+			if drawCount >= 10 && ply >= 40 {
+				result = 0.5
+				break
+			}
 		}
 
 		var u Update
@@ -279,11 +235,19 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 		refresh(&p, &ss.accStack[0])
 	}
 
-	for i := range entries {
-		entries[i].score = result
+	if numEntries == 0 {
+		return vb, 0, false
 	}
 
-	return entries, true
+	wdl := 1
+	if result == 1.0 {
+		wdl = 2
+	} else if result == 0.0 {
+		wdl = 0
+	}
+	vb.PatchWDL(wdl)
+
+	return vb, numEntries, true
 }
 
 func isRepetitionDG(p *Pos) bool {

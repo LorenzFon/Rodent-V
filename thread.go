@@ -32,6 +32,8 @@ import "time"
 // SearchState holds all per-thread mutable search context.
 type SearchState struct {
 	isUsingNNUE bool
+	tt          *TTable
+
 
 	// ---- Progress (reset each think) ----
 	nodes       int64 // nodes searched by this thread
@@ -119,6 +121,7 @@ func (ss *SearchState) doMove(p *Pos, ply, move int) *Update {
 	u := &ss.updateStack[ply]
 	r := &ss.revertStack[ply]
 	makeMove(p, u, r, move)
+	ss.tt.prefetch(p.key)
 	return u
 }
 

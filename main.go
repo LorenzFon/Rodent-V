@@ -57,8 +57,9 @@ func main() {
 
 	var p Pos
 	parseFEN(&p, startFEN)
-	x := nnueLoad(nnuePath)
-	_ = x
+	if !nnueInitEmbedded() {
+		nnueLoad(nnuePath)
+	}
 	if !nnue.Loaded {
 		fmt.Println("nnue not loaded")
 	}
