@@ -32,14 +32,14 @@ import (
 	"golang.org/x/sys/cpu"
 )
 
-//go:embed nets/rodent_v_256hl_3.bin
+//go:embed nets/rodent_v_384hl.bin
 var embeddedNet []byte
 
 // NNUE size and scale. AVX2 code supports following net sizes:
-// 64, 128, 256, 512
+// 64, 128, 256, 384, 512
 const (
 	NNUEInputSize  = 768
-	NNUEHiddenSize = 256
+	NNUEHiddenSize = 384
 	NNUEEvalScale  = 400
 	NNUEL0Scale    = 255
 	NNUEL1Scale    = 64
@@ -161,6 +161,12 @@ func init() {
 		captureFunction = captureAVX2_256
 		castleFunction = castleAVX2_256
 		evalFunction = getEvalAVX2_256
+	
+	case 384:
+		moveFunction = moveAVX2_384
+		captureFunction = captureAVX2_384
+		castleFunction = castleAVX2_384
+		evalFunction = getEvalAVX2_384
 
 	case 512:
 		moveFunction = moveAVX2_512
