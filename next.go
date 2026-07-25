@@ -273,7 +273,7 @@ func initQSearch(p *Pos, m *MovePicker) {
 	m.cur = 0
 }
 
-// nextCapture returns the next good capture, or 0 when done.
+// nextCapture returns the next capture, or 0 when done.
 func (m *MovePicker) nextCapture() int {
 	for m.cur < m.end {
 		move := m.pickBest()
@@ -371,7 +371,7 @@ func mvvLva(p *Pos, move int) int {
 func (ss *SearchState) getCorrection(p *Pos) int {
 	side := p.side
 	pawnIdx := int((p.pawnKey[White] ^ p.pawnKey[Black]) % corrHistSize)
-	corr := ss.corrHist[side][pawnIdx] / corrHistGrain
+	corr := ss.pawnCorrHist[side][pawnIdx] / corrHistGrain
 	corr += ss.nonPawnCorrHist[White][side][int(p.nonPawnKey[White]%corrHistSize)] / corrHistGrain
 	corr += ss.nonPawnCorrHist[Black][side][int(p.nonPawnKey[Black]%corrHistSize)] / corrHistGrain
 	return corr
@@ -389,7 +389,7 @@ func (ss *SearchState) addCorrection(p *Pos, depth, diff int) {
 	newWeight := min(16, 1+depth)
 	scaledDiff := diff * corrHistGrain
 	pawnIdx := int((p.pawnKey[White] ^ p.pawnKey[Black]) % corrHistSize)
-	updateCorrEntry(&ss.corrHist[side][pawnIdx], newWeight, scaledDiff)
+	updateCorrEntry(&ss.pawnCorrHist[side][pawnIdx], newWeight, scaledDiff)
 	updateCorrEntry(&ss.nonPawnCorrHist[White][side][int(p.nonPawnKey[White]%corrHistSize)], newWeight, scaledDiff)
 	updateCorrEntry(&ss.nonPawnCorrHist[Black][side][int(p.nonPawnKey[Black]%corrHistSize)], newWeight, scaledDiff)
 }

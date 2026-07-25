@@ -171,7 +171,9 @@ const (
 //
 //	lineMasks[dir][sq]: bitboard of all squares on the rank/file/
 //	                    diagonal through sq. dir: 0=rank, 1=file,
-//	                    2=diag (A1->H8), 3=anti (A8->H1).
+//	                    2=diag (A1->H8), 3=anti (A8->H1). Currently
+//						they are used only to optimize swap(), being
+//						superseded by magic bitboards elsewhere.
 //
 //	pawnAtk[color][sq]: squares a pawn of the given color attacks
 //	                    from sq.
