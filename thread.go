@@ -52,6 +52,7 @@ type SearchState struct {
 	contTo       [maxPly]int         // destination square of that move
 	contValid    [maxPly]bool        // false for null moves and unvisited plies
 	excludedMove [maxPly]int         // singular extension: excluded move (0 = none)
+	quietsMade   [maxPly][maxMoves]int // quiet moves tried so far at a current ply
 
 	// ---- Heuristic tables (persist across moves of the same game) ----
 	histTable       [2][64][64]int          // butterfly history [side][from][to]

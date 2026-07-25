@@ -353,9 +353,6 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	// scores (no cutoffs) and see less pruning.
 	isPv := beta > alpha+1
 
-	// Reset move counter (useful for pruning/reduction decisions).
-	movesTried := 0
-
 	// --- Transposition-table probe ---
 	ttMove := 0
 	ttFlag := 0
@@ -573,15 +570,15 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	origAlpha := alpha
 	bestScore := -inf
 	picker := &ss.moveBuffers[ply]
+	movesTried := 0 // move counter (useful for pruning/reduction decisions).
+	quietTried := 0 // quiet move counter (as above)
+	quietsMadeCount := 0 // index to ss.quietsMade;
+						 // ss.quietsMade tracks quiet moves that were 
+						 // fully searched without causing a beta cutoff.
+						 // On a cutoff we apply a malus to all of them.
 
 	initMovePicker(p, picker, ss, ttMove, ply)
 	var childPv [maxPly]int
-
-	quietTried := 0
-	// quietsMade tracks quiet moves that were fully searched without causing
-	// a beta cutoff.  On a cutoff we apply a malus to all of them.
-	var quietsMade [maxMoves]int
-	quietsMadeCount := 0
 
 	// --- Main move loop ---
 	for {
@@ -668,7 +665,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 		// Late move pruning: skip quiet moves beyond the threshold.
 		// Moves that give check are exempt — they may be the only defence
-		// or the only escape from a mating attack.
+		// or the only way to continue a mating attack.
 		// When improving we allow more moves (position is trending up, so
 		// later moves are more likely to be relevant).
 		if depth < 10 { // table size limit
@@ -796,7 +793,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// cut off and should be tried later in future sibling nodes.
 		if score >= beta {
 			if isQuiet(p, move) {
-				ss.updateHistory(p, move, depth, ply, quietsMade[:quietsMadeCount])
+				ss.updateHistory(p, move, depth, ply, ss.quietsMade[ply][:quietsMadeCount])
 			}
 
 			if ss.excludedMove[ply] == 0 {
@@ -815,7 +812,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// Record this quiet as searched-but-failed so we can penalise it
 		// if a later move causes a cutoff.
 		if stage == StageQuiet && quietsMadeCount < maxMoves {
-			quietsMade[quietsMadeCount] = move
+			ss.quietsMade[ply][quietsMadeCount] = move
 			quietsMadeCount++
 		}
 
