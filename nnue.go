@@ -256,24 +256,24 @@ func (acc *Accumulator) capture(
 	moverColor, moverPT, from, to int,
 	capturedColor, capturedPT, capturedSq int,
 ) {
-	mFrom0 := moverColor*384 + moverPT*64 + from
-	mTo0 := moverColor*384 + moverPT*64 + to
+	from0 := moverColor*384 + moverPT*64 + from
+	to0 := moverColor*384 + moverPT*64 + to
 	cap0 := capturedColor*384 + capturedPT*64 + capturedSq
 
-	mFrom1 := (moverColor^1)*384 + moverPT*64 + (from ^ 56)
-	mTo1 := (moverColor^1)*384 + moverPT*64 + (to ^ 56)
+	from1 := (moverColor^1)*384 + moverPT*64 + (from ^ 56)
+	to1 := (moverColor^1)*384 + moverPT*64 + (to ^ 56)
 	cap1 := (capturedColor^1)*384 + capturedPT*64 + (capturedSq ^ 56)
 
 	captureFunction(
 		&acc.values[0][0],
 		&acc.values[1][0],
 
-		&nnueParams.InputWeights[mTo0][0],
-		&nnueParams.InputWeights[mFrom0][0],
+		&nnueParams.InputWeights[to0][0],
+		&nnueParams.InputWeights[from0][0],
 		&nnueParams.InputWeights[cap0][0],
 
-		&nnueParams.InputWeights[mTo1][0],
-		&nnueParams.InputWeights[mFrom1][0],
+		&nnueParams.InputWeights[to1][0],
+		&nnueParams.InputWeights[from1][0],
 		&nnueParams.InputWeights[cap1][0],
 	)
 
@@ -315,18 +315,16 @@ func (acc *Accumulator) promotion(color, from, to, prom int) {
 	from1 := (color^1)*384 + P*64 + (from ^ 56)
 	to1 := (color^1)*384 + prom*64 + (to ^ 56)
 
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
+	moveFunction(
+		&acc.values[0][0],
+		&acc.values[1][0],
 
-	wFrom0 := &nnueParams.InputWeights[from0]
-	wTo0 := &nnueParams.InputWeights[to0]
-	wFrom1 := &nnueParams.InputWeights[from1]
-	wTo1 := &nnueParams.InputWeights[to1]
+		&nnueParams.InputWeights[from0][0],
+		&nnueParams.InputWeights[to0][0],
 
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += wTo0[i] - wFrom0[i]
-		a1[i] += wTo1[i] - wFrom1[i]
-	}
+		&nnueParams.InputWeights[from1][0],
+		&nnueParams.InputWeights[to1][0],
+	)
 }
 
 func (acc *Accumulator) promotionCapture(color, from, to, prom, captType int) {
@@ -340,21 +338,18 @@ func (acc *Accumulator) promotionCapture(color, from, to, prom, captType int) {
 	to1 := enemy*384 + prom*64 + (to ^ 56)
 	cap1 := color*384 + captType*64 + (to ^ 56)
 
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
+	captureFunction(
+		&acc.values[0][0],
+		&acc.values[1][0],
 
-	wFrom0 := &nnueParams.InputWeights[from0]
-	wTo0 := &nnueParams.InputWeights[to0]
-	wCap0 := &nnueParams.InputWeights[cap0]
+		&nnueParams.InputWeights[to0][0],
+		&nnueParams.InputWeights[from0][0],
+		&nnueParams.InputWeights[cap0][0],
 
-	wFrom1 := &nnueParams.InputWeights[from1]
-	wTo1 := &nnueParams.InputWeights[to1]
-	wCap1 := &nnueParams.InputWeights[cap1]
-
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += wTo0[i] - wFrom0[i] - wCap0[i]
-		a1[i] += wTo1[i] - wFrom1[i] - wCap1[i]
-	}
+		&nnueParams.InputWeights[to1][0],
+		&nnueParams.InputWeights[from1][0],
+		&nnueParams.InputWeights[cap1][0],
+	)
 }
 
 // apply full nnue accumulator update
