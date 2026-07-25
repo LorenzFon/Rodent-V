@@ -371,16 +371,19 @@ func mvvLva(p *Pos, move int) int {
 func (ss *SearchState) getCorrection(p *Pos) int {
 	side := p.side
 	pawnIdx := int((p.pawnKey[White] ^ p.pawnKey[Black]) % corrHistSize)
-	corr := ss.pawnCorrHist[side][pawnIdx] / corrHistGrain
-	corr += ss.nonPawnCorrHist[White][side][int(p.nonPawnKey[White]%corrHistSize)] / corrHistGrain
-	corr += ss.nonPawnCorrHist[Black][side][int(p.nonPawnKey[Black]%corrHistSize)] / corrHistGrain
+	corr := int(ss.pawnCorrHist[side][pawnIdx] / corrHistGrain)
+	corr += int(ss.nonPawnCorrHist[White][side][int(p.nonPawnKey[White]%corrHistSize)]) / corrHistGrain
+	corr += int(ss.nonPawnCorrHist[Black][side][int(p.nonPawnKey[Black]%corrHistSize)]) / corrHistGrain
 	return corr
 }
 
 // updateCorrEntry applies a weighted update to a single correction history entry.
-func updateCorrEntry(entry *int, newWeight, scaledDiff int) {
-	update := (*entry)*(corrHistWeightScale-newWeight) + scaledDiff*newWeight
-	*entry = max(-corrHistMax, min(corrHistMax, update/corrHistWeightScale))
+func updateCorrEntry(entry *int16, newWeight, scaledDiff int) {
+	old := int(*entry)
+	update := (old)*(corrHistWeightScale-newWeight) + scaledDiff*newWeight
+	update /= corrHistWeightScale
+	update = max(-corrHistMax, min(corrHistMax, update))
+	*entry = int16(update)
 }
 
 // addCorrection updates all correction history entries for the position.

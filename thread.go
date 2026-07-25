@@ -12,7 +12,7 @@
 //   --------
 //   One SearchState is created per thread slot and reused across
 //   moves of the same game.  Heuristic tables (history, correction)
-//   are NOT reset betwee\n moves so ordering signal accumulates.
+//   are NOT reset between moves so ordering signal accumulates.
 //   clearHistory() is called only on ucinewgame.
 //   resetForSearch() resets progress counters and per-ply context
 //   before each think() call.
@@ -55,12 +55,12 @@ type SearchState struct {
 	quietsMade   [maxPly][maxMoves]int // quiet moves tried so far at a current ply
 
 	// ---- Heuristic tables (persist across moves of the same game) ----
-	histTable       [2][64][64]int          // butterfly history [side][from][to]
-	contHistMain    [2][6][64][2][6][64]int // continuation history
-	killerMoves     [maxPly][2]int          // two killers per ply
-	moveBuffers     [maxPly]MovePicker      // pre-allocated pickers (one per ply)
-	pawnCorrHist        [2][corrHistSize]int    // pawn correction history
-	nonPawnCorrHist [2][2][corrHistSize]int // non-pawn correction history
+	histTable       [2][64][64]int            // butterfly history [side][from][to]
+	contHistMain    [2][6][64][2][6][64]int   // continuation history
+	killerMoves     [maxPly][2]int            // two killers per ply
+	moveBuffers     [maxPly]MovePicker        // pre-allocated pickers (one per ply)
+	pawnCorrHist    [2][corrHistSize]int16    // pawn correction history
+	nonPawnCorrHist [2][2][corrHistSize]int16 // non-pawn correction history
 }
 
 // State destroyed by makeMove.
@@ -93,8 +93,8 @@ func (ss *SearchState) clearHistory() {
 	ss.histTable = [2][64][64]int{}
 	ss.contHistMain = [2][6][64][2][6][64]int{}
 	ss.killerMoves = [maxPly][2]int{}
-	ss.pawnCorrHist = [2][corrHistSize]int{}
-	ss.nonPawnCorrHist = [2][2][corrHistSize]int{}
+	ss.pawnCorrHist = [2][corrHistSize]int16{}
+	ss.nonPawnCorrHist = [2][2][corrHistSize]int16{}
 }
 
 // resetForSearch prepares ss for a new search without losing
@@ -115,9 +115,9 @@ func (ss *SearchState) staticEval(p *Pos, ply int) int {
 	return evaluate(p, &ss.accStack[ply])
 }
 
-// doMove() is a wrapper for makemove to simplify search code
-// by hiding stacks. It also returns pointer to updateStack,
-// required by nnue accumulator.
+// doMove makes a move, stores all undo and NNUE update data,
+// and prefetches the resulting position's TT bucket.
+// It returns pointer to updateStack, required by nnue accumulator.
 func (ss *SearchState) doMove(p *Pos, ply, move int) *Update {
 	u := &ss.updateStack[ply]
 	r := &ss.revertStack[ply]
