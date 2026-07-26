@@ -58,7 +58,7 @@ var optionPerColorValues [2][EvalComponentN]int
 // default settings
 func init() {
 
-	nnuePath = "nets/rodent_v_256hl_3.bin"
+	nnuePath = "nets/rodent_v_256hl_4.bin"
 	singleOptions[NnuePerc] = 100
 	singleOptions[HcePerc] = 0
 	singleOptions[NodesLimit] = 0

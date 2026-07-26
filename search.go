@@ -111,7 +111,8 @@ import (
 // Global search state — shared across all threads.
 // Per-thread state lives in SearchState (see thread.go).
 var (
-	hardTimeLimit int64     // allocated move time in ms (-1 = unlimited); set by UCI
+	softTimeLimit int64     // allocated soft move time in ms; stop between iterations
+	hardTimeLimit int64     // allocated hard move time in ms (-1 = unlimited); drop-dead limit
 	pondering     bool      // true while in ponder mode (ignore clock)
 	rootDepth     int       // current iterative deepening depth (main thread drives)
 	abortFlag     int32     // set to 1 atomically to stop all threads
@@ -198,17 +199,25 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	var pv [maxPly]int
 	score := 0
 
+	var lastBestMove int
+	var bestMoveStability int
+
 	for rootDepth = 1; rootDepth <= maxDepth; rootDepth++ {
-		// Before starting a new depth, do an unthrottled time check.
-		// Two stopping criteria (either is sufficient):
-		//   1. Hard limit: elapsed >= timeLimit (don't start if already over).
-		//   2. Half-budget rule: elapsed >= timeLimit/2. The next depth
-		//      typically takes longer than all prior depths combined, so
-		//      starting it when half the budget is gone almost always busts
-		//      the limit. This is the key guard against time forfeits.
+		// Before starting a new depth, check elapsed time against dynamic soft time limit.
 		if rootDepth > 1 && !pondering && hardTimeLimit >= 0 {
 			elapsed := time.Now().UnixMilli() - ss.searchStart
-			if elapsed >= hardTimeLimit || elapsed >= hardTimeLimit/2 {
+			adjustedSoft := softTimeLimit
+			if bestMoveStability >= 4 {
+				// Stable best move over 4+ consecutive iterations -> reduce soft budget by 25%
+				adjustedSoft = softTimeLimit * 75 / 100
+			} else if bestMoveStability <= 1 {
+				// Unstable best move (changed on previous iteration) -> extend soft budget by 50%
+				adjustedSoft = softTimeLimit * 150 / 100
+				if adjustedSoft > hardTimeLimit {
+					adjustedSoft = hardTimeLimit
+				}
+			}
+			if elapsed >= adjustedSoft || elapsed >= hardTimeLimit {
 				break
 			}
 		}
@@ -252,6 +261,13 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 		}
 
 		score = iterScore
+
+		if pv[0] != 0 && pv[0] == lastBestMove {
+			bestMoveStability++
+		} else {
+			bestMoveStability = 1
+			lastBestMove = pv[0]
+		}
 	}
 
 	// Stop all helpers and wait for them to exit.
