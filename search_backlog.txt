@@ -22,3 +22,4 @@ FAILED
 - no probCut after null move
 - stop searching at d5 with just one root move (not in Infinite search or while pondering)
 - tt can prevent starting a null move search
+- pruning checking moves (futility/lmp)

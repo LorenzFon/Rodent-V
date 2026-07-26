@@ -56,7 +56,7 @@ type SearchState struct {
 
 	// ---- Heuristic tables (persist across moves of the same game) ----
 	histTable       [2][64][64]int            // butterfly history [side][from][to]
-	contHistMain    [2][6][64][2][6][64]int   // continuation history
+	contHistMain    [2][6][64][2][6][64]int16 // continuation history
 	killerMoves     [maxPly][2]int            // two killers per ply
 	moveBuffers     [maxPly]MovePicker        // pre-allocated pickers (one per ply)
 	pawnCorrHist    [2][corrHistSize]int16    // pawn correction history
@@ -91,7 +91,7 @@ type SearchResult struct {
 // Call on ucinewgame to prevent cross-game contamination.
 func (ss *SearchState) clearHistory() {
 	ss.histTable = [2][64][64]int{}
-	ss.contHistMain = [2][6][64][2][6][64]int{}
+	ss.contHistMain = [2][6][64][2][6][64]int16{}
 	ss.killerMoves = [maxPly][2]int{}
 	ss.pawnCorrHist = [2][corrHistSize]int16{}
 	ss.nonPawnCorrHist = [2][2][corrHistSize]int16{}

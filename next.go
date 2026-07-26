@@ -304,10 +304,10 @@ func scoreQuiet(m *MovePicker) {
 		pt := m.p.typeAt(from) // piece type (0-5)
 		score := ss.histTable[side][from][to]
 		if ply >= 1 && ss.contValid[ply-1] {
-			score += ss.contHistMain[ss.contSide[ply-1]][ss.contPiece[ply-1]][ss.contTo[ply-1]][side][pt][to]
+			score += int (ss.contHistMain[ss.contSide[ply-1]][ss.contPiece[ply-1]][ss.contTo[ply-1]][side][pt][to])
 		}
 		if ply >= 2 && ss.contValid[ply-2] {
-			score += ss.contHistMain[ss.contSide[ply-2]][ss.contPiece[ply-2]][ss.contTo[ply-2]][side][pt][to]
+			score += int (ss.contHistMain[ss.contSide[ply-2]][ss.contPiece[ply-2]][ss.contTo[ply-2]][side][pt][to])
 		}
 		m.value[i] = score
 	}
@@ -367,7 +367,7 @@ func mvvLva(p *Pos, move int) int {
 }
 
 // getCorrection returns the total correction value for the position,
-// combining pawn and non-pawn correction history.
+// combining pawn and non-pawn correction history. Max correction = 96.
 func (ss *SearchState) getCorrection(p *Pos) int {
 	side := p.side
 	pawnIdx := int((p.pawnKey[White] ^ p.pawnKey[Black]) % corrHistSize)
@@ -380,7 +380,7 @@ func (ss *SearchState) getCorrection(p *Pos) int {
 // updateCorrEntry applies a weighted update to a single correction history entry.
 func updateCorrEntry(entry *int16, newWeight, scaledDiff int) {
 	old := int(*entry)
-	update := (old)*(corrHistWeightScale-newWeight) + scaledDiff*newWeight
+	update := old*(corrHistWeightScale-newWeight) + scaledDiff*newWeight
 	update /= corrHistWeightScale
 	update = max(-corrHistMax, min(corrHistMax, update))
 	*entry = int16(update)
@@ -417,6 +417,16 @@ func histUpdate(entry *int, delta int) {
 	*entry += delta - (*entry)*abs/maxHist
 }
 
+func histUpdateInt16(entry *int16, delta int) {
+	abs := delta
+	if abs < 0 {
+		abs = -abs
+	}
+	value := int(*entry)
+	value += delta - (value)*abs/maxHist
+	*entry = int16(value)
+}
+
 // isQuiet returns true if move is a quiet move (no capture, no promotion, no EP).
 func isQuiet(p *Pos, move int) bool {
 	return p.board[moveTo(move)] == NO_PC && !isProm(move) && moveType(move) != EP_CAP
@@ -437,10 +447,10 @@ func (ss *SearchState) updateHistory(p *Pos, move, depth, ply int, quietsTried [
 		pt := p.typeAt(moveFrom(mv))
 		to := moveTo(mv)
 		if ply >= 1 && ss.contValid[ply-1] {
-			histUpdate(&ss.contHistMain[ss.contSide[ply-1]][ss.contPiece[ply-1]][ss.contTo[ply-1]][side][pt][to], delta)
+			histUpdateInt16(&ss.contHistMain[ss.contSide[ply-1]][ss.contPiece[ply-1]][ss.contTo[ply-1]][side][pt][to], delta)
 		}
 		if ply >= 2 && ss.contValid[ply-2] {
-			histUpdate(&ss.contHistMain[ss.contSide[ply-2]][ss.contPiece[ply-2]][ss.contTo[ply-2]][side][pt][to], delta)
+			histUpdateInt16(&ss.contHistMain[ss.contSide[ply-2]][ss.contPiece[ply-2]][ss.contTo[ply-2]][side][pt][to], delta)
 		}
 	}
 
