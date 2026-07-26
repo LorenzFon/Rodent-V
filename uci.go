@@ -132,7 +132,8 @@ func uciLoop() {
 
 		case "go":
 			stopSearch()
-			mt, md := parseGoParams(tokens[1:], &p)
+			st, mt, md := parseGoParams(tokens[1:], &p)
+			softTimeLimit = st
 			hardTimeLimit = mt
 			pondering = false
 			for _, t := range tokens[1:] {
@@ -358,9 +359,10 @@ func parsePosition(p *Pos, tokens []string) {
 
 // parseGoParams reads the "go" command parameters and returns:
 //
-//	timeLimit (ms): allocated time for this move; -1 = no limit.
+//	softLimit (ms): allocated soft time for stopping between iterations; -1 = no limit.
+//	hardLimit (ms): absolute deadline for stopping mid-search; -1 = no limit.
 //	maxDepth: maximum search depth.
-func parseGoParams(tokens []string, p *Pos) (int64, int) {
+func parseGoParams(tokens []string, p *Pos) (int64, int64, int) {
 	wtime := int64(-1)
 	btime := int64(-1)
 	winc := int64(0)
@@ -409,12 +411,16 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 				}
 			}
 		case "infinite":
-			return -1, maxPly - 1
+			return -1, -1, maxPly - 1
 		}
 	}
 
 	if movetime >= 0 {
-		return movetime - 50, maxDepth // subtract I/O safety margin
+		t := movetime - 50 // subtract I/O safety margin
+		if t < 0 {
+			t = 0
+		}
+		return t, t, maxDepth
 	}
 
 	var myTime, myInc int64
@@ -426,7 +432,7 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 		myInc = binc
 	}
 	if myTime < 0 {
-		return -1, maxDepth // no clock provided -> search indefinitely
+		return -1, -1, maxDepth // no clock provided -> search indefinitely
 	}
 
 	// Reserve a small buffer when only one move remains on the clock.
@@ -447,7 +453,17 @@ func parseGoParams(tokens []string, p *Pos) (int64, int) {
 	if alloc < 0 {
 		alloc = 0
 	}
-	return alloc, maxDepth
+	// Soft limit: stop comfortably between iterations (75% of base time).
+	soft := alloc * 75 / 100
+	// Hard limit: allow up to 4x base time in complex struggles before aborting.
+	hard := alloc * 4
+	if hard > myTime-50 {
+		hard = myTime - 50
+		if hard < 0 {
+			hard = 0
+		}
+	}
+	return soft, hard, maxDepth
 }
 
 // ---- Move string conversion ----
