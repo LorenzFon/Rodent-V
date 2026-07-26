@@ -48,14 +48,6 @@ package main
 // entry in the range [-maxHist, +maxHist].
 const maxHist = 16384
 
-// Correction history constants.
-const (
-	corrHistSize        = 16384              // number of entries per side
-	corrHistGrain       = 256                // scaling factor for diff
-	corrHistWeightScale = 256                // weight divisor
-	corrHistMax         = corrHistGrain * 32 // absolute clamp
-)
-
 // Heuristic tables are now per-thread fields inside SearchState (thread.go).
 
 type MoveGenStage int
@@ -304,10 +296,10 @@ func scoreQuiet(m *MovePicker) {
 		pt := m.p.typeAt(from) // piece type (0-5)
 		score := ss.histTable[side][from][to]
 		if ply >= 1 && ss.contValid[ply-1] {
-			score += int (ss.contHistMain[ss.contSide[ply-1]][ss.contPiece[ply-1]][ss.contTo[ply-1]][side][pt][to])
+			score += int(ss.contHistMain[ss.contSide[ply-1]][ss.contPiece[ply-1]][ss.contTo[ply-1]][side][pt][to])
 		}
 		if ply >= 2 && ss.contValid[ply-2] {
-			score += int (ss.contHistMain[ss.contSide[ply-2]][ss.contPiece[ply-2]][ss.contTo[ply-2]][side][pt][to])
+			score += int(ss.contHistMain[ss.contSide[ply-2]][ss.contPiece[ply-2]][ss.contTo[ply-2]][side][pt][to])
 		}
 		m.value[i] = score
 	}
@@ -349,11 +341,11 @@ func isBadCapture(p *Pos, move int) bool {
 
 // mvvLva scores a capture move for ordering:
 //
-//   Most Valuable Victim, Least Valuable Aggressor.
+//	Most Valuable Victim, Least Valuable Aggressor.
 //
-//   Regular captures: (victimType * 6) + (5 - attackerType)
-//   Promotions:       promType - 5  (queen promotion = -1, etc.)
-//   En passant / EP_SET: score 5 (pawn exchange, relatively neutral).
+//	Regular captures: (victimType * 6) + (5 - attackerType)
+//	Promotions:       promType - 5  (queen promotion = -1, etc.)
+//	En passant / EP_SET: score 5 (pawn exchange, relatively neutral).
 //
 // Higher scores are tried first.
 func mvvLva(p *Pos, move int) int {
@@ -364,37 +356,6 @@ func mvvLva(p *Pos, move int) int {
 		return promType(move) - 5 // queen=-1, rook=-2, bishop=-3, knight=-4
 	}
 	return 5 // default (e.g. quiet ep-set)
-}
-
-// getCorrection returns the total correction value for the position,
-// combining pawn and non-pawn correction history. Max correction = 96.
-func (ss *SearchState) getCorrection(p *Pos) int {
-	side := p.side
-	pawnIdx := int((p.pawnKey[White] ^ p.pawnKey[Black]) % corrHistSize)
-	corr := int(ss.pawnCorrHist[side][pawnIdx] / corrHistGrain)
-	corr += int(ss.nonPawnCorrHist[White][side][int(p.nonPawnKey[White]%corrHistSize)]) / corrHistGrain
-	corr += int(ss.nonPawnCorrHist[Black][side][int(p.nonPawnKey[Black]%corrHistSize)]) / corrHistGrain
-	return corr
-}
-
-// updateCorrEntry applies a weighted update to a single correction history entry.
-func updateCorrEntry(entry *int16, newWeight, scaledDiff int) {
-	old := int(*entry)
-	update := old*(corrHistWeightScale-newWeight) + scaledDiff*newWeight
-	update /= corrHistWeightScale
-	update = max(-corrHistMax, min(corrHistMax, update))
-	*entry = int16(update)
-}
-
-// addCorrection updates all correction history entries for the position.
-func (ss *SearchState) addCorrection(p *Pos, depth, diff int) {
-	side := p.side
-	newWeight := min(16, 1+depth)
-	scaledDiff := diff * corrHistGrain
-	pawnIdx := int((p.pawnKey[White] ^ p.pawnKey[Black]) % corrHistSize)
-	updateCorrEntry(&ss.pawnCorrHist[side][pawnIdx], newWeight, scaledDiff)
-	updateCorrEntry(&ss.nonPawnCorrHist[White][side][int(p.nonPawnKey[White]%corrHistSize)], newWeight, scaledDiff)
-	updateCorrEntry(&ss.nonPawnCorrHist[Black][side][int(p.nonPawnKey[Black]%corrHistSize)], newWeight, scaledDiff)
 }
 
 // histBonus returns the bonus/malus value for a history update at the

@@ -402,8 +402,10 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	// We also adjust static eval by a dynamic, search-dependent correction factor.
 	// This factor rises when in search current position overperforms its static eval
 	// and falls in the opposite case.
-	staticEval := 0
-	rawEval := 0
+
+	rawEval := 0       // raw score returned by eval function
+	correctedEval := 0 // eval after corrhist correction, later used by that heuristic
+	staticEval := 0    // fully adjusted static eval, used throughout search
 
 	if !nodeInCheck {
 		rawEval = ss.staticEval(p, ply)
@@ -412,6 +414,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			correction = ss.getCorrection(p)
 		}
 		staticEval = rawEval + correction
+		correctedEval = staticEval
 		ss.evalStack[ply] = staticEval
 	} else {
 		ss.evalStack[ply] = noEval
@@ -481,7 +484,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 			reduction := nmpBaseReduction + depth/nmpDepthReduction
 
-			// We need to prepare child accumulator, but we don't need a pointer, 
+			// We need to prepare child accumulator, but we don't need a pointer,
 			// because null move does not change accumulator state.
 			ss.prepareChildAccumulator(ply)
 
@@ -586,12 +589,12 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	origAlpha := alpha
 	bestScore := -inf
 	picker := &ss.moveBuffers[ply]
-	movesTried := 0 // move counter (useful for pruning/reduction decisions).
-	quietTried := 0 // quiet move counter (as above)
+	movesTried := 0      // move counter (useful for pruning/reduction decisions).
+	quietTried := 0      // quiet move counter (as above)
 	quietsMadeCount := 0 // index to ss.quietsMade;
-						 // ss.quietsMade tracks quiet moves that were 
-						 // fully searched without causing a beta cutoff.
-						 // On a cutoff we apply a malus to all of them.
+	// ss.quietsMade tracks quiet moves that were
+	// fully searched without causing a beta cutoff.
+	// On a cutoff we apply a malus to all of them.
 
 	initMovePicker(p, picker, ss, ttMove, ply)
 	var childPv [maxPly]int
@@ -727,7 +730,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 		// --- Late move reduction ---
 		isReduced := false
-	
+
 		// LMR of quiet nodes
 		if useLMR && stage == StageQuiet && depth >= minLmrDepth &&
 			!nodeInCheck && movesTried >= 4 {
@@ -804,22 +807,29 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		}
 
 		// Beta cutoff: this move is "too good"; the opponent won't allow
-		// reaching this position, so we can stop searching.  Apply a malus
-		// to every quiet that was searched before this one — they failed to
-		// cut off and should be tried later in future sibling nodes.
+		// reaching this position, so we can stop searching.
 		if score >= beta {
+
+			// We want to try moves that may cause a beta cutoff as early
+			// as possible. History move ordering tries to increase chances
+			// of such an occurence.
+
+			// Award a bonus to a quiet move that caused a cutoff.
+			// Apply a malus to every quiet move that was searched before
+			// this one — they failed to produce a cutoff and should be
+			// tried later in future sibling nodes.
 			if isQuiet(p, move) {
 				ss.updateHistory(p, move, depth, ply, ss.quietsMade[ply][:quietsMadeCount])
 			}
 
+			// TT save.
 			if ss.excludedMove[ply] == 0 {
 				ss.tt.store(p.key, move, score, LOWER, depth, ply)
 			}
 
-			if !nodeInCheck && isQuiet(p, move) && score > staticEval {
-
-				// Update correction history on beta cutoff.
-				ss.addCorrection(p, depth, score-rawEval)
+			// Update correction history on beta cutoff.
+			if !nodeInCheck && isQuiet(p, move) && score > correctedEval {
+				ss.addCorrection(p, depth, score-correctedEval)
 			}
 
 			return score
@@ -891,10 +901,10 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	if !nodeInCheck &&
 		ss.excludedMove[ply] == 0 &&
 		!(bestMove != 0 && !isQuiet(p, bestMove)) &&
-		!((bound == LOWER && bestScore <= staticEval) ||
-			(bound == UPPER && bestScore >= staticEval)) {
+		!((bound == LOWER && bestScore <= correctedEval) ||
+			(bound == UPPER && bestScore >= correctedEval)) {
 
-		ss.addCorrection(p, depth, bestScore-rawEval)
+		ss.addCorrection(p, depth, bestScore-correctedEval)
 	}
 
 	return bestScore

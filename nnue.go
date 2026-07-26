@@ -161,7 +161,7 @@ func init() {
 		captureFunction = captureAVX2_256
 		castleFunction = castleAVX2_256
 		evalFunction = getEvalAVX2_256
-	
+
 	case 384:
 		moveFunction = moveAVX2_384
 		captureFunction = captureAVX2_384
