@@ -28,14 +28,13 @@
 package main
 
 import (
-	"fmt"
 	"time"
 )
 
 // SearchState holds all per-thread mutable search context.
 type SearchState struct {
 	isUsingNNUE bool
-	tt          *TTable
+	tt          *TTable // pointer to transposition table
 
 	staticEval EvalFunc
 
@@ -117,28 +116,13 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.rootHistLen = p.histLen
 	ss.contValid = [maxPly]bool{}
 	ss.killerMoves = [maxPly][2]int{}
-	ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
 
-	// eval function choice
-	if pestoEval {
-		ss.isUsingNNUE = false // for speed
-		ss.staticEval = ss.evalPesto
-	} else if !ss.isUsingNNUE && singleOptions[HcePerc] == 100 {
-		ss.staticEval = ss.evalHCE // either HCE picked by user or no net loaded
-	} else if ss.isUsingNNUE && singleOptions[HcePerc] == 0 {
-		fmt.Println("pure nn")
-		ss.staticEval = ss.evalNNUE // nnue loaded, no HCE
-	} else {
-		ss.staticEval = ss.evalHybrid // hybrid
-	}
+	ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
+	ss.pickEvalFunction()
 }
 
 // interface for eval wrapper
 type EvalFunc func(p *Pos, ply int) int
-
-func (ss *SearchState) evalHybrid(p *Pos, ply int) int {
-	return evaluate(p, &ss.accStack[ply])
-}
 
 func (ss *SearchState) evalPesto(p *Pos, ply int) int {
 	return evaluatePesto(p)
@@ -155,7 +139,35 @@ func (ss *SearchState) evalNNUE(p *Pos, ply int) int {
 	return ss.accStack[ply].getEval(p.side) * singleOptions[NnuePerc] / 100
 }
 
-// acc.getEval(p.side) * singleOptions[NnuePerc] / 100
+func (ss *SearchState) evalHybrid(p *Pos, ply int) int {
+	return evaluate(p, &ss.accStack[ply])
+}
+
+// which eval function we want to use? (PeSTO, HCE, NNUE, hybrid)
+func (ss *SearchState) pickEvalFunction() {
+
+	// user wants PeSTo eval
+	if pestoEval {
+		ss.isUsingNNUE = false // side effect, needed for speed
+		ss.staticEval = ss.evalPesto
+		return
+	}
+
+	// either fallback when NNUE isn't loaded or user wants HCE
+	if !ss.isUsingNNUE && singleOptions[HcePerc] == 100 {
+		ss.staticEval = ss.evalHCE
+		return
+	}
+
+	// NNUE mode with no fluff
+	if ss.isUsingNNUE && singleOptions[HcePerc] == 0 {
+		ss.staticEval = ss.evalNNUE
+		return
+	}
+
+	// hybrid eval
+	ss.staticEval = ss.evalHybrid
+}
 
 // doMove makes a move, stores all undo and NNUE update data,
 // and prefetches the resulting position's TT bucket.
@@ -185,6 +197,7 @@ func (ss *SearchState) prepareChildAccumulator(ply int) *Accumulator {
 	return child
 }
 
+// record data needed for continuation history calculations
 func (ss *SearchState) recordContHistContext(ply, side, piece, to int) {
 	ss.contSide[ply] = side
 	ss.contPiece[ply] = piece
