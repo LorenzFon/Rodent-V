@@ -27,13 +27,17 @@
 
 package main
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // SearchState holds all per-thread mutable search context.
 type SearchState struct {
 	isUsingNNUE bool
 	tt          *TTable
 
+	staticEval EvalFunc
 
 	// ---- Progress (reset each think) ----
 	nodes       int64 // nodes searched by this thread
@@ -61,6 +65,8 @@ type SearchState struct {
 	moveBuffers     [maxPly]MovePicker        // pre-allocated pickers (one per ply)
 	pawnCorrHist    [2][corrHistSize]int16    // pawn correction history
 	nonPawnCorrHist [2][2][corrHistSize]int16 // non-pawn correction history
+	minorCorrHist [2][2][corrHistSize]int16 // non-pawn correction history
+	majorCorrHist [2][2][corrHistSize]int16 // non-pawn correction history
 }
 
 // State destroyed by makeMove.
@@ -69,6 +75,8 @@ type Revert struct {
 	oldKey          uint64
 	oldPawnKey      [2]uint64
 	oldNonPawnKey   [2]uint64
+	oldMajorKey     [2]uint64
+	oldMinorKey     [2]uint64
 	oldCastleRights int
 	oldEpSquare     int
 	oldClock        int
@@ -95,6 +103,8 @@ func (ss *SearchState) clearHistory() {
 	ss.killerMoves = [maxPly][2]int{}
 	ss.pawnCorrHist = [2][corrHistSize]int16{}
 	ss.nonPawnCorrHist = [2][2][corrHistSize]int16{}
+	ss.majorCorrHist = [2][2][corrHistSize]int16{}
+	ss.minorCorrHist = [2][2][corrHistSize]int16{}
 }
 
 // resetForSearch prepares ss for a new search without losing
@@ -108,12 +118,45 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.contValid = [maxPly]bool{}
 	ss.killerMoves = [maxPly][2]int{}
 	ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
+
+	// eval function choice
+	if !ss.isUsingNNUE && singleOptions[HcePerc] == 100 {
+		ss.staticEval = ss.evalHCE // either HCE picked by user or no net loaded
+	} else if ss.isUsingNNUE && singleOptions[HcePerc] == 0 {
+		fmt.Println("pure nn")
+		ss.staticEval = ss.evalNNUE // nnue loaded, no HCE
+	} else {
+		ss.staticEval = ss.evalHybrid // hybrid
+	}
+
+	// for pesto eval do:
+	// ss.isUsingNNUE = false
+	// ss.staticEval = ss.evalPesto
 }
 
-// eval wrapper
-func (ss *SearchState) staticEval(p *Pos, ply int) int {
+// interface for eval wrapper
+type EvalFunc func(p *Pos, ply int) int
+
+func (ss *SearchState) evalHybrid(p *Pos, ply int) int {
 	return evaluate(p, &ss.accStack[ply])
 }
+
+func (ss *SearchState) evalPesto(p *Pos, ply int) int {
+	return evaluatePesto(p)
+}
+
+func (ss *SearchState) evalHCE(p *Pos, ply int) int {
+	return evaluateHCE(p)
+}
+
+func (ss *SearchState) evalNNUE(p *Pos, ply int) int {
+	//return evaluateNNUE(p, &ss.accStack[ply])
+
+	// actually no evaltt is faster up to 256hl
+	return ss.accStack[ply].getEval(p.side) * singleOptions[NnuePerc] / 100
+}
+
+// acc.getEval(p.side) * singleOptions[NnuePerc] / 100
 
 // doMove makes a move, stores all undo and NNUE update data,
 // and prefetches the resulting position's TT bucket.
