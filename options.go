@@ -28,6 +28,8 @@ import (
 
 var nnuePath string // default path to NNUE file
 
+var pestoEval bool // are we using pesto eval?
+
 // color-independent options
 type SingleOption int
 
@@ -62,16 +64,7 @@ func init() {
 	singleOptions[NnuePerc] = 100
 	singleOptions[HcePerc] = 0
 	singleOptions[NodesLimit] = 0
-
-	// TSCP: 1600 CCRL
-	// LittleWing: 2005 CCRL
-	// Sungorus: 2268 CCRL
-
-	// 1024: 1408 CCRL (vs TSCP)
-	// 2048: 1655 CCRL (vs TSCP)
-	// 8192: 2139 (vs LilttleWing) / 2068 (vs Sungorus) CCRL = 2100
-	// 16384: 2300 (vs sungorus)
-	// 65356: 2730 (vs Fruit 2.1)
+	pestoEval = false
 
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		optionPerColorValues[weightOwn][c] = 100

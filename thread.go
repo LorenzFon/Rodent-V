@@ -47,15 +47,15 @@ type SearchState struct {
 	rootHistLen int   // p.histLen when think() began (repetition detection)
 
 	// ---- Per-ply context (indexed by ply, reset each think) ----
-	accStack     [maxPly]Accumulator // NNUE accumulator uses copy/makes
-	updateStack  [maxPly]Update      // data for lazy nnue accumulator updates
-	revertStack  [maxPly]Revert      // data for reverting board state
-	evalStack    [maxPly]int         // static eval at each ply; noEval when in check
-	contSide     [maxPly]int         // side that made the move reaching this ply
-	contPiece    [maxPly]int         // piece type (0-5) of that move
-	contTo       [maxPly]int         // destination square of that move
-	contValid    [maxPly]bool        // false for null moves and unvisited plies
-	excludedMove [maxPly]int         // singular extension: excluded move (0 = none)
+	accStack     [maxPly]Accumulator   // NNUE accumulator uses copy/makes
+	updateStack  [maxPly]Update        // data for lazy nnue accumulator updates
+	revertStack  [maxPly]Revert        // data for reverting board state
+	evalStack    [maxPly]int           // static eval at each ply; noEval when in check
+	contSide     [maxPly]int           // side that made the move reaching this ply
+	contPiece    [maxPly]int           // piece type (0-5) of that move
+	contTo       [maxPly]int           // destination square of that move
+	contValid    [maxPly]bool          // false for null moves and unvisited plies
+	excludedMove [maxPly]int           // singular extension: excluded move (0 = none)
 	quietsMade   [maxPly][maxMoves]int // quiet moves tried so far at a current ply
 
 	// ---- Heuristic tables (persist across moves of the same game) ----
@@ -65,8 +65,8 @@ type SearchState struct {
 	moveBuffers     [maxPly]MovePicker        // pre-allocated pickers (one per ply)
 	pawnCorrHist    [2][corrHistSize]int16    // pawn correction history
 	nonPawnCorrHist [2][2][corrHistSize]int16 // non-pawn correction history
-	minorCorrHist [2][2][corrHistSize]int16 // non-pawn correction history
-	majorCorrHist [2][2][corrHistSize]int16 // non-pawn correction history
+	minorCorrHist   [2][2][corrHistSize]int16 // non-pawn correction history
+	majorCorrHist   [2][2][corrHistSize]int16 // non-pawn correction history
 }
 
 // State destroyed by makeMove.
@@ -120,7 +120,10 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
 
 	// eval function choice
-	if !ss.isUsingNNUE && singleOptions[HcePerc] == 100 {
+	if pestoEval {
+		ss.isUsingNNUE = false // for speed
+		ss.staticEval = ss.evalPesto
+	} else if !ss.isUsingNNUE && singleOptions[HcePerc] == 100 {
 		ss.staticEval = ss.evalHCE // either HCE picked by user or no net loaded
 	} else if ss.isUsingNNUE && singleOptions[HcePerc] == 0 {
 		fmt.Println("pure nn")
@@ -128,10 +131,6 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	} else {
 		ss.staticEval = ss.evalHybrid // hybrid
 	}
-
-	// for pesto eval do:
-	// ss.isUsingNNUE = false
-	// ss.staticEval = ss.evalPesto
 }
 
 // interface for eval wrapper
