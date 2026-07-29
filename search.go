@@ -177,6 +177,11 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	ss.resetForSearch(p)
 	refresh(p, &ss.accStack[0])
 
+	// Emit info about node limit
+	if singleOptions[NodesLimit] > 0 {
+		fmt.Println("info string search limited to ", singleOptions[NodesLimit], " nodes")
+	}
+
 	// Launch lazy SMP helper threads (depth 1..INF until abortFlag fires).
 	var wg sync.WaitGroup
 	for i := 1; i < numThreads && i < len(states); i++ {
@@ -1306,6 +1311,12 @@ func (ss *SearchState) checkTime() {
 		return
 	}
 
+	// Nodes limit for weaker personalities
+	if singleOptions[NodesLimit] > 0 && ss.nodes >= int64(singleOptions[NodesLimit]) {
+		atomic.StoreInt32(&abortFlag, 1)
+	}
+
+	// Timeout
 	if !pondering && hardTimeLimit >= 0 {
 		if time.Now().UnixMilli()-ss.searchStart >= hardTimeLimit {
 			atomic.StoreInt32(&abortFlag, 1)
@@ -1342,7 +1353,7 @@ func (ss *SearchState) isImproving(ply, staticEval int, nodeInCheck bool) bool {
 
 func isMateScore(score int) bool {
 	return (score <= -mate+maxPly ||
-		score >= mate-maxPly)
+		    score >= mate-maxPly)
 }
 
 func (ss *SearchState) isAbortingSearch() bool {

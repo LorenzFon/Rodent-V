@@ -64,8 +64,8 @@ type SearchState struct {
 	moveBuffers     [maxPly]MovePicker        // pre-allocated pickers (one per ply)
 	pawnCorrHist    [2][corrHistSize]int16    // pawn correction history
 	nonPawnCorrHist [2][2][corrHistSize]int16 // non-pawn correction history
-	minorCorrHist   [2][2][corrHistSize]int16 // non-pawn correction history
-	majorCorrHist   [2][2][corrHistSize]int16 // non-pawn correction history
+	minorCorrHist   [2][2][corrHistSize]int16 // knight-bishop-king correction history
+	majorCorrHist   [2][2][corrHistSize]int16 // rook-queen-king correction history
 }
 
 // State destroyed by makeMove.
