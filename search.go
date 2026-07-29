@@ -321,11 +321,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 	// Quiescence search entry point
 	if depth <= 0 {
-		if useChecksInQs {
-			return ss.quiesceCheck(p, ply, alpha, beta, pv)
-		} else {
-			return ss.quiesce(p, ply, alpha, beta, pv)
-		}
+		return ss.quiesce(p, ply, alpha, beta, pv)
 	}
 
 	// Set selDepth (max distance from root
@@ -915,132 +911,6 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	return bestScore
 }
 
-// unused
-func (ss *SearchState) quiesceCheck(p *Pos, ply, alpha, beta int, pv []int) int {
-	ss.nodes++
-
-	if ply > ss.selDepth {
-		ss.selDepth = ply
-	}
-
-	ss.checkTime()
-	if ss.isAbortingSearch() {
-		return 0
-	}
-
-	pv[0] = 0
-
-	// Draw.
-	if ss.isDraw(p) {
-		return 0
-	}
-
-	// Guard against search stacks overflow.
-	if plyLimitReached(ply) {
-		return ss.staticEval(p, ply)
-	}
-
-	// TT probe: use depth=0 for all qsearch entries.
-	ttMove := 0
-	ttScore := 0
-	ttFlag := 0
-	ttDepth := 0
-
-	if ss.tt.probe(p.key, &ttMove, &ttScore, &ttFlag, &ttDepth, alpha, beta, 0, ply) {
-		return ttScore
-	}
-
-	inCheck := p.inCheck()
-
-	picker := &ss.moveBuffers[ply]
-	var childPv [maxPly]int
-
-	best := -inf
-
-	if !inCheck {
-		rawQEval := ss.staticEval(p, ply)
-		best = rawQEval + ss.getCorrection(p)
-
-		if best >= beta {
-			ss.tt.store(p.key, 0, best, LOWER, 0, ply)
-			return best
-		}
-
-		if best > alpha {
-			alpha = best
-		}
-
-		initMovePicker(p, picker, ss, 0, ply)
-	} else {
-		initMovePicker(p, picker, ss, 0, ply)
-	}
-
-	movesTried := 0
-
-	for {
-		var move int
-
-		if inCheck {
-			move, _ = picker.nextMove()
-			if move == 0 {
-				break
-			}
-		} else {
-			move, _ = picker.nextCaptureOrCheck()
-			if move == 0 {
-				break
-			}
-		}
-
-		// We are about to move. Prepare NNUE accumulator for the next ply.
-		childAcc := ss.prepareChildAccumulator(ply)
-
-		// doMove() executes a move and creates pointer
-		// to data required by NNUE accumulator
-		u := ss.doMove(p, ply, move)
-
-		// Skip illegal move.
-		if p.selfInCheck() {
-			ss.undoMove(p, ply)
-			continue
-		}
-
-		// Update NNUE accumulator once we know move is legal
-		if childAcc != nil {
-			childAcc.applyPendingChanges(u)
-		}
-
-		movesTried++
-
-		score := -ss.quiesce(p, ply+1, -beta, -alpha, childPv[:])
-
-		ss.undoMove(p, ply)
-
-		if ss.isAbortingSearch() {
-			return 0
-		}
-
-		if score >= beta {
-			return score
-		}
-
-		if score > best {
-			best = score
-
-			if score > alpha {
-				alpha = score
-				buildPV(pv, childPv[:], move)
-			}
-		}
-	}
-
-	if inCheck && movesTried == 0 {
-		return -mate + ply
-	}
-
-	return best
-}
-
 // quiesce searches captures (and, when in check, all moves) until the
 // position is quiet, then returns the static evaluation.  This prevents
 // the "horizon effect" where the engine ignores an imminent capture at
@@ -1324,6 +1194,7 @@ func (ss *SearchState) checkTime() {
 	}
 }
 
+// Return eval adjusted by transposition table score
 func (ss *SearchState) adjustedStaticEval(ply, staticEval, ttScore, ttFlag int, nodeInCheck bool) int {
 	if nodeInCheck || ss.excludedMove[ply] != 0 || ttFlag == 0 {
 		return staticEval
@@ -1338,6 +1209,7 @@ func (ss *SearchState) adjustedStaticEval(ply, staticEval, ttScore, ttFlag int, 
 	return staticEval
 }
 
+// Are we better than 2 plies ago (4 if 2 plies ago we were in check)?
 func (ss *SearchState) isImproving(ply, staticEval int, nodeInCheck bool) bool {
 	if nodeInCheck {
 		return false
@@ -1351,18 +1223,24 @@ func (ss *SearchState) isImproving(ply, staticEval int, nodeInCheck bool) bool {
 	return true
 }
 
+// Is score in the checkate range?
 func isMateScore(score int) bool {
 	return (score <= -mate+maxPly ||
-		    score >= mate-maxPly)
+		score >= mate-maxPly)
 }
 
+// Are we in the process of aborting search?
 func (ss *SearchState) isAbortingSearch() bool {
+	// For datagen
 	if ss.nodesLimit > 0 && ss.nodes >= ss.nodesLimit {
 		return true
 	}
+
+	// Timeout
 	return atomic.LoadInt32(&abortFlag) != 0
 }
 
+// Is search stack about to overflow?
 func plyLimitReached(ply int) bool {
 	return ply >= maxPly-1
 }
