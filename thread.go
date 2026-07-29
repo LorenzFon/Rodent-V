@@ -27,13 +27,16 @@
 
 package main
 
-import "time"
+import (
+	"time"
+)
 
 // SearchState holds all per-thread mutable search context.
 type SearchState struct {
 	isUsingNNUE bool
-	tt          *TTable
+	tt          *TTable // pointer to transposition table
 
+	staticEval EvalFunc
 
 	// ---- Progress (reset each think) ----
 	nodes       int64 // nodes searched by this thread
@@ -43,15 +46,15 @@ type SearchState struct {
 	rootHistLen int   // p.histLen when think() began (repetition detection)
 
 	// ---- Per-ply context (indexed by ply, reset each think) ----
-	accStack     [maxPly]Accumulator // NNUE accumulator uses copy/makes
-	updateStack  [maxPly]Update      // data for lazy nnue accumulator updates
-	revertStack  [maxPly]Revert      // data for reverting board state
-	evalStack    [maxPly]int         // static eval at each ply; noEval when in check
-	contSide     [maxPly]int         // side that made the move reaching this ply
-	contPiece    [maxPly]int         // piece type (0-5) of that move
-	contTo       [maxPly]int         // destination square of that move
-	contValid    [maxPly]bool        // false for null moves and unvisited plies
-	excludedMove [maxPly]int         // singular extension: excluded move (0 = none)
+	accStack     [maxPly]Accumulator   // NNUE accumulator uses copy/makes
+	updateStack  [maxPly]Update        // data for lazy nnue accumulator updates
+	revertStack  [maxPly]Revert        // data for reverting board state
+	evalStack    [maxPly]int           // static eval at each ply; noEval when in check
+	contSide     [maxPly]int           // side that made the move reaching this ply
+	contPiece    [maxPly]int           // piece type (0-5) of that move
+	contTo       [maxPly]int           // destination square of that move
+	contValid    [maxPly]bool          // false for null moves and unvisited plies
+	excludedMove [maxPly]int           // singular extension: excluded move (0 = none)
 	quietsMade   [maxPly][maxMoves]int // quiet moves tried so far at a current ply
 
 	// ---- Heuristic tables (persist across moves of the same game) ----
@@ -61,6 +64,8 @@ type SearchState struct {
 	moveBuffers     [maxPly]MovePicker        // pre-allocated pickers (one per ply)
 	pawnCorrHist    [2][corrHistSize]int16    // pawn correction history
 	nonPawnCorrHist [2][2][corrHistSize]int16 // non-pawn correction history
+	minorCorrHist   [2][2][corrHistSize]int16 // knight-bishop-king correction history
+	majorCorrHist   [2][2][corrHistSize]int16 // rook-queen-king correction history
 }
 
 // State destroyed by makeMove.
@@ -69,6 +74,8 @@ type Revert struct {
 	oldKey          uint64
 	oldPawnKey      [2]uint64
 	oldNonPawnKey   [2]uint64
+	oldMajorKey     [2]uint64
+	oldMinorKey     [2]uint64
 	oldCastleRights int
 	oldEpSquare     int
 	oldClock        int
@@ -95,6 +102,8 @@ func (ss *SearchState) clearHistory() {
 	ss.killerMoves = [maxPly][2]int{}
 	ss.pawnCorrHist = [2][corrHistSize]int16{}
 	ss.nonPawnCorrHist = [2][2][corrHistSize]int16{}
+	ss.majorCorrHist = [2][2][corrHistSize]int16{}
+	ss.minorCorrHist = [2][2][corrHistSize]int16{}
 }
 
 // resetForSearch prepares ss for a new search without losing
@@ -107,12 +116,57 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.rootHistLen = p.histLen
 	ss.contValid = [maxPly]bool{}
 	ss.killerMoves = [maxPly][2]int{}
+
 	ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
+	ss.pickEvalFunction()
 }
 
-// eval wrapper
-func (ss *SearchState) staticEval(p *Pos, ply int) int {
+// interface for eval wrapper
+type EvalFunc func(p *Pos, ply int) int
+
+func (ss *SearchState) evalPesto(p *Pos, ply int) int {
+	return evaluatePesto(p)
+}
+
+func (ss *SearchState) evalHCE(p *Pos, ply int) int {
+	return evaluateHCE(p)
+}
+
+func (ss *SearchState) evalNNUE(p *Pos, ply int) int {
+	//return evaluateNNUE(p, &ss.accStack[ply])
+
+	// actually no evaltt is faster up to 256hl
+	return ss.accStack[ply].getEval(p.side) * singleOptions[NnuePerc] / 100
+}
+
+func (ss *SearchState) evalHybrid(p *Pos, ply int) int {
 	return evaluate(p, &ss.accStack[ply])
+}
+
+// which eval function we want to use? (PeSTO, HCE, NNUE, hybrid)
+func (ss *SearchState) pickEvalFunction() {
+
+	// user wants PeSTo eval
+	if pestoEval {
+		ss.isUsingNNUE = false // side effect, needed for speed
+		ss.staticEval = ss.evalPesto
+		return
+	}
+
+	// either fallback when NNUE isn't loaded or user wants HCE
+	if !ss.isUsingNNUE && singleOptions[HcePerc] == 100 {
+		ss.staticEval = ss.evalHCE
+		return
+	}
+
+	// NNUE mode with no fluff
+	if ss.isUsingNNUE && singleOptions[HcePerc] == 0 {
+		ss.staticEval = ss.evalNNUE
+		return
+	}
+
+	// hybrid eval
+	ss.staticEval = ss.evalHybrid
 }
 
 // doMove makes a move, stores all undo and NNUE update data,
@@ -143,6 +197,7 @@ func (ss *SearchState) prepareChildAccumulator(ply int) *Accumulator {
 	return child
 }
 
+// record data needed for continuation history calculations
 func (ss *SearchState) recordContHistContext(ply, side, piece, to int) {
 	ss.contSide[ply] = side
 	ss.contPiece[ply] = piece

@@ -62,7 +62,9 @@ type Pos struct {
 	histLen      int         // number of keys stored in keyHist
 	key          uint64      // Zobrist hash of the current position
 	pawnKey      [2]uint64   // Zobrist hash of pawn position (per side)
-	nonPawnKey   [2]uint64   // Zobrist hash of non-pawn pieces (per color)
+	nonPawnKey   [2]uint64   // Zobrist hash of non-pawn pieces (per side)
+	majorKey     [2]uint64   // Zobrist hash of king and major pieces (per side)
+	minorKey     [2]uint64   // Zobrist hash of king and minor pieces (per side)
 	keyHist      [256]uint64 // hash keys since last irreversible move
 }
 
@@ -255,6 +257,10 @@ func parseFEN(p *Pos, epd string) {
 	p.pawnKey[Black] = computePawnKey(p, Black)
 	p.nonPawnKey[White] = computeNonPawnKey(p, White)
 	p.nonPawnKey[Black] = computeNonPawnKey(p, Black)
+	p.minorKey[White] = computeMinorKey(p, White)
+	p.minorKey[Black] = computeMinorKey(p, Black)
+	p.majorKey[White] = computeMajorKey(p, White)
+	p.majorKey[Black] = computeMajorKey(p, Black)
 }
 
 // ================================================================
@@ -303,6 +309,30 @@ func computeNonPawnKey(p *Pos, side int) uint64 {
 	for sq := 0; sq < 64; sq++ {
 		pc := p.board[sq]
 		if pc != NO_PC && colorOf(pc) == side && typeOf(pc) != P {
+			key ^= zobPiece[pc][sq]
+		}
+	}
+	return key
+}
+
+func computeMinorKey(p *Pos, side int) uint64 {
+	var key uint64
+	for sq := 0; sq < 64; sq++ {
+		pc := p.board[sq]
+		if pc != NO_PC && colorOf(pc) == side && 
+		(typeOf(pc) == N || typeOf(pc) == B || typeOf(pc) == K)  {
+			key ^= zobPiece[pc][sq]
+		}
+	}
+	return key
+}
+
+func computeMajorKey(p *Pos, side int) uint64 {
+	var key uint64
+	for sq := 0; sq < 64; sq++ {
+		pc := p.board[sq]
+		if pc != NO_PC && colorOf(pc) == side && 
+		(typeOf(pc) == R || typeOf(pc) == Q || typeOf(pc) == K)  {
 			key ^= zobPiece[pc][sq]
 		}
 	}

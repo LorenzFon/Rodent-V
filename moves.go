@@ -51,6 +51,8 @@ func makeMove(p *Pos, u *Update, r *Revert, move int) {
 	r.oldKey = p.key
 	r.oldPawnKey = p.pawnKey
 	r.oldNonPawnKey = p.nonPawnKey
+	r.oldMinorKey = p.minorKey
+	r.oldMajorKey = p.majorKey
 	r.oldCastleRights = p.castleRights
 	r.oldEpSquare = p.epSquare
 	r.oldClock = p.clock
@@ -91,15 +93,23 @@ func makeMove(p *Pos, u *Update, r *Revert, move int) {
 	// --- Move the piece from -> to ---
 	p.board[u.from] = NO_PC
 	p.board[u.to] = makePiece(side, u.movingType)
-	p.key ^= zobPiece[makePiece(side, u.movingType)][u.from] ^
-		zobPiece[makePiece(side, u.movingType)][u.to]
+
+	hashDelta := zobPiece[makePiece(side, u.movingType)][u.from] ^
+		         zobPiece[makePiece(side, u.movingType)][u.to]
+
+	p.key ^= hashDelta
 	if u.movingType == P {
-		p.pawnKey[side] = p.pawnKey[side] ^ zobPiece[makePiece(side, u.movingType)][u.from] ^
-			zobPiece[makePiece(side, u.movingType)][u.to]
+		p.pawnKey[side] ^= hashDelta
 	} else {
-		p.nonPawnKey[side] ^= zobPiece[makePiece(side, u.movingType)][u.from] ^
-			zobPiece[makePiece(side, u.movingType)][u.to]
+		p.nonPawnKey[side] ^= hashDelta
+		if u.movingType == N || u.movingType == B || u.movingType == K {
+			p.minorKey[side] ^= hashDelta
+		}
+		if u.movingType == R || u.movingType == Q || u.movingType == K {
+			p.majorKey[side] ^= hashDelta
+		}
 	}
+
 	p.colorBB[side] ^= squareBit(u.from) | squareBit(u.to)
 	p.typeBB[u.movingType] ^= squareBit(u.from) | squareBit(u.to)
 
@@ -111,12 +121,19 @@ func makeMove(p *Pos, u *Update, r *Revert, move int) {
 	// --- Handle a normal capture at "to" ---
 	if u.captType != NO_TP {
 		u.capSq = u.to
-		p.key ^= zobPiece[makePiece(opp(side), u.captType)][u.to]
+		hashDelta = zobPiece[makePiece(opp(side), u.captType)][u.to]
+		p.key ^= hashDelta
 		if u.captType == P {
-			p.pawnKey[opp(side)] = p.pawnKey[opp(side)] ^ zobPiece[makePiece(opp(side), u.captType)][u.to]
+			p.pawnKey[opp(side)] ^= hashDelta
 		} else if u.captType != K {
-			p.nonPawnKey[opp(side)] ^= zobPiece[makePiece(opp(side), u.captType)][u.to]
+			p.nonPawnKey[opp(side)] ^= hashDelta
 		}
+		if u.captType == N || u.movingType == B {
+			p.minorKey[side] ^= hashDelta
+	    }
+		if u.captType == R || u.movingType == Q {
+			p.majorKey[side] ^= hashDelta
+	    }
 		p.colorBB[opp(side)] ^= squareBit(u.to)
 		p.typeBB[u.captType] ^= squareBit(u.to)
 		p.count[opp(side)][u.captType]--
@@ -147,10 +164,11 @@ func makeMove(p *Pos, u *Update, r *Revert, move int) {
 
 		p.board[u.rookFrom] = NO_PC
 		p.board[u.rookTo] = makePiece(side, R)
-		p.key ^= zobPiece[makePiece(side, R)][u.rookFrom] ^
-			zobPiece[makePiece(side, R)][u.rookTo]
-		p.nonPawnKey[side] ^= zobPiece[makePiece(side, R)][u.rookFrom] ^
-			zobPiece[makePiece(side, R)][u.rookTo]
+		hashDelta = zobPiece[makePiece(side, R)][u.rookFrom] ^
+			        zobPiece[makePiece(side, R)][u.rookTo]
+		p.key ^= hashDelta
+		p.nonPawnKey[side] ^= hashDelta
+		p.majorKey[side] ^= hashDelta
 		p.colorBB[side] ^= squareBit(u.rookFrom) | squareBit(u.rookTo)
 		p.typeBB[R] ^= squareBit(u.rookFrom) | squareBit(u.rookTo)
 
@@ -187,6 +205,12 @@ func makeMove(p *Pos, u *Update, r *Revert, move int) {
 			zobPiece[makePiece(side, promotedType)][u.to]
 		p.pawnKey[side] ^= zobPiece[makePiece(side, P)][u.to]
 		p.nonPawnKey[side] ^= zobPiece[makePiece(side, promotedType)][u.to]
+		if promotedType == B || promotedType == N {
+			p.minorKey[side] ^= zobPiece[makePiece(side, promotedType)][u.to]
+		}
+		if promotedType == R || promotedType == Q {
+			p.majorKey[side] ^= zobPiece[makePiece(side, promotedType)][u.to]
+		}
 		p.typeBB[P] ^= squareBit(u.to)
 		p.typeBB[promotedType] ^= squareBit(u.to)
 		p.count[side][promotedType]++
@@ -280,6 +304,8 @@ func unmakeMove(p *Pos, u *Update, r *Revert) {
 	p.key = r.oldKey
 	p.pawnKey = r.oldPawnKey
 	p.nonPawnKey = r.oldNonPawnKey
+	p.minorKey = r.oldMinorKey
+	p.majorKey = r.oldMajorKey
 	p.castleRights = r.oldCastleRights
 	p.epSquare = r.oldEpSquare
 	p.clock = r.oldClock

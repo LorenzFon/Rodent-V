@@ -94,13 +94,14 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V s10")
+			fmt.Println("id name Rodent V s13")
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			if nnue.Loaded {
 				fmt.Printf("info string Loaded NNUE network: %s\n", nnuePath)
 			}
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
+			fmt.Println("option name PestoEval type check default false")
 			fmt.Println("option name Save Personality type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
 			fmt.Println("option name nodesLimit type spin default ", singleOptions[NodesLimit], " min 0 max 1000000000")
@@ -192,7 +193,6 @@ func uciLoop() {
 
 		case "threats":
 			PrintThreatDebug(&p)
-
 		}
 	}
 
@@ -247,9 +247,27 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
+	case strings.EqualFold(name, "PestoEval"):
+		if b, err := strconv.ParseBool(value); err == nil {
+			pestoEval = b
+		}
+		return
+
 	case strings.EqualFold(name, "Threads"):
 		if n, err := strconv.Atoi(value); err == nil {
 			numThreads = limitValue(n, 1, 256)
+		}
+		return
+
+	case strings.EqualFold(name, "nodesLimit"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
+		}
+		return
+
+	case strings.EqualFold(name, "hceWeight"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[HcePerc] = limitValue(n, 0, 256)
 		}
 		return
 
@@ -257,21 +275,6 @@ func parseSetOption(tokens []string) {
 		if n, err := strconv.Atoi(value); err == nil {
 			singleOptions[NnuePerc] = limitValue(n, 0, 256)
 		}
-
-		return
-
-	case strings.EqualFold(name, "maxNodes"):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
-		}
-
-		return
-
-	case strings.EqualFold(name, "hceWeight"):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[HcePerc] = limitValue(n, 0, 256)
-		}
-
 		return
 
 	case strings.EqualFold(name, "nnuePath"):
@@ -286,18 +289,19 @@ func parseSetOption(tokens []string) {
 		} else {
 			fmt.Printf("info string failed to load NNUE: %s\n", value)
 		}
-
 		return
 	}
 
 	// Eval component options, e.g. "Material", "material", "MATERIAL"
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
+
 		if strings.EqualFold(name, "Own"+evalComponentName[c]) {
 			if v, err := strconv.Atoi(value); err == nil {
 				optionPerColorValues[weightOwn][c] = limitValue(v, 0, 500)
 			}
 			return
 		}
+
 		if strings.EqualFold(name, "Opp"+evalComponentName[c]) {
 			if v, err := strconv.Atoi(value); err == nil {
 				optionPerColorValues[weightOpp][c] = limitValue(v, 0, 500)

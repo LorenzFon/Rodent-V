@@ -151,7 +151,27 @@ func evaluate(p *Pos, acc *Accumulator) int {
 	return score
 }
 
-// eval_trace describes engine's evaluation
+// evaluateHCE is 100% handcrafted eval, sped up by eval transposition table
+func evaluateHCE(p *Pos) int {
+	if score, ok := probeEvalHash(p.key); ok {
+		return score
+	}
+	score := eval_internal(p, false)
+	storeEvalHash(p.key, score)
+	return score
+}
+
+// evaluateNNUE is weighted NNUE eval, sped up by eval transposition table
+func evaluateNNUE(p *Pos, acc *Accumulator) int {
+	if score, ok := probeEvalHash(p.key); ok {
+		return score
+	}
+	score := acc.getEval(p.side) * singleOptions[NnuePerc] / 100
+	storeEvalHash(p.key, score)
+	return score
+}
+
+// eval_trace describes engine's hce evaluation
 func eval_trace(p *Pos) int {
 	return eval_internal(p, true)
 }
