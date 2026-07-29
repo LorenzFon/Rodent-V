@@ -52,9 +52,9 @@ package main
 // genCaptures fills list with all captures, en-passant captures, and
 // promotions for the side to move, then returns the count.
 func genCaptures(p *Pos, list []int) int {
-	n    := 0
+	n := 0
 	side := p.side
-	occ  := p.occupied()
+	occ := p.occupied()
 
 	// ---- Pawn captures and promotions ----
 	if side == White {
@@ -63,53 +63,69 @@ func genCaptures(p *Pos, list []int) int {
 		bb := ((p.pieceBB(White, P) & ^fileABB & rank7BB) << 7) & p.colorBB[Black]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (Q_PROM << 12) | (to << 6) | (to - 7); n++
-			list[n] = (R_PROM << 12) | (to << 6) | (to - 7); n++
-			list[n] = (B_PROM << 12) | (to << 6) | (to - 7); n++
-			list[n] = (N_PROM << 12) | (to << 6) | (to - 7); n++
+			list[n] = (Q_PROM << 12) | (to << 6) | (to - 7)
+			n++
+			list[n] = (R_PROM << 12) | (to << 6) | (to - 7)
+			n++
+			list[n] = (B_PROM << 12) | (to << 6) | (to - 7)
+			n++
+			list[n] = (N_PROM << 12) | (to << 6) | (to - 7)
+			n++
 			bb &= bb - 1
 		}
 		// Promotion-captures to the right (toward file H).
 		bb = ((p.pieceBB(White, P) & ^fileHBB & rank7BB) << 9) & p.colorBB[Black]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (Q_PROM << 12) | (to << 6) | (to - 9); n++
-			list[n] = (R_PROM << 12) | (to << 6) | (to - 9); n++
-			list[n] = (B_PROM << 12) | (to << 6) | (to - 9); n++
-			list[n] = (N_PROM << 12) | (to << 6) | (to - 9); n++
+			list[n] = (Q_PROM << 12) | (to << 6) | (to - 9)
+			n++
+			list[n] = (R_PROM << 12) | (to << 6) | (to - 9)
+			n++
+			list[n] = (B_PROM << 12) | (to << 6) | (to - 9)
+			n++
+			list[n] = (N_PROM << 12) | (to << 6) | (to - 9)
+			n++
 			bb &= bb - 1
 		}
 		// Quiet promotions (pawn on rank 7 pushes straight to rank 8).
 		bb = ((p.pieceBB(White, P) & rank7BB) << 8) & p.empty()
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (Q_PROM << 12) | (to << 6) | (to - 8); n++
-			list[n] = (R_PROM << 12) | (to << 6) | (to - 8); n++
-			list[n] = (B_PROM << 12) | (to << 6) | (to - 8); n++
-			list[n] = (N_PROM << 12) | (to << 6) | (to - 8); n++
+			list[n] = (Q_PROM << 12) | (to << 6) | (to - 8)
+			n++
+			list[n] = (R_PROM << 12) | (to << 6) | (to - 8)
+			n++
+			list[n] = (B_PROM << 12) | (to << 6) | (to - 8)
+			n++
+			list[n] = (N_PROM << 12) | (to << 6) | (to - 8)
+			n++
 			bb &= bb - 1
 		}
 		// Normal captures left (no rank-7 pawns, no file-A pawns).
 		bb = ((p.pieceBB(White, P) & ^fileABB & ^rank7BB) << 7) & p.colorBB[Black]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | (to - 7); n++
+			list[n] = (to << 6) | (to - 7)
+			n++
 			bb &= bb - 1
 		}
 		// Normal captures right.
 		bb = ((p.pieceBB(White, P) & ^fileHBB & ^rank7BB) << 9) & p.colorBB[Black]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | (to - 9); n++
+			list[n] = (to << 6) | (to - 9)
+			n++
 			bb &= bb - 1
 		}
 		// En passant.
 		if to := p.epSquare; to != NO_SQ {
 			if ((p.pieceBB(White, P)&^fileABB)<<7)&squareBit(to) != 0 {
-				list[n] = (EP_CAP << 12) | (to << 6) | (to - 7); n++
+				list[n] = (EP_CAP << 12) | (to << 6) | (to - 7)
+				n++
 			}
 			if ((p.pieceBB(White, P)&^fileHBB)<<9)&squareBit(to) != 0 {
-				list[n] = (EP_CAP << 12) | (to << 6) | (to - 9); n++
+				list[n] = (EP_CAP << 12) | (to << 6) | (to - 9)
+				n++
 			}
 		}
 	} else {
@@ -118,53 +134,69 @@ func genCaptures(p *Pos, list []int) int {
 		bb := ((p.pieceBB(Black, P) & ^fileABB & rank2BB) >> 9) & p.colorBB[White]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (Q_PROM << 12) | (to << 6) | (to + 9); n++
-			list[n] = (R_PROM << 12) | (to << 6) | (to + 9); n++
-			list[n] = (B_PROM << 12) | (to << 6) | (to + 9); n++
-			list[n] = (N_PROM << 12) | (to << 6) | (to + 9); n++
+			list[n] = (Q_PROM << 12) | (to << 6) | (to + 9)
+			n++
+			list[n] = (R_PROM << 12) | (to << 6) | (to + 9)
+			n++
+			list[n] = (B_PROM << 12) | (to << 6) | (to + 9)
+			n++
+			list[n] = (N_PROM << 12) | (to << 6) | (to + 9)
+			n++
 			bb &= bb - 1
 		}
 		// Promotion-captures right (>>7).
 		bb = ((p.pieceBB(Black, P) & ^fileHBB & rank2BB) >> 7) & p.colorBB[White]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (Q_PROM << 12) | (to << 6) | (to + 7); n++
-			list[n] = (R_PROM << 12) | (to << 6) | (to + 7); n++
-			list[n] = (B_PROM << 12) | (to << 6) | (to + 7); n++
-			list[n] = (N_PROM << 12) | (to << 6) | (to + 7); n++
+			list[n] = (Q_PROM << 12) | (to << 6) | (to + 7)
+			n++
+			list[n] = (R_PROM << 12) | (to << 6) | (to + 7)
+			n++
+			list[n] = (B_PROM << 12) | (to << 6) | (to + 7)
+			n++
+			list[n] = (N_PROM << 12) | (to << 6) | (to + 7)
+			n++
 			bb &= bb - 1
 		}
 		// Quiet promotions.
 		bb = ((p.pieceBB(Black, P) & rank2BB) >> 8) & p.empty()
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (Q_PROM << 12) | (to << 6) | (to + 8); n++
-			list[n] = (R_PROM << 12) | (to << 6) | (to + 8); n++
-			list[n] = (B_PROM << 12) | (to << 6) | (to + 8); n++
-			list[n] = (N_PROM << 12) | (to << 6) | (to + 8); n++
+			list[n] = (Q_PROM << 12) | (to << 6) | (to + 8)
+			n++
+			list[n] = (R_PROM << 12) | (to << 6) | (to + 8)
+			n++
+			list[n] = (B_PROM << 12) | (to << 6) | (to + 8)
+			n++
+			list[n] = (N_PROM << 12) | (to << 6) | (to + 8)
+			n++
 			bb &= bb - 1
 		}
 		// Normal captures left.
 		bb = ((p.pieceBB(Black, P) & ^fileABB & ^rank2BB) >> 9) & p.colorBB[White]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | (to + 9); n++
+			list[n] = (to << 6) | (to + 9)
+			n++
 			bb &= bb - 1
 		}
 		// Normal captures right.
 		bb = ((p.pieceBB(Black, P) & ^fileHBB & ^rank2BB) >> 7) & p.colorBB[White]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | (to + 7); n++
+			list[n] = (to << 6) | (to + 7)
+			n++
 			bb &= bb - 1
 		}
 		// En passant.
 		if to := p.epSquare; to != NO_SQ {
 			if ((p.pieceBB(Black, P)&^fileABB)>>9)&squareBit(to) != 0 {
-				list[n] = (EP_CAP << 12) | (to << 6) | (to + 9); n++
+				list[n] = (EP_CAP << 12) | (to << 6) | (to + 9)
+				n++
 			}
 			if ((p.pieceBB(Black, P)&^fileHBB)>>7)&squareBit(to) != 0 {
-				list[n] = (EP_CAP << 12) | (to << 6) | (to + 7); n++
+				list[n] = (EP_CAP << 12) | (to << 6) | (to + 7)
+				n++
 			}
 		}
 	}
@@ -173,10 +205,11 @@ func genCaptures(p *Pos, list []int) int {
 	pieces := p.pieceBB(side, N)
 	for pieces != 0 {
 		from := lsb(pieces)
-		bb   := knightAtk[from] & p.colorBB[opp(side)]
+		bb := knightAtk[from] & p.colorBB[opp(side)]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
+			list[n] = (to << 6) | from
+			n++
 			bb &= bb - 1
 		}
 		pieces &= pieces - 1
@@ -186,10 +219,11 @@ func genCaptures(p *Pos, list []int) int {
 	pieces = p.pieceBB(side, B)
 	for pieces != 0 {
 		from := lsb(pieces)
-		bb   := bishopAttacks(occ, from) & p.colorBB[opp(side)]
+		bb := bishopAttacks(occ, from) & p.colorBB[opp(side)]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
+			list[n] = (to << 6) | from
+			n++
 			bb &= bb - 1
 		}
 		pieces &= pieces - 1
@@ -199,10 +233,11 @@ func genCaptures(p *Pos, list []int) int {
 	pieces = p.pieceBB(side, R)
 	for pieces != 0 {
 		from := lsb(pieces)
-		bb   := rookAttacks(occ, from) & p.colorBB[opp(side)]
+		bb := rookAttacks(occ, from) & p.colorBB[opp(side)]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
+			list[n] = (to << 6) | from
+			n++
 			bb &= bb - 1
 		}
 		pieces &= pieces - 1
@@ -212,10 +247,11 @@ func genCaptures(p *Pos, list []int) int {
 	pieces = p.pieceBB(side, Q)
 	for pieces != 0 {
 		from := lsb(pieces)
-		bb   := queenAttacks(occ, from) & p.colorBB[opp(side)]
+		bb := queenAttacks(occ, from) & p.colorBB[opp(side)]
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
+			list[n] = (to << 6) | from
+			n++
 			bb &= bb - 1
 		}
 		pieces &= pieces - 1
@@ -225,7 +261,8 @@ func genCaptures(p *Pos, list []int) int {
 	bb := kingAtk[p.kingSq[side]] & p.colorBB[opp(side)]
 	for bb != 0 {
 		to := lsb(bb)
-		list[n] = (to << 6) | p.kingSq[side]; n++
+		list[n] = (to << 6) | p.kingSq[side]
+		n++
 		bb &= bb - 1
 	}
 
@@ -235,9 +272,9 @@ func genCaptures(p *Pos, list []int) int {
 // genQuiet fills list with all non-capturing, non-promoting moves for
 // the side to move, then returns the count.
 func genQuiet(p *Pos, list []int) int {
-	n     := 0
-	side  := p.side
-	occ   := p.occupied()
+	n := 0
+	side := p.side
+	occ := p.occupied()
 	empty := p.empty()
 
 	// ---- Castling ----
@@ -247,54 +284,62 @@ func genQuiet(p *Pos, list []int) int {
 		// Kingside: E1->G1; F1, G1 must be empty; E1 and F1 not attacked.
 		if p.castleRights&1 != 0 && occ&0x0000000000000060 == 0 {
 			if !isAttacked(p, E1, Black) && !isAttacked(p, F1, Black) {
-				list[n] = (CASTLE << 12) | (G1 << 6) | E1; n++
+				list[n] = (CASTLE << 12) | (G1 << 6) | E1
+				n++
 			}
 		}
 		// Queenside: E1->C1; B1, C1, D1 must be empty; E1 and D1 not attacked.
 		if p.castleRights&2 != 0 && occ&0x000000000000000E == 0 {
 			if !isAttacked(p, E1, Black) && !isAttacked(p, D1, Black) {
-				list[n] = (CASTLE << 12) | (C1 << 6) | E1; n++
+				list[n] = (CASTLE << 12) | (C1 << 6) | E1
+				n++
 			}
 		}
 		// Double pawn push: only from rank 2, and rank 3 must be clear too.
-		bb := (((p.pieceBB(White, P)&rank2BB)<<8)&empty)<<8 & empty
+		bb := (((p.pieceBB(White, P) & rank2BB) << 8) & empty) << 8 & empty
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (EP_SET << 12) | (to << 6) | (to - 16); n++
+			list[n] = (EP_SET << 12) | (to << 6) | (to - 16)
+			n++
 			bb &= bb - 1
 		}
 		// Single pawn push (not rank 7; promotions are in genCaptures).
 		bb = ((p.pieceBB(White, P) & ^rank7BB) << 8) & empty
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | (to - 8); n++
+			list[n] = (to << 6) | (to - 8)
+			n++
 			bb &= bb - 1
 		}
 	} else {
 		// Black kingside: E8->G8.
 		if p.castleRights&4 != 0 && occ&0x6000000000000000 == 0 {
 			if !isAttacked(p, E8, White) && !isAttacked(p, F8, White) {
-				list[n] = (CASTLE << 12) | (G8 << 6) | E8; n++
+				list[n] = (CASTLE << 12) | (G8 << 6) | E8
+				n++
 			}
 		}
 		// Black queenside: E8->C8.
 		if p.castleRights&8 != 0 && occ&0x0E00000000000000 == 0 {
 			if !isAttacked(p, E8, White) && !isAttacked(p, D8, White) {
-				list[n] = (CASTLE << 12) | (C8 << 6) | E8; n++
+				list[n] = (CASTLE << 12) | (C8 << 6) | E8
+				n++
 			}
 		}
 		// Double pawn push.
-		bb := (((p.pieceBB(Black, P)&rank7BB)>>8)&empty)>>8 & empty
+		bb := (((p.pieceBB(Black, P) & rank7BB) >> 8) & empty) >> 8 & empty
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (EP_SET << 12) | (to << 6) | (to + 16); n++
+			list[n] = (EP_SET << 12) | (to << 6) | (to + 16)
+			n++
 			bb &= bb - 1
 		}
 		// Single pawn push.
 		bb = ((p.pieceBB(Black, P) & ^rank2BB) >> 8) & empty
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | (to + 8); n++
+			list[n] = (to << 6) | (to + 8)
+			n++
 			bb &= bb - 1
 		}
 	}
@@ -303,10 +348,11 @@ func genQuiet(p *Pos, list []int) int {
 	pieces := p.pieceBB(side, N)
 	for pieces != 0 {
 		from := lsb(pieces)
-		bb   := knightAtk[from] & empty
+		bb := knightAtk[from] & empty
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
+			list[n] = (to << 6) | from
+			n++
 			bb &= bb - 1
 		}
 		pieces &= pieces - 1
@@ -316,10 +362,11 @@ func genQuiet(p *Pos, list []int) int {
 	pieces = p.pieceBB(side, B)
 	for pieces != 0 {
 		from := lsb(pieces)
-		bb   := bishopAttacks(occ, from) & empty
+		bb := bishopAttacks(occ, from) & empty
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
+			list[n] = (to << 6) | from
+			n++
 			bb &= bb - 1
 		}
 		pieces &= pieces - 1
@@ -329,10 +376,11 @@ func genQuiet(p *Pos, list []int) int {
 	pieces = p.pieceBB(side, R)
 	for pieces != 0 {
 		from := lsb(pieces)
-		bb   := rookAttacks(occ, from) & empty
+		bb := rookAttacks(occ, from) & empty
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
+			list[n] = (to << 6) | from
+			n++
 			bb &= bb - 1
 		}
 		pieces &= pieces - 1
@@ -342,10 +390,11 @@ func genQuiet(p *Pos, list []int) int {
 	pieces = p.pieceBB(side, Q)
 	for pieces != 0 {
 		from := lsb(pieces)
-		bb   := queenAttacks(occ, from) & empty
+		bb := queenAttacks(occ, from) & empty
 		for bb != 0 {
 			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
+			list[n] = (to << 6) | from
+			n++
 			bb &= bb - 1
 		}
 		pieces &= pieces - 1
@@ -355,78 +404,10 @@ func genQuiet(p *Pos, list []int) int {
 	bb := kingAtk[p.kingSq[side]] & empty
 	for bb != 0 {
 		to := lsb(bb)
-		list[n] = (to << 6) | p.kingSq[side]; n++
+		list[n] = (to << 6) | p.kingSq[side]
+		n++
 		bb &= bb - 1
 	}
 
 	return n
 }
-
-// generates selected checks (non-discovered piece checks)
-func genChecks(p *Pos, list []int) int {
-	n     := 0
-	side  := p.side
-	occ   := p.occupied()
-	empty := p.empty()
-	ksq := p.kingSq[opp(side)]
-	nChecks := knightAtk[ksq] & empty
-	bChecks := bishopAttacks(occ, ksq) & empty
-	rChecks := rookAttacks(occ, ksq) & empty
-	qChecks := rChecks | bChecks
-
-
-	// ---- Knight quiet checks ----
-	pieces := p.pieceBB(side, N)
-	for pieces != 0 {
-		from := lsb(pieces)
-		bb   := knightAtk[from] & nChecks
-		for bb != 0 {
-			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
-			bb &= bb - 1
-		}
-		pieces &= pieces - 1
-	}
-
-	// ---- Bishop quiet checks ----
-	pieces = p.pieceBB(side, B)
-	for pieces != 0 {
-		from := lsb(pieces)
-		bb   := bishopAttacks(occ, from) & bChecks
-		for bb != 0 {
-			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
-			bb &= bb - 1
-		}
-		pieces &= pieces - 1
-	}
-
-	// ---- Rook quiet checks ----
-	pieces = p.pieceBB(side, R)
-	for pieces != 0 {
-		from := lsb(pieces)
-		bb   := rookAttacks(occ, from) & rChecks
-		for bb != 0 {
-			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
-			bb &= bb - 1
-		}
-		pieces &= pieces - 1
-	}
-
-	// ---- Queen quiet checks ----
-	pieces = p.pieceBB(side, Q)
-	for pieces != 0 {
-		from := lsb(pieces)
-		bb   := queenAttacks(occ, from) & qChecks
-		for bb != 0 {
-			to := lsb(bb)
-			list[n] = (to << 6) | from; n++
-			bb &= bb - 1
-		}
-		pieces &= pieces - 1
-	}
-
-	return n
-}
-

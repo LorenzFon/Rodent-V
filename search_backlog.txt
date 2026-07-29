@@ -16,6 +16,7 @@ PASSED
 - if null move search gives a mate score, return beta
 - hard and soft time limits
 - don't use rfp in pawn only endings (Haka)
+- major and minor corrhist (gainer with pesto eval, non-regression with NNUE)
 
 FAILED
 
@@ -24,3 +25,4 @@ FAILED
 - tt can prevent starting a null move search
 - pruning checking moves (futility/lmp)
 - king-rook-pawn corrhist
+- LMR of killer moves (halved)
