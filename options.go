@@ -28,7 +28,9 @@ import (
 
 var nnuePath string // default path to NNUE file
 
-var pestoEval bool // are we using pesto eval?
+var pestoEval bool            // are we using pesto eval?
+var adjustEvalByCorrhist bool // are we using corrhist
+// (corrhist makes engine stronger but can mask eval properties)
 
 // color-independent options
 type SingleOption int
@@ -55,6 +57,7 @@ var engineSide int
 const weightOwn = 0
 const weightOpp = 1
 
+// NOTE: evalComponent is defined in EvalData
 var optionPerColorValues [2][EvalComponentN]int
 
 // default settings
@@ -64,7 +67,9 @@ func init() {
 	singleOptions[NnuePerc] = 100
 	singleOptions[HcePerc] = 0
 	singleOptions[NodesLimit] = 0
+
 	pestoEval = false
+	adjustEvalByCorrhist = true
 
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		optionPerColorValues[weightOwn][c] = 100
