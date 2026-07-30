@@ -39,13 +39,17 @@ const (
 	HcePerc SingleOption = iota
 	NnuePerc
 	NodesLimit
+	LikesClosed
+	KingTropism
 	NofSingleOptions
 )
 
 var SingleOptionName = [NofSingleOptions]string{
-	HcePerc:    "hceWeight",
-	NnuePerc:   "nnueWeight",
-	NodesLimit: "nodesLimit",
+	HcePerc:     "hceWeight",
+	NnuePerc:    "nnueWeight",
+	NodesLimit:  "nodesLimit",
+	LikesClosed: "likesClosed",
+	KingTropism: "kingTropism",
 }
 
 var singleOptions [NofSingleOptions]int
@@ -64,9 +68,11 @@ var optionPerColorValues [2][EvalComponentN]int
 func init() {
 
 	nnuePath = "nets/rodent_v_256hl_4.bin"
-	singleOptions[NnuePerc] = 100
-	singleOptions[HcePerc] = 0
+	singleOptions[NnuePerc] = 30
+	singleOptions[HcePerc] = 60
 	singleOptions[NodesLimit] = 0
+	singleOptions[LikesClosed] = 0
+	singleOptions[KingTropism] = 0
 
 	pestoEval = false
 	adjustEvalByCorrhist = true

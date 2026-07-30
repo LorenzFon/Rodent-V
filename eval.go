@@ -145,6 +145,14 @@ func evaluate(p *Pos, acc *Accumulator) int {
 		}
 
 		score = hceScore + nnueScore
+
+		// Flair options
+		if singleOptions[LikesClosed] > 0 {
+			score += flairClosed(p)
+		}
+		if singleOptions[KingTropism] > 0 {
+			score += flairTropism(p)
+		}
 	}
 
 	storeEvalHash(p.key, score)

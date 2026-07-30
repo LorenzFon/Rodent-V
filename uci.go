@@ -110,6 +110,8 @@ func uciLoop() {
 			fmt.Println("option name NnuePath type string default", nnuePath)
 
 			printUciOptionsPerColor()
+			fmt.Println("option name likesClosed type spin default ", singleOptions[LikesClosed], " min 0 max 256")
+			fmt.Println("option name kingTropism type spin default ", singleOptions[KingTropism], " min 0 max 256")
 			fmt.Println("uciok")
 
 		case "isready":
@@ -268,6 +270,18 @@ func parseSetOption(tokens []string) {
 	case strings.EqualFold(name, "hceWeight"):
 		if n, err := strconv.Atoi(value); err == nil {
 			singleOptions[HcePerc] = limitValue(n, 0, 256)
+		}
+		return
+
+	case strings.EqualFold(name, "likesClosed"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[LikesClosed] = limitValue(n, 0, 256)
+		}
+		return
+
+	case strings.EqualFold(name, "kingTropism"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[KingTropism] = limitValue(n, 0, 256)
 		}
 		return
 
