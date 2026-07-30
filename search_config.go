@@ -3,8 +3,7 @@ package main
 // Search config.
 // Cost of disabling is measured by 1000 game matches at 16 + 0.16
 const (
-	adjustEvalByCorrhist = true
-	adjustEvalByTT       = false
+	adjustEvalByTT = false
 
 	useRFP       = true
 	rfpMaxDepth  = 7        //

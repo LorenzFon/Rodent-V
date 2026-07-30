@@ -456,8 +456,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			rfpDepthMargin = rfpImpMargin
 		}
 
-		if useRFP && p.canNullMove() && depth <= rfpMaxDepth &&
-			beta < mate-maxPly &&
+		if useRFP && p.canNullMove() && depth <= rfpMaxDepth && !isMating(beta) &&
 			staticEval-rfpDepthMargin*depth >= beta {
 
 			return staticEval - rfpDepthMargin*depth
@@ -499,7 +498,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 			}
 
 			// Do not return an unproven mate score.
-			if score >= mate-maxPly {
+			if isMating(score) {
 				score = beta
 			}
 
@@ -522,7 +521,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 	// --- ProbCut ---
 	// If a tactical move already exceeds beta by a safety margin at reduced
 	// depth, assume the full node will also fail high and prune the rest.
-	if useProbcut && !isPv && !nodeInCheck && depth >= probcutMinDepth && beta < mate-maxPly &&
+	if useProbcut && !isPv && !nodeInCheck && depth >= probcutMinDepth && !isMating(beta) &&
 		ss.excludedMove[ply] == 0 {
 		probcutBeta := min(beta+probcutMargin, mate-maxPly)
 		probcutDepth := depth - 1 - probcutReduction
@@ -712,7 +711,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// cannot plausibly raise alpha even with a generous margin.
 		if useFutility && stage == StageQuiet && !isPv && !nodeInCheck && !givesCheck &&
 			ss.excludedMove[ply] == 0 && depth <= fpMaxDepth &&
-			quietTried > 0 && alpha < mate-maxPly &&
+			quietTried > 0 && !isMating(alpha) &&
 			staticEval+fpMargin*depth <= alpha {
 			ss.undoMove(p, ply)
 			continue
@@ -965,7 +964,13 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 
 	if !inCheck {
 		rawQEval := ss.staticEval(p, ply)
-		best = rawQEval + ss.getCorrection(p)
+
+		// Adjust eval using correction history
+		if adjustEvalByCorrhist {
+			best = rawQEval + ss.getCorrection(p)
+		} else {
+			best = rawQEval
+		}
 
 		if best >= beta {
 			ss.tt.store(p.key, 0, best, LOWER, 0, ply)
@@ -1223,10 +1228,19 @@ func (ss *SearchState) isImproving(ply, staticEval int, nodeInCheck bool) bool {
 	return true
 }
 
+// Does score show we are delivering checkmate?
+func isMating(score int) bool {
+	return score >= mate-maxPly
+}
+
+// Does score show we are being checkmated?
+func isMated(score int) bool {
+	return score <= -mate+maxPly
+}
+
 // Is score in the checkate range?
 func isMateScore(score int) bool {
-	return (score <= -mate+maxPly ||
-		score >= mate-maxPly)
+	return isMating(score) || isMated(score)
 }
 
 // Are we in the process of aborting search?
