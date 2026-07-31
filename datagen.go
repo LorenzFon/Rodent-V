@@ -88,7 +88,7 @@ func runDatagen(targetPositions, threads, nodesPerMove int, bookFile string) {
 			ss := new(SearchState)
 			ss.tt = new(TTable)
 			ss.tt.alloc(1)
-			ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
+			ss.isUsingNNUE = nnue.Loaded && singleOptionValue[NnuePerc] > 0
 
 			for {
 				if atomic.LoadInt64(&totalPositions) >= int64(targetPositions) {
@@ -265,7 +265,7 @@ func isRepetitionDG(p *Pos) bool {
 
 func runDatagenSearch(p *Pos, ss *SearchState, softNodesLimit int) (int, int) {
 	ss.resetForSearch(p)
-	
+
 	// HARD nodes limit checked mid-search (8 million nodes)
 	ss.nodesLimit = 8000000
 	refresh(p, &ss.accStack[0])
@@ -276,26 +276,26 @@ func runDatagenSearch(p *Pos, ss *SearchState, softNodesLimit int) (int, int) {
 
 	for d := 1; d < 100; d++ {
 		iterScore := ss.search(p, 0, -inf, inf, d, false, pv[:])
-		
+
 		// If we hit the 8M hard limit mid-search, we discard this depth's result
 		if ss.isAbortingSearch() {
 			break
 		}
-		
+
 		if pv[0] != 0 {
 			score = iterScore
 			bestMove = pv[0]
 		}
-		
+
 		// SOFT nodes limit checked only AFTER an iteration finishes
 		if ss.nodes >= int64(softNodesLimit) {
 			break
 		}
 	}
-	
+
 	// Reset the nodes limit to 0 so the subsequent quiesce filter doesn't instantly abort
 	ss.nodesLimit = 0
-	
+
 	return bestMove, score
 }
 

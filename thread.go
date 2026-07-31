@@ -117,7 +117,7 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.contValid = [maxPly]bool{}
 	ss.killerMoves = [maxPly][2]int{}
 
-	ss.isUsingNNUE = nnue.Loaded && singleOptions[NnuePerc] > 0
+	ss.isUsingNNUE = nnue.Loaded && singleOptionValue[NnuePerc] > 0
 	ss.pickEvalFunction()
 }
 
@@ -136,7 +136,7 @@ func (ss *SearchState) evalNNUE(p *Pos, ply int) int {
 	//return evaluateNNUE(p, &ss.accStack[ply])
 
 	// actually no evaltt is faster up to 256hl
-	return ss.accStack[ply].getEval(p.side) * singleOptions[NnuePerc] / 100
+	return ss.accStack[ply].getEval(p.side) * singleOptionValue[NnuePerc] / 100
 }
 
 func (ss *SearchState) evalHybrid(p *Pos, ply int) int {
@@ -154,13 +154,13 @@ func (ss *SearchState) pickEvalFunction() {
 	}
 
 	// either fallback when NNUE isn't loaded or user wants HCE
-	if !ss.isUsingNNUE && singleOptions[HcePerc] == 100 {
+	if !ss.isUsingNNUE && singleOptionValue[HcePerc] == 100 {
 		ss.staticEval = ss.evalHCE
 		return
 	}
 
 	// NNUE mode with no fluff
-	if ss.isUsingNNUE && singleOptions[HcePerc] == 0 {
+	if ss.isUsingNNUE && singleOptionValue[HcePerc] == 0 {
 		ss.staticEval = ss.evalNNUE
 		return
 	}
