@@ -86,6 +86,7 @@ func init() {
 	}
 }
 
+// set value, min, max and name for an option
 func registerSingleOption(
 	option SingleOption,
 	name string,

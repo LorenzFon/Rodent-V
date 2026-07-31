@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"sort"
+	"strings"
 )
 
 // globally available books
@@ -21,12 +22,14 @@ func initBooks(guideBookName, mainBookName string) {
 // main book initializer
 func initMainBook(path string) bool {
 	mainBook.filter = 19
+	mainBook.verbose = !strings.Contains(strings.ToLower(path), "empty.bin")
 	return mainBook.open(path)
 }
 
 // guide book initializer
 func initGuideBook(path string) bool {
 	guideBook.filter = 10
+	mainBook.verbose = !strings.Contains(strings.ToLower(path), "empty.bin")
 	return guideBook.open(path)
 }
 
@@ -41,6 +44,7 @@ type PolyglotBook struct {
 	name    string
 	entries []PolyglotEntry
 	filter  int // percentage of maximum weight, for example 20
+	verbose bool
 }
 
 var PG = [781]uint64{
@@ -394,11 +398,13 @@ func (book *PolyglotBook) open(path string) bool {
 		return book.entries[i].key < book.entries[j].key
 	})
 
-	fmt.Printf(
-		"info string reading book file %q: success, %d entries\n",
-		path,
-		len(book.entries),
-	)
+	if book.verbose {
+		fmt.Printf(
+			"info string reading book file %q: success, %d entries\n",
+			path,
+			len(book.entries),
+		)
+	}
 
 	return true
 }
@@ -436,12 +442,14 @@ func (book *PolyglotBook) getMove(p *Pos) int {
 		return 0
 	}
 
-	fmt.Printf("info string probing %q\n", book.name)
+	if book.verbose {
+		fmt.Printf("info string probing %q\n", book.name)
+	}
 
 	key := polyglotKey(p)
 	first := book.findFirst(key)
 
-	if first == len(book.entries) {
+	if first == len(book.entries) && book.verbose {
 		fmt.Println("info string no book move found")
 		return 0
 	}
@@ -484,24 +492,26 @@ func (book *PolyglotBook) getMove(p *Pos) int {
 		weightSum += weight
 	}
 
-	if len(choices) == 0 || weightSum == 0 {
+	if (len(choices) == 0 || weightSum == 0) && book.verbose {
 		fmt.Println("info string no usable book move found")
 		return 0
 	}
 
-	for _, choice := range choices {
-		if book.isInfrequent(choice.weight, maxWeight) {
-			fmt.Printf(
-				"info string %s ?! weight %d\n",
-				moveToStr(choice.move),
-				choice.weight,
-			)
-		} else {
-			fmt.Printf(
-				"info string %s %d %%\n",
-				moveToStr(choice.move),
-				choice.weight*100/weightSum,
-			)
+	if book.verbose {
+		for _, choice := range choices {
+			if book.isInfrequent(choice.weight, maxWeight) {
+				fmt.Printf(
+					"info string %s ?! weight %d\n",
+					moveToStr(choice.move),
+					choice.weight,
+				)
+			} else {
+				fmt.Printf(
+					"info string %s %d %%\n",
+					moveToStr(choice.move),
+					choice.weight*100/weightSum,
+				)
+			}
 		}
 	}
 
@@ -521,7 +531,7 @@ func (book *PolyglotBook) getMove(p *Pos) int {
 		}
 	}
 
-	if bestMove != 0 {
+	if bestMove != 0 && book.verbose {
 		fmt.Printf("info string selected book move %s\n", moveToStr(bestMove))
 	}
 
