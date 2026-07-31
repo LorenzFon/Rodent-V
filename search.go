@@ -178,8 +178,8 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	refresh(p, &ss.accStack[0])
 
 	// Emit info about node limit
-	if singleOptions[NodesLimit] > 0 {
-		fmt.Println("info string search limited to ", singleOptions[NodesLimit], " nodes")
+	if singleOptionValue[NodesLimit] > 0 {
+		fmt.Println("info string search limited to ", singleOptionValue[NodesLimit], " nodes")
 	}
 
 	// Launch lazy SMP helper threads (depth 1..INF until abortFlag fires).
@@ -1187,7 +1187,7 @@ func (ss *SearchState) checkTime() {
 	}
 
 	// Nodes limit for weaker personalities
-	if singleOptions[NodesLimit] > 0 && ss.nodes >= int64(singleOptions[NodesLimit]) {
+	if singleOptionValue[NodesLimit] > 0 && ss.nodes >= int64(singleOptionValue[NodesLimit]) {
 		atomic.StoreInt32(&abortFlag, 1)
 	}
 

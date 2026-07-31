@@ -104,13 +104,18 @@ func uciLoop() {
 			fmt.Println("option name PestoEval type check default false")
 			fmt.Println("option name Save Personality type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
-			fmt.Println("option name nodesLimit type spin default ", singleOptions[NodesLimit], " min 0 max 1000000000")
-			fmt.Println("option name hceWeight type spin default ", singleOptions[HcePerc], " min 0 max 256")
-			fmt.Println("option name nnueWeight type spin default ", singleOptions[NnuePerc], " min 0 max 256")
-			fmt.Println("option name nnueScale type spin default ", singleOptions[NnueScale], " min 10 max 2000")
+			printSingleOption(NodesLimit)
+			printSingleOption(HcePerc)
+			printSingleOption(NnuePerc)
 			fmt.Println("option name NnuePath type string default", nnuePath)
+			fmt.Println("option name MainBook type string default", mainBookPath)
+			fmt.Println("option name GuideBook type string default", guideBookPath)
 
 			printUciOptionsPerColor()
+
+			printSingleOption(LikesClosed)
+			printSingleOption(KingTropism)
+			printSingleOption(Forwardness)
 			fmt.Println("uciok")
 
 		case "isready":
@@ -134,23 +139,33 @@ func uciLoop() {
 
 		case "go":
 			stopSearch()
-			st, mt, md := parseGoParams(tokens[1:], &p)
-			softTimeLimit = st
-			hardTimeLimit = mt
-			pondering = false
-			for _, t := range tokens[1:] {
-				if t == "ponder" {
-					pondering = true
-					break
-				}
-			}
-			posForSearch := p // copy: the search owns its own position
-			searchDone = make(chan struct{})
-			go func(pos Pos, done chan struct{}, maxDepth int) {
-				defer close(done)
-				think(&pos, states, maxDepth)
-			}(posForSearch, searchDone, md)
 
+			move := 0
+			move = guideBook.getMove(&p)
+			if move == 0 {
+				move = mainBook.getMove(&p)
+			}
+			if move != 0 {
+				fmt.Printf("bestmove %s\n", moveToStr(move))
+			} else {
+
+				st, mt, md := parseGoParams(tokens[1:], &p)
+				softTimeLimit = st
+				hardTimeLimit = mt
+				pondering = false
+				for _, t := range tokens[1:] {
+					if t == "ponder" {
+						pondering = true
+						break
+					}
+				}
+				posForSearch := p // copy: the search owns its own position
+				searchDone = make(chan struct{})
+				go func(pos Pos, done chan struct{}, maxDepth int) {
+					defer close(done)
+					think(&pos, states, maxDepth)
+				}(posForSearch, searchDone, md)
+			}
 		case "stop":
 			stopSearch()
 
@@ -248,7 +263,7 @@ func parseSetOption(tokens []string) {
 		return
 
 	case strings.EqualFold(name, "Save Personality"):
-		if err := saveOptions("C:/Users/Paweł/Rodent-V-search_rewrite/options.txt"); err != nil {
+		if err := saveOptions("C:/Users/Paweł/Rodent-V-main/options.txt"); err != nil {
 			fmt.Printf("info string failed to save personality: %v\n", err)
 		} else {
 			fmt.Println("info string personality saved")
@@ -304,24 +319,43 @@ func parseSetOption(tokens []string) {
 			fmt.Printf("info string failed to load NNUE: %s\n", value)
 		}
 		return
+
+	case strings.EqualFold(name, "mainBook"):
+		if value == "" {
+			fmt.Println("info string main book file path is empty")
+			return
+		}
+
+		if initMainBook(value) {
+			mainBookPath = value
+		} else {
+			fmt.Printf("info string failed to load main book %q\n", value)
+		}
+		return
+
+	case strings.EqualFold(name, "guideBook"):
+		if value == "" {
+			fmt.Println("info string guide book file path is empty")
+			return
+		}
+
+		if initGuideBook(value) {
+			guideBookPath = value
+		} else {
+			fmt.Printf("info string failed to load guide book %q\n", value)
+		}
+
+		return
 	}
 
-	// Eval component options, e.g. "Material", "material", "MATERIAL"
-	for c := EvalComponent(0); c < EvalComponentN; c++ {
+	// Parse all the single options
+	if setSingleOption(name, value) {
+		return
+	}
 
-		if strings.EqualFold(name, "Own"+evalComponentName[c]) {
-			if v, err := strconv.Atoi(value); err == nil {
-				optionPerColorValues[weightOwn][c] = limitValue(v, 0, 500)
-			}
-			return
-		}
-
-		if strings.EqualFold(name, "Opp"+evalComponentName[c]) {
-			if v, err := strconv.Atoi(value); err == nil {
-				optionPerColorValues[weightOpp][c] = limitValue(v, 0, 500)
-			}
-			return
-		}
+	// Parse all the per color (asymmetric) options
+	if setPerColorOption(name, value) {
+		return
 	}
 }
 

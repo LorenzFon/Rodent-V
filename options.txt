@@ -1,0 +1,23 @@
+; Rodent V options
+setoption name nnuePath value nets/rodent_v_256hl_4.bin
+setoption name hceWeight value 60
+setoption name nnueWeight value 50
+setoption name nodesLimit value 0
+setoption name likesClosed value 0
+setoption name kingTropism value 15
+setoption name OwnMaterial value 0
+setoption name OppMaterial value 0
+setoption name OwnPST value 0
+setoption name OppPST value 0
+setoption name OwnMobility value 125
+setoption name OppMobility value 90
+setoption name OwnSafety value 75
+setoption name OppSafety value 140
+setoption name OwnPawns value 0
+setoption name OppPawns value 0
+setoption name OwnPassers value 0
+setoption name OppPassers value 0
+setoption name OwnThreats value 100
+setoption name OppThreats value 100
+setoption name OwnOther value 0
+setoption name OppOther value 0

@@ -132,7 +132,7 @@ func testQuietPositionWithState(fen string, p *Pos, ss *SearchState) (filterResu
 
 	atomic.StoreInt32(&abortFlag, 0)
 	hardTimeLimit = -1
-	singleOptions[NodesLimit] = 0
+	singleOptionValue[NodesLimit] = 0
 
 	staticScore := evaluate(p, &ss.accStack[0])
 

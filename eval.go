@@ -137,14 +137,25 @@ func evaluate(p *Pos, acc *Accumulator) int {
 	} else {
 		nnueScore := 0
 		hceScore := 0
-		if singleOptions[NnuePerc] > 0 {
-			nnueScore = acc.getEval(p.side) * singleOptions[NnuePerc] / 100
+		if singleOptionValue[NnuePerc] > 0 {
+			nnueScore = acc.getEval(p.side) * singleOptionValue[NnuePerc] / 100
 		}
-		if singleOptions[HcePerc] > 0 {
-			hceScore = eval_internal(p, false) * singleOptions[HcePerc] / 100
+		if singleOptionValue[HcePerc] > 0 {
+			hceScore = eval_internal(p, false) * singleOptionValue[HcePerc] / 100
 		}
 
 		score = hceScore + nnueScore
+
+		// Flair options
+		if singleOptionValue[LikesClosed] > 0 {
+			score += flairClosed(p)
+		}
+		if singleOptionValue[KingTropism] > 0 {
+			score += flairTropism(p)
+		}
+		if singleOptionValue[Forwardness] > 0 {
+			score += flairForward(p)
+		}
 	}
 
 	storeEvalHash(p.key, score)
@@ -166,7 +177,7 @@ func evaluateNNUE(p *Pos, acc *Accumulator) int {
 	if score, ok := probeEvalHash(p.key); ok {
 		return score
 	}
-	score := acc.getEval(p.side) * singleOptions[NnuePerc] / 100
+	score := acc.getEval(p.side) * singleOptionValue[NnuePerc] / 100
 	storeEvalHash(p.key, score)
 	return score
 }

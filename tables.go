@@ -112,6 +112,14 @@ const (
 	NO_SQ                          = 64 // sentinel for "no square"
 )
 
+// Castle rights (bytes of one int).
+const (
+	wKingsideCastle  = 1
+	wQueensideCastle = 2
+	bKingsideCastle  = 4
+	bQueensideCastle = 8
+)
+
 // Engine limits.
 const (
 	maxPly   = 64    // maximum search depth

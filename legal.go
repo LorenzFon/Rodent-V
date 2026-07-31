@@ -37,11 +37,11 @@ package main
 // in position p.  It does NOT check for self-check (the caller does
 // that via selfInCheck after makeMove).
 func isLegal(p *Pos, move int) bool {
-	side     := p.side
-	from     := moveFrom(move)
-	to       := moveTo(move)
+	side := p.side
+	from := moveFrom(move)
+	to := moveTo(move)
 	fromType := p.typeAt(from)
-	toType   := p.typeAt(to)
+	toType := p.typeAt(to)
 
 	// The from-square must hold a piece belonging to the moving side.
 	if fromType == NO_TP || colorOf(p.board[from]) != side {
@@ -63,12 +63,12 @@ func isLegal(p *Pos, move int) bool {
 				return false
 			}
 			if to > from { // kingside
-				return p.castleRights&1 != 0 &&
+				return p.castleRights&wKingsideCastle != 0 &&
 					p.occupied()&0x0000000000000060 == 0 &&
 					!isAttacked(p, E1, Black) && !isAttacked(p, F1, Black)
 			}
 			// queenside
-			return p.castleRights&2 != 0 &&
+			return p.castleRights&wQueensideCastle != 0 &&
 				p.occupied()&0x000000000000000E == 0 &&
 				!isAttacked(p, E1, Black) && !isAttacked(p, D1, Black)
 		}
@@ -76,12 +76,12 @@ func isLegal(p *Pos, move int) bool {
 			return false
 		}
 		if to > from { // kingside
-			return p.castleRights&4 != 0 &&
+			return p.castleRights&bKingsideCastle != 0 &&
 				p.occupied()&0x6000000000000000 == 0 &&
 				!isAttacked(p, E8, White) && !isAttacked(p, F8, White)
 		}
 		// queenside
-		return p.castleRights&8 != 0 &&
+		return p.castleRights&bQueensideCastle != 0 &&
 			p.occupied()&0x0E00000000000000 == 0 &&
 			!isAttacked(p, E8, White) && !isAttacked(p, D8, White)
 

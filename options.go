@@ -23,16 +23,23 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
-var nnuePath string // default path to NNUE file
+var nnuePath string      // default path to NNUE file
+var guideBookPath string // path to repertoire Polyglot book, default is empty
+var mainBookPath string  // path to main Polyglot book, default is empty
 
 var pestoEval bool            // are we using pesto eval?
 var adjustEvalByCorrhist bool // are we using corrhist
 // (corrhist makes engine stronger but can mask eval properties)
 
-// color-independent options
+// Rodent has two kinds of eval options: asymmetric, set independently
+// for engine's and opponent's side, and symmetrical, affecting both
+// sides to the same extent
+
+// symmetrical, side-independent options
 type SingleOption int
 
 const (
@@ -50,26 +57,30 @@ var SingleOptionName = [NofSingleOptions]string{
 	NnueScale:  "nnueScale",
 }
 
-var singleOptions [NofSingleOptions]int
+// Asymmetric, side-dependent options (EvaComponent) are defined
+// in EvalData. They need to be indexed by engine/non engine side,
+// not white/black, hence we need to set engineSide variable
+// at the beginning of each search.
+var optionPerColorValues [2][EvalComponentN]int
 
-// color-dependent options need to be indexed
-// by engine/non engine side, not white/black
 var engineSide int
 
 const weightOwn = 0
 const weightOpp = 1
 
-// NOTE: evalComponent is defined in EvalData
-var optionPerColorValues [2][EvalComponentN]int
-
 // default settings
 func init() {
 
-	nnuePath = "nets/rodent_v_512hl_6.bin"
-	singleOptions[NnuePerc] = 100
-	singleOptions[HcePerc] = 0
-	singleOptions[NodesLimit] = 0
-	singleOptions[NnueScale] = 400
+	guideBookPath = "books/empty.bin"
+	mainBookPath = "books/empty.bin"
+	nnuePath = "nets/rodent_v_256hl_4.bin"
+
+	registerSingleOption(HcePerc, "hceWeight", 60, 0, 256)
+	registerSingleOption(NnuePerc, "nnueWeight", 30, 0, 256)
+	registerSingleOption(NodesLimit, "nodesLimit", 0, 0, 1000*1000*1000)
+	registerSingleOption(LikesClosed, "likesClosed", 0, 0, 256)
+	registerSingleOption(KingTropism, "kingTropism", 0, 0, 256)
+	registerSingleOption(Forwardness, "forwardness", 0, 0, 256)
 
 	pestoEval = false
 	adjustEvalByCorrhist = true
@@ -78,6 +89,20 @@ func init() {
 		optionPerColorValues[weightOwn][c] = 100
 		optionPerColorValues[weightOpp][c] = 100
 	}
+}
+
+// set value, min, max and name for an option
+func registerSingleOption(
+	option SingleOption,
+	name string,
+	defaultValue int,
+	minValue int,
+	maxValue int,
+) {
+	singleOptionName[option] = name
+	singleOptionValue[option] = defaultValue
+	singleOptionMin[option] = minValue
+	singleOptionMax[option] = maxValue
 }
 
 // saveOptions writes the current engine options as UCI setoption commands,
@@ -106,12 +131,28 @@ func saveOptions(path string) error {
 			return err
 		}
 
+		if _, err := fmt.Fprintf(
+			writer,
+			"setoption name mainBookPath value %s\n",
+			mainBookPath,
+		); err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(
+			writer,
+			"setoption name guideBookPath value %s\n",
+			guideBookPath,
+		); err != nil {
+			return err
+		}
+
 		for option := SingleOption(0); option < NofSingleOptions; option++ {
 			if _, err := fmt.Fprintf(
 				writer,
 				"setoption name %s value %d\n",
-				SingleOptionName[option],
-				singleOptions[option],
+				singleOptionName[option],
+				singleOptionValue[option],
 			); err != nil {
 				return err
 			}
@@ -204,18 +245,79 @@ func readOptions(path string) error {
 	return nil
 }
 
-// prints color-separated options
+// printUciOptionsPerColor prints color-separated options
 func printUciOptionsPerColor() {
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
-		fmt.Printf(
-			"option name Own%s type spin default %d min 0 max 500\n",
-			evalComponentName[c],
-			optionPerColorValues[weightOwn][c],
-		)
-		fmt.Printf(
-			"option name Opp%s type spin default %d min 0 max 500\n",
-			evalComponentName[c],
-			optionPerColorValues[weightOpp][c],
-		)
+		printPerColorOption(c)
 	}
+}
+
+// printPerColorOption prints option that has separate values
+// for engine's and its opponents' side
+func printPerColorOption(component EvalComponent) {
+	fmt.Printf(
+		"option name Own%s type spin default %d min 0 max 500\n",
+		evalComponentName[component],
+		optionPerColorValues[weightOwn][component],
+	)
+
+	fmt.Printf(
+		"option name Opp%s type spin default %d min 0 max 500\n",
+		evalComponentName[component],
+		optionPerColorValues[weightOpp][component],
+	)
+}
+
+func setPerColorOption(name, value string) bool {
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return false
+	}
+
+	for c := EvalComponent(0); c < EvalComponentN; c++ {
+		switch {
+		case strings.EqualFold(name, "Own"+evalComponentName[c]):
+			optionPerColorValues[weightOwn][c] = limitValue(v, 0, 500)
+			return true
+
+		case strings.EqualFold(name, "Opp"+evalComponentName[c]):
+			optionPerColorValues[weightOpp][c] = limitValue(v, 0, 500)
+			return true
+		}
+	}
+
+	return false
+}
+
+// prints spin option applicable to both sides
+// NOTE: we are relying on Println adding spaces between arguments
+func printSingleOption(option SingleOption) {
+	fmt.Println(
+		"option name", singleOptionName[option],
+		"type spin default", singleOptionValue[option],
+		"min", singleOptionMin[option],
+		"max", singleOptionMax[option],
+	)
+}
+
+func setSingleOption(name, value string) bool {
+	for option := SingleOption(0); option < NofSingleOptions; option++ {
+		if !strings.EqualFold(name, singleOptionName[option]) {
+			continue
+		}
+
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			fmt.Printf("info string invalid value %q for option %s\n",
+				value, singleOptionName[option])
+			return true
+		}
+
+		singleOptionValue[option] = limitValue(n,
+			singleOptionMin[option],
+			singleOptionMax[option])
+		return true
+	}
+
+	return false
 }
