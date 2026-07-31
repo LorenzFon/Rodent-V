@@ -153,6 +153,9 @@ func evaluate(p *Pos, acc *Accumulator) int {
 		if singleOptions[KingTropism] > 0 {
 			score += flairTropism(p)
 		}
+		if singleOptions[Forwardness] > 0 {
+			score += flairForward(p)
+		}
 	}
 
 	storeEvalHash(p.key, score)

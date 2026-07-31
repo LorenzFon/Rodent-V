@@ -105,13 +105,15 @@ func uciLoop() {
 			fmt.Println("option name Save Personality type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
 			fmt.Println("option name nodesLimit type spin default ", singleOptions[NodesLimit], " min 0 max 1000000000")
-			fmt.Println("option name hceWeight type spin default ", singleOptions[HcePerc], " min 0 max 256")
-			fmt.Println("option name nnueWeight type spin default ", singleOptions[NnuePerc], " min 0 max 256")
+			printSpinOption(HcePerc, 0, 256)
+			printSpinOption(NnuePerc, 0, 256)
 			fmt.Println("option name NnuePath type string default", nnuePath)
 
 			printUciOptionsPerColor()
-			fmt.Println("option name likesClosed type spin default ", singleOptions[LikesClosed], " min 0 max 256")
-			fmt.Println("option name kingTropism type spin default ", singleOptions[KingTropism], " min 0 max 256")
+
+			printSpinOption(LikesClosed, 0, 256)
+			printSpinOption(KingTropism, 0, 256)
+			printSpinOption(Forwardness, 0, 256)
 			fmt.Println("uciok")
 
 		case "isready":
@@ -242,7 +244,7 @@ func parseSetOption(tokens []string) {
 		return
 
 	case strings.EqualFold(name, "Save Personality"):
-		if err := saveOptions("C:/Users/Paweł/Rodent-V-search_rewrite/options.txt"); err != nil {
+		if err := saveOptions("C:/Users/Paweł/Rodent-V-main/options.txt"); err != nil {
 			fmt.Printf("info string failed to save personality: %v\n", err)
 		} else {
 			fmt.Println("info string personality saved")
@@ -261,31 +263,37 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
-	case strings.EqualFold(name, "nodesLimit"):
+	case strings.EqualFold(name, SingleOptionName[NodesLimit]):
 		if n, err := strconv.Atoi(value); err == nil {
 			singleOptions[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
 		}
 		return
 
-	case strings.EqualFold(name, "hceWeight"):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[HcePerc] = limitValue(n, 0, 256)
-		}
-		return
-
-	case strings.EqualFold(name, "likesClosed"):
+	case strings.EqualFold(name, SingleOptionName[LikesClosed]):
 		if n, err := strconv.Atoi(value); err == nil {
 			singleOptions[LikesClosed] = limitValue(n, 0, 256)
 		}
 		return
 
-	case strings.EqualFold(name, "kingTropism"):
+	case strings.EqualFold(name, SingleOptionName[KingTropism]):
 		if n, err := strconv.Atoi(value); err == nil {
 			singleOptions[KingTropism] = limitValue(n, 0, 256)
 		}
 		return
 
-	case strings.EqualFold(name, "nnueWeight"):
+	case strings.EqualFold(name, SingleOptionName[Forwardness]):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[Forwardness] = limitValue(n, 0, 256)
+		}
+		return
+
+	case strings.EqualFold(name, SingleOptionName[HcePerc]):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[HcePerc] = limitValue(n, 0, 256)
+		}
+		return
+
+	case strings.EqualFold(name, SingleOptionName[NnuePerc]):
 		if n, err := strconv.Atoi(value); err == nil {
 			singleOptions[NnuePerc] = limitValue(n, 0, 256)
 		}

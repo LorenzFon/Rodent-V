@@ -41,6 +41,7 @@ const (
 	NodesLimit
 	LikesClosed
 	KingTropism
+	Forwardness
 	NofSingleOptions
 )
 
@@ -50,6 +51,7 @@ var SingleOptionName = [NofSingleOptions]string{
 	NodesLimit:  "nodesLimit",
 	LikesClosed: "likesClosed",
 	KingTropism: "kingTropism",
+	Forwardness: "forwardness",
 }
 
 var singleOptions [NofSingleOptions]int
@@ -207,18 +209,35 @@ func readOptions(path string) error {
 	return nil
 }
 
-// prints color-separated options
+// printUciOptionsPerColor prints color-separated options
 func printUciOptionsPerColor() {
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
-		fmt.Printf(
-			"option name Own%s type spin default %d min 0 max 500\n",
-			evalComponentName[c],
-			optionPerColorValues[weightOwn][c],
-		)
-		fmt.Printf(
-			"option name Opp%s type spin default %d min 0 max 500\n",
-			evalComponentName[c],
-			optionPerColorValues[weightOpp][c],
-		)
+		printDoubleOption(c)
 	}
+}
+
+// printDoubleOption prints option that has separate values
+// for engine's and its opponents' side
+func printDoubleOption(component EvalComponent) {
+	fmt.Printf(
+		"option name Own%s type spin default %d min 0 max 500\n",
+		evalComponentName[component],
+		optionPerColorValues[weightOwn][component],
+	)
+
+	fmt.Printf(
+		"option name Opp%s type spin default %d min 0 max 500\n",
+		evalComponentName[component],
+		optionPerColorValues[weightOpp][component],
+	)
+}
+
+// prints SingleOption as a spin option with default, min and max values
+func printSpinOption(option SingleOption, minValue, maxValue int) {
+	fmt.Println(
+		"option name ", SingleOptionName[option],
+		" type spin default ", singleOptions[option],
+		" min ", minValue,
+		" max ", maxValue,
+	)
 }
