@@ -282,30 +282,6 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
-	case strings.EqualFold(name, "nodesLimit"):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
-		}
-		return
-
-	case strings.EqualFold(name, "nnueScale"):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[NnueScale] = limitValue(n, 10, 2000)
-		}
-		return
-
-	case strings.EqualFold(name, "hceWeight"):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[HcePerc] = limitValue(n, 0, 256)
-		}
-		return
-
-	case strings.EqualFold(name, "nnueWeight"):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[NnuePerc] = limitValue(n, 0, 256)
-		}
-		return
-
 	case strings.EqualFold(name, "nnuePath"):
 		if value == "" {
 			fmt.Println("info string NNUE file path is empty")
@@ -716,7 +692,7 @@ func measureScale(path string) {
 		absMean := float64(totalAbs) / float64(count)
 		fmt.Printf("info string Positions: %d\n", count)
 		fmt.Printf("info string Average Absolute Eval: %.2f\n", absMean)
-		fmt.Printf("info string Current NnueScale: %d\n", singleOptions[NnueScale])
+		fmt.Printf("info string Current NnueScale: %d\n", singleOptionValue[NnueScale])
 	} else {
 		fmt.Println("info string No valid positions found.")
 	}
