@@ -74,7 +74,7 @@ func init() {
 
 	guideBookPath = "books/empty.bin"
 	mainBookPath = "books/empty.bin"
-	nnuePath = "nets/rodent_v_256hl_4.bin"
+	nnuePath = "nets/rodent_v_512hl_6.bin"
 
 	registerSingleOption(HcePerc, "hceWeight", 60, 0, 256)
 	registerSingleOption(NnuePerc, "nnueWeight", 30, 0, 256)
