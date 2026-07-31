@@ -26,7 +26,9 @@ import (
 	"strings"
 )
 
-var nnuePath string // default path to NNUE file
+var nnuePath string      // default path to NNUE file
+var guideBookPath string // path to repertoire Polyglot book, default is empty
+var mainBookPath string  // path to main Polyglot book, default is empty
 
 var pestoEval bool            // are we using pesto eval?
 var adjustEvalByCorrhist bool // are we using corrhist
@@ -69,6 +71,8 @@ var optionPerColorValues [2][EvalComponentN]int
 // default settings
 func init() {
 
+	guideBookPath = "books/empty.bin"
+	mainBookPath = "books/empty.bin"
 	nnuePath = "nets/rodent_v_256hl_4.bin"
 	singleOptions[NnuePerc] = 30
 	singleOptions[HcePerc] = 60
@@ -107,6 +111,22 @@ func saveOptions(path string) error {
 			writer,
 			"setoption name nnuePath value %s\n",
 			nnuePath,
+		); err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(
+			writer,
+			"setoption name mainBookPath value %s\n",
+			mainBookPath,
+		); err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(
+			writer,
+			"setoption name guideBookPath value %s\n",
+			guideBookPath,
 		); err != nil {
 			return err
 		}

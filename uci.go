@@ -108,6 +108,8 @@ func uciLoop() {
 			printSpinOption(HcePerc, 0, 256)
 			printSpinOption(NnuePerc, 0, 256)
 			fmt.Println("option name NnuePath type string default", nnuePath)
+			fmt.Println("option name MainBook type string default", mainBookPath)
+			fmt.Println("option name GuideBook type string default", guideBookPath)
 
 			printUciOptionsPerColor()
 
@@ -137,23 +139,33 @@ func uciLoop() {
 
 		case "go":
 			stopSearch()
-			st, mt, md := parseGoParams(tokens[1:], &p)
-			softTimeLimit = st
-			hardTimeLimit = mt
-			pondering = false
-			for _, t := range tokens[1:] {
-				if t == "ponder" {
-					pondering = true
-					break
-				}
-			}
-			posForSearch := p // copy: the search owns its own position
-			searchDone = make(chan struct{})
-			go func(pos Pos, done chan struct{}, maxDepth int) {
-				defer close(done)
-				think(&pos, states, maxDepth)
-			}(posForSearch, searchDone, md)
 
+			move := 0
+			move = guideBook.getMove(&p)
+			if move == 0 {
+				move = mainBook.getMove(&p)
+			}
+			if move != 0 {
+				fmt.Printf("bestmove %s\n", moveToStr(move))
+			} else {
+
+				st, mt, md := parseGoParams(tokens[1:], &p)
+				softTimeLimit = st
+				hardTimeLimit = mt
+				pondering = false
+				for _, t := range tokens[1:] {
+					if t == "ponder" {
+						pondering = true
+						break
+					}
+				}
+				posForSearch := p // copy: the search owns its own position
+				searchDone = make(chan struct{})
+				go func(pos Pos, done chan struct{}, maxDepth int) {
+					defer close(done)
+					think(&pos, states, maxDepth)
+				}(posForSearch, searchDone, md)
+			}
 		case "stop":
 			stopSearch()
 
@@ -311,6 +323,33 @@ func parseSetOption(tokens []string) {
 		} else {
 			fmt.Printf("info string failed to load NNUE: %s\n", value)
 		}
+		return
+
+	case strings.EqualFold(name, "mainBook"):
+		if value == "" {
+			fmt.Println("info string main book file path is empty")
+			return
+		}
+
+		mainBookPath = value
+		fmt.Printf("info string main book path is now %q\n", mainBookPath)
+
+		fmt.Printf("info string changing main book to %q\n", value)
+		if initMainBook(value) {
+			fmt.Printf("info string main book changed to %q\n", value)
+		} else {
+			fmt.Printf("info string failed to change main book to %q\n", value)
+		}
+		return
+
+	case strings.EqualFold(name, "guideBook"):
+		if value == "" {
+			fmt.Println("info string guide book file path is empty")
+			return
+		}
+
+		guideBookPath = value
+		initGuideBook(value)
 		return
 	}
 

@@ -114,6 +114,10 @@ func main() {
 		}
 	}
 
+	// default is no opening books
+	initBooks("books/empty.bin", "books/empty.bin")
+
+	// main program loop
 	uciLoop()
 }
 
