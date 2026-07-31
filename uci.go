@@ -207,6 +207,13 @@ func uciLoop() {
 				fmt.Print(acc.getEval(p.side))
 			}
 
+		case "measure_scale":
+			if len(tokens) >= 2 {
+				measureScale(tokens[1])
+			} else {
+				fmt.Println("info string Usage: measure_scale <epd_file>")
+			}
+
 		case "threats":
 			PrintThreatDebug(&p)
 		}
@@ -272,6 +279,30 @@ func parseSetOption(tokens []string) {
 	case strings.EqualFold(name, "Threads"):
 		if n, err := strconv.Atoi(value); err == nil {
 			numThreads = limitValue(n, 1, 256)
+		}
+		return
+
+	case strings.EqualFold(name, "nodesLimit"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
+		}
+		return
+
+	case strings.EqualFold(name, "nnueScale"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[NnueScale] = limitValue(n, 10, 2000)
+		}
+		return
+
+	case strings.EqualFold(name, "hceWeight"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[HcePerc] = limitValue(n, 0, 256)
+		}
+		return
+
+	case strings.EqualFold(name, "nnueWeight"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[NnuePerc] = limitValue(n, 0, 256)
 		}
 		return
 
@@ -643,4 +674,50 @@ func limitValue(value, min, max int) int {
 		return max
 	}
 	return value
+}
+
+func measureScale(path string) {
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println("info string Error opening file:", err)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var totalAbs int64
+	var count int64
+	var acc Accumulator
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" { continue }
+		
+		var p Pos
+		parseFEN(&p, line)
+		
+		refresh(&p, &acc)
+		eval := acc.getEval(p.side)
+		
+		absEval := eval
+		if absEval < 0 {
+			absEval = -absEval
+		}
+		
+		totalAbs += int64(absEval)
+		count++
+		
+		if count % 100000 == 0 {
+			fmt.Printf("info string Processed %d positions...\n", count)
+		}
+	}
+	
+	if count > 0 {
+		absMean := float64(totalAbs) / float64(count)
+		fmt.Printf("info string Positions: %d\n", count)
+		fmt.Printf("info string Average Absolute Eval: %.2f\n", absMean)
+		fmt.Printf("info string Current NnueScale: %d\n", singleOptions[NnueScale])
+	} else {
+		fmt.Println("info string No valid positions found.")
+	}
 }

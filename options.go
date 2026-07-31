@@ -46,16 +46,16 @@ const (
 	HcePerc SingleOption = iota
 	NnuePerc
 	NodesLimit
-	LikesClosed
-	KingTropism
-	Forwardness
+	NnueScale
 	NofSingleOptions
 )
 
-var singleOptionName [NofSingleOptions]string
-var singleOptionValue [NofSingleOptions]int
-var singleOptionMin [NofSingleOptions]int
-var singleOptionMax [NofSingleOptions]int
+var SingleOptionName = [NofSingleOptions]string{
+	HcePerc:    "hceWeight",
+	NnuePerc:   "nnueWeight",
+	NodesLimit: "nodesLimit",
+	NnueScale:  "nnueScale",
+}
 
 // Asymmetric, side-dependent options (EvaComponent) are defined
 // in EvalData. They need to be indexed by engine/non engine side,
