@@ -425,7 +425,7 @@ func (acc *Accumulator) getEval(stm int) int {
 
 	sum = sum/NNUEL0Scale + int32(nnueParams.OutputBias)
 
-	return int(sum * int32(singleOptions[NnueScale]) /
+	return int(sum * int32(singleOptionValue[NnueScale]) /
 		(NNUEL0Scale * NNUEL1Scale))
 }
 

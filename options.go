@@ -47,15 +47,16 @@ const (
 	NnuePerc
 	NodesLimit
 	NnueScale
+	LikesClosed
+	KingTropism
+	Forwardness
 	NofSingleOptions
 )
 
-var SingleOptionName = [NofSingleOptions]string{
-	HcePerc:    "hceWeight",
-	NnuePerc:   "nnueWeight",
-	NodesLimit: "nodesLimit",
-	NnueScale:  "nnueScale",
-}
+var singleOptionName [NofSingleOptions]string
+var singleOptionValue [NofSingleOptions]int
+var singleOptionMin [NofSingleOptions]int
+var singleOptionMax [NofSingleOptions]int
 
 // Asymmetric, side-dependent options (EvaComponent) are defined
 // in EvalData. They need to be indexed by engine/non engine side,
@@ -77,6 +78,7 @@ func init() {
 
 	registerSingleOption(HcePerc, "hceWeight", 60, 0, 256)
 	registerSingleOption(NnuePerc, "nnueWeight", 30, 0, 256)
+	registerSingleOption(NnueScale, "nnueScale", 400, 0, 2000)
 	registerSingleOption(NodesLimit, "nodesLimit", 0, 0, 1000*1000*1000)
 	registerSingleOption(LikesClosed, "likesClosed", 0, 0, 256)
 	registerSingleOption(KingTropism, "kingTropism", 0, 0, 256)
