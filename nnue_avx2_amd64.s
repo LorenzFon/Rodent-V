@@ -1048,6 +1048,18 @@ eval384_loop:
 //     w0, w1 *int16,
 //     sum *int32,
 // )
+//
+// For every neuron:
+//
+//     v = clamp(acc, 0, 255)
+//     sum += v * v * weight
+//
+// Lizard-style exact split:
+//
+//     v² = v * floor(v/2) + v * ceil(v/2)
+//
+// 512 int16 neurons = 1024 bytes.
+// Each loop iteration processes 16 neurons per perspective.
 TEXT ·getEvalAVX2_512(SB), NOSPLIT, $0-40
 	MOVQ a0+0(FP), AX
 	MOVQ a1+8(FP), BX
@@ -1055,108 +1067,106 @@ TEXT ·getEvalAVX2_512(SB), NOSPLIT, $0-40
 	MOVQ w1+24(FP), DX
 	MOVQ sum+32(FP), SI
 
-	// Y14 = zero
+	// Y14 = sixteen int16 zeros.
 	VPXOR Y14, Y14, Y14
 
-	// Y15 = sixteen int16 values containing 255
+	// Y15 = sixteen int16 values equal to 255.
 	MOVL $255, R8
 	VMOVD R8, X15
 	VPBROADCASTW X15, Y15
 
-	// Y8 = int32 accumulation
+	// Y13 = sixteen int16 values equal to 1.
+	MOVL $1, R8
+	VMOVD R8, X13
+	VPBROADCASTW X13, Y13
+
+	// Y8 accumulates eight int32 partial sums.
 	VPXOR Y8, Y8, Y8
 
 	XORQ R9, R9
 
-eval512_loop:
+geteval_512_loop:
 	// ------------------------------------------------------------
-	// Perspective 0, lower eight neurons
+	// Perspective 0
 	// ------------------------------------------------------------
 
+	// Load 16 accumulator values and 16 signed weights.
 	VMOVDQU (AX)(R9*1), Y0
 	VMOVDQU (CX)(R9*1), Y1
 
-	// clamp accumulator to [0, 255]
+	// SCReLU clipping: v = clamp(acc, 0, 255).
 	VPMAXSW Y14, Y0, Y0
 	VPMINSW Y15, Y0, Y0
 
-	// lower 8 x int16 -> int32
-	VPMOVSXWD X0, Y2
-	VPMOVSXWD X1, Y3
+	// Y2 = floor(v / 2)
+	// Y3 = ceil(v / 2) = (v + 1) / 2
+	VPSRLW $1, Y0, Y2
+	VPADDW Y13, Y0, Y3
+	VPSRLW $1, Y3, Y3
 
-	// x² * weight
-	VPMULLD Y2, Y2, Y2
-	VPMULLD Y3, Y2, Y2
+	// Y2 = v * floor(v / 2)
+	// Y3 = v * ceil(v / 2)
+	VPMULLW Y0, Y2, Y2
+	VPMULLW Y0, Y3, Y3
+
+	// Multiply partial products by output weights and horizontally add pairs.
+	VPMADDWD Y1, Y2, Y2
+	VPMADDWD Y1, Y3, Y3
 
 	VPADDD Y2, Y8, Y8
+	VPADDD Y3, Y8, Y8
 
 	// ------------------------------------------------------------
-	// Perspective 0, upper eight neurons
-	// ------------------------------------------------------------
-
-	VEXTRACTI128 $1, Y0, X4
-	VEXTRACTI128 $1, Y1, X5
-
-	VPMOVSXWD X4, Y4
-	VPMOVSXWD X5, Y5
-
-	VPMULLD Y4, Y4, Y4
-	VPMULLD Y5, Y4, Y4
-
-	VPADDD Y4, Y8, Y8
-
-	// ------------------------------------------------------------
-	// Perspective 1, lower eight neurons
+	// Perspective 1
 	// ------------------------------------------------------------
 
 	VMOVDQU (BX)(R9*1), Y0
 	VMOVDQU (DX)(R9*1), Y1
 
+	// SCReLU clipping: v = clamp(acc, 0, 255).
 	VPMAXSW Y14, Y0, Y0
 	VPMINSW Y15, Y0, Y0
 
-	VPMOVSXWD X0, Y2
-	VPMOVSXWD X1, Y3
+	// Y2 = floor(v / 2)
+	// Y3 = ceil(v / 2) = (v + 1) / 2
+	VPSRLW $1, Y0, Y2
+	VPADDW Y13, Y0, Y3
+	VPSRLW $1, Y3, Y3
 
-	VPMULLD Y2, Y2, Y2
-	VPMULLD Y3, Y2, Y2
+	// Partial SCReLU products.
+	VPMULLW Y0, Y2, Y2
+	VPMULLW Y0, Y3, Y3
+
+	// Multiply by output weights and accumulate.
+	VPMADDWD Y1, Y2, Y2
+	VPMADDWD Y1, Y3, Y3
 
 	VPADDD Y2, Y8, Y8
+	VPADDD Y3, Y8, Y8
 
-	// ------------------------------------------------------------
-	// Perspective 1, upper eight neurons
-	// ------------------------------------------------------------
-
-	VEXTRACTI128 $1, Y0, X4
-	VEXTRACTI128 $1, Y1, X5
-
-	VPMOVSXWD X4, Y4
-	VPMOVSXWD X5, Y5
-
-	VPMULLD Y4, Y4, Y4
-	VPMULLD Y5, Y4, Y4
-
-	VPADDD Y4, Y8, Y8
-
-	// 16 int16 neurons = 32 bytes
+	// 16 int16 neurons = 32 bytes.
 	ADDQ $32, R9
 
-	// 512 int16 neurons = 1024 bytes
+	// 512 int16 neurons = 1024 bytes.
 	CMPQ R9, $1024
-	JL eval512_loop
+	JB geteval_512_loop
 
-	// Horizontal sum of eight int32 lanes in Y8.
+	// Horizontally reduce eight int32 lanes to one int32.
 	VEXTRACTI128 $1, Y8, X1
 	VPADDD X1, X8, X8
 
+	// [a,b,c,d] + [c,d,a,b]
 	VPSHUFD $0x4E, X8, X1
 	VPADDD X1, X8, X8
 
+	// [a,b,...] + [b,a,...]
 	VPSHUFD $0xB1, X8, X1
 	VPADDD X1, X8, X8
 
+	// Store the low int32 result.
 	VMOVD X8, R8
 	MOVL R8, (SI)
 
 	VZEROUPPER
 	RET
+	
