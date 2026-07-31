@@ -104,18 +104,18 @@ func uciLoop() {
 			fmt.Println("option name PestoEval type check default false")
 			fmt.Println("option name Save Personality type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
-			fmt.Println("option name nodesLimit type spin default ", singleOptions[NodesLimit], " min 0 max 1000000000")
-			printSpinOption(HcePerc, 0, 256)
-			printSpinOption(NnuePerc, 0, 256)
+			printSpinOption(NodesLimit)
+			printSpinOption(HcePerc)
+			printSpinOption(NnuePerc)
 			fmt.Println("option name NnuePath type string default", nnuePath)
 			fmt.Println("option name MainBook type string default", mainBookPath)
 			fmt.Println("option name GuideBook type string default", guideBookPath)
 
 			printUciOptionsPerColor()
 
-			printSpinOption(LikesClosed, 0, 256)
-			printSpinOption(KingTropism, 0, 256)
-			printSpinOption(Forwardness, 0, 256)
+			printSpinOption(LikesClosed)
+			printSpinOption(KingTropism)
+			printSpinOption(Forwardness)
 			fmt.Println("uciok")
 
 		case "isready":
@@ -275,42 +275,6 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
-	case strings.EqualFold(name, SingleOptionName[NodesLimit]):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
-		}
-		return
-
-	case strings.EqualFold(name, SingleOptionName[LikesClosed]):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[LikesClosed] = limitValue(n, 0, 256)
-		}
-		return
-
-	case strings.EqualFold(name, SingleOptionName[KingTropism]):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[KingTropism] = limitValue(n, 0, 256)
-		}
-		return
-
-	case strings.EqualFold(name, SingleOptionName[Forwardness]):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[Forwardness] = limitValue(n, 0, 256)
-		}
-		return
-
-	case strings.EqualFold(name, SingleOptionName[HcePerc]):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[HcePerc] = limitValue(n, 0, 256)
-		}
-		return
-
-	case strings.EqualFold(name, SingleOptionName[NnuePerc]):
-		if n, err := strconv.Atoi(value); err == nil {
-			singleOptions[NnuePerc] = limitValue(n, 0, 256)
-		}
-		return
-
 	case strings.EqualFold(name, "nnuePath"):
 		if value == "" {
 			fmt.Println("info string NNUE file path is empty")
@@ -331,14 +295,10 @@ func parseSetOption(tokens []string) {
 			return
 		}
 
-		mainBookPath = value
-		fmt.Printf("info string main book path is now %q\n", mainBookPath)
-
-		fmt.Printf("info string changing main book to %q\n", value)
 		if initMainBook(value) {
-			fmt.Printf("info string main book changed to %q\n", value)
+			mainBookPath = value
 		} else {
-			fmt.Printf("info string failed to change main book to %q\n", value)
+			fmt.Printf("info string failed to load main book %q\n", value)
 		}
 		return
 
@@ -348,8 +308,16 @@ func parseSetOption(tokens []string) {
 			return
 		}
 
-		guideBookPath = value
-		initGuideBook(value)
+		if initGuideBook(value) {
+			guideBookPath = value
+		} else {
+			fmt.Printf("info string failed to load guide book %q\n", value)
+		}
+
+		return
+	}
+
+	if setSingleOption(name, value) {
 		return
 	}
 

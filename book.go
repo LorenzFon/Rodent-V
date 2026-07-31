@@ -25,16 +25,16 @@ func initMainBook(path string) bool {
 }
 
 // guide book initializer
-func initGuideBook(guideBookName string) {
+func initGuideBook(path string) bool {
 	guideBook.filter = 10
-	guideBook.open(guideBookName)
+	return guideBook.open(path)
 }
 
 type PolyglotEntry struct {
 	key    uint64
 	move   uint16
 	weight uint16
-	learn  uint32
+	learn  uint32 // unused by Rodent
 }
 
 type PolyglotBook struct {
@@ -540,13 +540,13 @@ func polyglotMoveToInternal(p *Pos, encoded uint16) int {
 
 	// Polyglot represents castling as king captures rook.
 	switch {
-	case from == E1 && to == H1:
+	case from == E1 && to == H1 && isOnSq(p, White, K, from):
 		to = G1
-	case from == E1 && to == A1:
+	case from == E1 && to == A1 && isOnSq(p, White, K, from):
 		to = C1
-	case from == E8 && to == H8:
+	case from == E8 && to == H8 && isOnSq(p, Black, K, from):
 		to = G8
-	case from == E8 && to == A8:
+	case from == E8 && to == A8 && isOnSq(p, Black, K, from):
 		to = C8
 	}
 

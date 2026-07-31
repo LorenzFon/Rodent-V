@@ -23,6 +23,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -47,16 +48,10 @@ const (
 	NofSingleOptions
 )
 
-var SingleOptionName = [NofSingleOptions]string{
-	HcePerc:     "hceWeight",
-	NnuePerc:    "nnueWeight",
-	NodesLimit:  "nodesLimit",
-	LikesClosed: "likesClosed",
-	KingTropism: "kingTropism",
-	Forwardness: "forwardness",
-}
-
-var singleOptions [NofSingleOptions]int
+var singleOptionName [NofSingleOptions]string
+var singleOptionValue [NofSingleOptions]int
+var singleOptionMin [NofSingleOptions]int
+var singleOptionMax [NofSingleOptions]int
 
 // color-dependent options need to be indexed
 // by engine/non engine side, not white/black
@@ -74,11 +69,13 @@ func init() {
 	guideBookPath = "books/empty.bin"
 	mainBookPath = "books/empty.bin"
 	nnuePath = "nets/rodent_v_256hl_4.bin"
-	singleOptions[NnuePerc] = 30
-	singleOptions[HcePerc] = 60
-	singleOptions[NodesLimit] = 0
-	singleOptions[LikesClosed] = 0
-	singleOptions[KingTropism] = 0
+
+	registerSingleOption(HcePerc, "hceWeight", 60, 0, 256)
+	registerSingleOption(NnuePerc, "nnueWeight", 30, 0, 256)
+	registerSingleOption(NodesLimit, "nodesLimit", 0, 0, 1000*1000*1000)
+	registerSingleOption(LikesClosed, "likesClosed", 0, 0, 256)
+	registerSingleOption(KingTropism, "kingTropism", 0, 0, 256)
+	registerSingleOption(Forwardness, "forwardness", 0, 0, 256)
 
 	pestoEval = false
 	adjustEvalByCorrhist = true
@@ -87,6 +84,19 @@ func init() {
 		optionPerColorValues[weightOwn][c] = 100
 		optionPerColorValues[weightOpp][c] = 100
 	}
+}
+
+func registerSingleOption(
+	option SingleOption,
+	name string,
+	defaultValue int,
+	minValue int,
+	maxValue int,
+) {
+	singleOptionName[option] = name
+	singleOptionValue[option] = defaultValue
+	singleOptionMin[option] = minValue
+	singleOptionMax[option] = maxValue
 }
 
 // saveOptions writes the current engine options as UCI setoption commands,
@@ -135,8 +145,8 @@ func saveOptions(path string) error {
 			if _, err := fmt.Fprintf(
 				writer,
 				"setoption name %s value %d\n",
-				SingleOptionName[option],
-				singleOptions[option],
+				singleOptionName[option],
+				singleOptionValue[option],
 			); err != nil {
 				return err
 			}
@@ -252,12 +262,32 @@ func printDoubleOption(component EvalComponent) {
 	)
 }
 
-// prints SingleOption as a spin option with default, min and max values
-func printSpinOption(option SingleOption, minValue, maxValue int) {
+// prints spin option applicable to both sides
+// NOTE: we are relying on Println adding spaces between arguments
+func printSpinOption(option SingleOption) {
 	fmt.Println(
-		"option name ", SingleOptionName[option],
-		" type spin default ", singleOptions[option],
-		" min ", minValue,
-		" max ", maxValue,
+		"option name", singleOptionName[option],
+		"type spin default", singleOptionValue[option],
+		"min", singleOptionMin[option],
+		"max", singleOptionMax[option],
 	)
+}
+
+func setSingleOption(name, value string) bool {
+	for option := SingleOption(0); option < NofSingleOptions; option++ {
+		if !strings.EqualFold(name, singleOptionName[option]) {
+			continue
+		}
+
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			fmt.Printf("info string invalid value %q for option %s\n", value, singleOptionName[option])
+			return true
+		}
+
+		singleOptionValue[option] = limitValue(n, singleOptionMin[option], singleOptionMax[option])
+		return true
+	}
+
+	return false
 }
