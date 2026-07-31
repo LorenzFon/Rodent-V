@@ -107,6 +107,7 @@ func uciLoop() {
 			fmt.Println("option name nodesLimit type spin default ", singleOptions[NodesLimit], " min 0 max 1000000000")
 			fmt.Println("option name hceWeight type spin default ", singleOptions[HcePerc], " min 0 max 256")
 			fmt.Println("option name nnueWeight type spin default ", singleOptions[NnuePerc], " min 0 max 256")
+			fmt.Println("option name nnueScale type spin default ", singleOptions[NnueScale], " min 10 max 2000")
 			fmt.Println("option name NnuePath type string default", nnuePath)
 
 			printUciOptionsPerColor()
@@ -191,6 +192,13 @@ func uciLoop() {
 				fmt.Print(acc.getEval(p.side))
 			}
 
+		case "measure_scale":
+			if len(tokens) >= 2 {
+				measureScale(tokens[1])
+			} else {
+				fmt.Println("info string Usage: measure_scale <epd_file>")
+			}
+
 		case "threats":
 			PrintThreatDebug(&p)
 		}
@@ -262,6 +270,12 @@ func parseSetOption(tokens []string) {
 	case strings.EqualFold(name, "nodesLimit"):
 		if n, err := strconv.Atoi(value); err == nil {
 			singleOptions[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
+		}
+		return
+
+	case strings.EqualFold(name, "nnueScale"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptions[NnueScale] = limitValue(n, 10, 2000)
 		}
 		return
 
@@ -626,4 +640,50 @@ func limitValue(value, min, max int) int {
 		return max
 	}
 	return value
+}
+
+func measureScale(path string) {
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println("info string Error opening file:", err)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var totalAbs int64
+	var count int64
+	var acc Accumulator
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" { continue }
+		
+		var p Pos
+		parseFEN(&p, line)
+		
+		refresh(&p, &acc)
+		eval := acc.getEval(p.side)
+		
+		absEval := eval
+		if absEval < 0 {
+			absEval = -absEval
+		}
+		
+		totalAbs += int64(absEval)
+		count++
+		
+		if count % 100000 == 0 {
+			fmt.Printf("info string Processed %d positions...\n", count)
+		}
+	}
+	
+	if count > 0 {
+		absMean := float64(totalAbs) / float64(count)
+		fmt.Printf("info string Positions: %d\n", count)
+		fmt.Printf("info string Average Absolute Eval: %.2f\n", absMean)
+		fmt.Printf("info string Current NnueScale: %d\n", singleOptions[NnueScale])
+	} else {
+		fmt.Println("info string No valid positions found.")
+	}
 }

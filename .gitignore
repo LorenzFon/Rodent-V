@@ -46,4 +46,7 @@ bullet\
 nets\
 *.ps1
 *.md
+
+# data
+*.vf
 *.bin

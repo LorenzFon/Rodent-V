@@ -32,15 +32,14 @@ import (
 	"golang.org/x/sys/cpu"
 )
 
-//go:embed nets/rodent_v_256hl_4.bin
+//go:embed nets/rodent_v_512hl_6.bin
 var embeddedNet []byte
 
 // NNUE size and scale. AVX2 code supports following net sizes:
 // 64, 128, 256, 384, 512
 const (
 	NNUEInputSize  = 768
-	NNUEHiddenSize = 256
-	NNUEEvalScale  = 400
+	NNUEHiddenSize = 512
 	NNUEL0Scale    = 255
 	NNUEL1Scale    = 64
 )
@@ -426,7 +425,7 @@ func (acc *Accumulator) getEval(stm int) int {
 
 	sum = sum/NNUEL0Scale + int32(nnueParams.OutputBias)
 
-	return int(sum * NNUEEvalScale /
+	return int(sum * int32(singleOptions[NnueScale]) /
 		(NNUEL0Scale * NNUEL1Scale))
 }
 
