@@ -104,18 +104,18 @@ func uciLoop() {
 			fmt.Println("option name PestoEval type check default false")
 			fmt.Println("option name Save Personality type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
-			printSpinOption(NodesLimit)
-			printSpinOption(HcePerc)
-			printSpinOption(NnuePerc)
+			printSingleOption(NodesLimit)
+			printSingleOption(HcePerc)
+			printSingleOption(NnuePerc)
 			fmt.Println("option name NnuePath type string default", nnuePath)
 			fmt.Println("option name MainBook type string default", mainBookPath)
 			fmt.Println("option name GuideBook type string default", guideBookPath)
 
 			printUciOptionsPerColor()
 
-			printSpinOption(LikesClosed)
-			printSpinOption(KingTropism)
-			printSpinOption(Forwardness)
+			printSingleOption(LikesClosed)
+			printSingleOption(KingTropism)
+			printSingleOption(Forwardness)
 			fmt.Println("uciok")
 
 		case "isready":
@@ -317,26 +317,14 @@ func parseSetOption(tokens []string) {
 		return
 	}
 
+	// Parse all the single options
 	if setSingleOption(name, value) {
 		return
 	}
 
-	// Eval component options, e.g. "Material", "material", "MATERIAL"
-	for c := EvalComponent(0); c < EvalComponentN; c++ {
-
-		if strings.EqualFold(name, "Own"+evalComponentName[c]) {
-			if v, err := strconv.Atoi(value); err == nil {
-				optionPerColorValues[weightOwn][c] = limitValue(v, 0, 500)
-			}
-			return
-		}
-
-		if strings.EqualFold(name, "Opp"+evalComponentName[c]) {
-			if v, err := strconv.Atoi(value); err == nil {
-				optionPerColorValues[weightOpp][c] = limitValue(v, 0, 500)
-			}
-			return
-		}
+	// Parse all the per color (asymmetric) options
+	if setPerColorOption(name, value) {
+		return
 	}
 }
 
