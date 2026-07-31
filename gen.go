@@ -282,14 +282,14 @@ func genQuiet(p *Pos, list []int) int {
 	// king and passing square not under attack.
 	if side == White {
 		// Kingside: E1->G1; F1, G1 must be empty; E1 and F1 not attacked.
-		if p.castleRights&1 != 0 && occ&0x0000000000000060 == 0 {
+		if p.castleRights&wKingsideCastle != 0 && occ&0x0000000000000060 == 0 {
 			if !isAttacked(p, E1, Black) && !isAttacked(p, F1, Black) {
 				list[n] = (CASTLE << 12) | (G1 << 6) | E1
 				n++
 			}
 		}
 		// Queenside: E1->C1; B1, C1, D1 must be empty; E1 and D1 not attacked.
-		if p.castleRights&2 != 0 && occ&0x000000000000000E == 0 {
+		if p.castleRights&wQueensideCastle != 0 && occ&0x000000000000000E == 0 {
 			if !isAttacked(p, E1, Black) && !isAttacked(p, D1, Black) {
 				list[n] = (CASTLE << 12) | (C1 << 6) | E1
 				n++
@@ -313,14 +313,14 @@ func genQuiet(p *Pos, list []int) int {
 		}
 	} else {
 		// Black kingside: E8->G8.
-		if p.castleRights&4 != 0 && occ&0x6000000000000000 == 0 {
+		if p.castleRights&bKingsideCastle != 0 && occ&0x6000000000000000 == 0 {
 			if !isAttacked(p, E8, White) && !isAttacked(p, F8, White) {
 				list[n] = (CASTLE << 12) | (G8 << 6) | E8
 				n++
 			}
 		}
 		// Black queenside: E8->C8.
-		if p.castleRights&8 != 0 && occ&0x0E00000000000000 == 0 {
+		if p.castleRights&bQueensideCastle != 0 && occ&0x0E00000000000000 == 0 {
 			if !isAttacked(p, E8, White) && !isAttacked(p, D8, White) {
 				list[n] = (CASTLE << 12) | (C8 << 6) | E8
 				n++

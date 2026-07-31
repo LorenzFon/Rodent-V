@@ -35,7 +35,11 @@ var pestoEval bool            // are we using pesto eval?
 var adjustEvalByCorrhist bool // are we using corrhist
 // (corrhist makes engine stronger but can mask eval properties)
 
-// color-independent options
+// Rodent has two kinds of eval options: asymmetric, set independently
+// for engine's and opponent's side, and symmetrical, affecting both
+// sides to the same extent
+
+// symmetrical, side-independent options
 type SingleOption int
 
 const (
@@ -53,15 +57,16 @@ var singleOptionValue [NofSingleOptions]int
 var singleOptionMin [NofSingleOptions]int
 var singleOptionMax [NofSingleOptions]int
 
-// color-dependent options need to be indexed
-// by engine/non engine side, not white/black
+// Asymmetric, side-dependent options (EvaComponent) are defined
+// in EvalData. They need to be indexed by engine/non engine side,
+// not white/black, hence we need to set engineSide variable
+// at the beginning of each search.
+var optionPerColorValues [2][EvalComponentN]int
+
 var engineSide int
 
 const weightOwn = 0
 const weightOpp = 1
-
-// NOTE: evalComponent is defined in EvalData
-var optionPerColorValues [2][EvalComponentN]int
 
 // default settings
 func init() {
@@ -243,13 +248,13 @@ func readOptions(path string) error {
 // printUciOptionsPerColor prints color-separated options
 func printUciOptionsPerColor() {
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
-		printDoubleOption(c)
+		printPerColorOption(c)
 	}
 }
 
-// printDoubleOption prints option that has separate values
+// printPerColorOption prints option that has separate values
 // for engine's and its opponents' side
-func printDoubleOption(component EvalComponent) {
+func printPerColorOption(component EvalComponent) {
 	fmt.Printf(
 		"option name Own%s type spin default %d min 0 max 500\n",
 		evalComponentName[component],
@@ -263,9 +268,30 @@ func printDoubleOption(component EvalComponent) {
 	)
 }
 
+func setPerColorOption(name, value string) bool {
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return false
+	}
+
+	for c := EvalComponent(0); c < EvalComponentN; c++ {
+		switch {
+		case strings.EqualFold(name, "Own"+evalComponentName[c]):
+			optionPerColorValues[weightOwn][c] = limitValue(v, 0, 500)
+			return true
+
+		case strings.EqualFold(name, "Opp"+evalComponentName[c]):
+			optionPerColorValues[weightOpp][c] = limitValue(v, 0, 500)
+			return true
+		}
+	}
+
+	return false
+}
+
 // prints spin option applicable to both sides
 // NOTE: we are relying on Println adding spaces between arguments
-func printSpinOption(option SingleOption) {
+func printSingleOption(option SingleOption) {
 	fmt.Println(
 		"option name", singleOptionName[option],
 		"type spin default", singleOptionValue[option],
@@ -282,11 +308,14 @@ func setSingleOption(name, value string) bool {
 
 		n, err := strconv.Atoi(value)
 		if err != nil {
-			fmt.Printf("info string invalid value %q for option %s\n", value, singleOptionName[option])
+			fmt.Printf("info string invalid value %q for option %s\n",
+				value, singleOptionName[option])
 			return true
 		}
 
-		singleOptionValue[option] = limitValue(n, singleOptionMin[option], singleOptionMax[option])
+		singleOptionValue[option] = limitValue(n,
+			singleOptionMin[option],
+			singleOptionMax[option])
 		return true
 	}
 

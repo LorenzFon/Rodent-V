@@ -95,7 +95,7 @@ func makeMove(p *Pos, u *Update, r *Revert, move int) {
 	p.board[u.to] = makePiece(side, u.movingType)
 
 	hashDelta := zobPiece[makePiece(side, u.movingType)][u.from] ^
-		         zobPiece[makePiece(side, u.movingType)][u.to]
+		zobPiece[makePiece(side, u.movingType)][u.to]
 
 	p.key ^= hashDelta
 	if u.movingType == P {
@@ -130,10 +130,10 @@ func makeMove(p *Pos, u *Update, r *Revert, move int) {
 		}
 		if u.captType == N || u.movingType == B {
 			p.minorKey[side] ^= hashDelta
-	    }
+		}
 		if u.captType == R || u.movingType == Q {
 			p.majorKey[side] ^= hashDelta
-	    }
+		}
 		p.colorBB[opp(side)] ^= squareBit(u.to)
 		p.typeBB[u.captType] ^= squareBit(u.to)
 		p.count[opp(side)][u.captType]--
@@ -165,7 +165,7 @@ func makeMove(p *Pos, u *Update, r *Revert, move int) {
 		p.board[u.rookFrom] = NO_PC
 		p.board[u.rookTo] = makePiece(side, R)
 		hashDelta = zobPiece[makePiece(side, R)][u.rookFrom] ^
-			        zobPiece[makePiece(side, R)][u.rookTo]
+			zobPiece[makePiece(side, R)][u.rookTo]
 		p.key ^= hashDelta
 		p.nonPawnKey[side] ^= hashDelta
 		p.majorKey[side] ^= hashDelta

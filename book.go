@@ -343,16 +343,16 @@ func polyglotKey(p *Pos) uint64 {
 		key ^= PG[780]
 	}
 
-	if p.castleRights&1 != 0 {
+	if p.castleRights&wKingsideCastle != 0 {
 		key ^= PG[768]
 	}
-	if p.castleRights&2 != 0 {
+	if p.castleRights&wQueensideCastle != 0 {
 		key ^= PG[769]
 	}
-	if p.castleRights&4 != 0 {
+	if p.castleRights&bKingsideCastle != 0 {
 		key ^= PG[770]
 	}
-	if p.castleRights&8 != 0 {
+	if p.castleRights&bQueensideCastle != 0 {
 		key ^= PG[771]
 	}
 
