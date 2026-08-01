@@ -50,6 +50,7 @@ const (
 	LikesClosed
 	KingTropism
 	Forwardness
+	HorizontalMirroring
 	NofSingleOptions
 )
 
@@ -83,6 +84,7 @@ func init() {
 	registerSingleOption(LikesClosed, "likesClosed", 0, 0, 256)
 	registerSingleOption(KingTropism, "kingTropism", 0, 0, 256)
 	registerSingleOption(Forwardness, "forwardness", 0, 0, 256)
+	registerSingleOption(HorizontalMirroring, "horizontalMirroring", 0, 0, 1)
 
 	pestoEval = false
 	adjustEvalByCorrhist = true

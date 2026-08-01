@@ -116,6 +116,7 @@ func uciLoop() {
 			printSingleOption(LikesClosed)
 			printSingleOption(KingTropism)
 			printSingleOption(Forwardness)
+			printSingleOption(HorizontalMirroring)
 			fmt.Println("uciok")
 
 		case "isready":
@@ -398,7 +399,7 @@ func parsePosition(p *Pos, tokens []string) {
 			var u Update
 			var r Revert
 			makeMove(p, &u, &r, move)
-			acc.applyPendingChanges(&u)
+			acc.applyPendingChanges(p, &u)
 			if p.clock == 0 {
 				p.histLen = 0
 			}

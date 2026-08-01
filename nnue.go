@@ -178,6 +178,22 @@ func init() {
 	}
 }
 
+var zeroWeights [NNUEHiddenSize]int16
+
+func featureIndex(color, pt, sq, kingSq, perspective int) int {
+	idxSq := sq
+	if perspective == 1 {
+		idxSq ^= 56
+	}
+	if singleOptionValue[HorizontalMirroring] == 1 {
+		if kingSq%8 > 3 {
+			idxSq ^= 7
+		}
+	}
+	return (color^perspective)*384 + pt*64 + idxSq
+}
+
+
 // Clear = empty-board state = biases only.
 func (acc *Accumulator) clear() {
 	a0 := &acc.values[0]
@@ -196,9 +212,9 @@ func (acc *Accumulator) copyFrom(src *Accumulator) {
 }
 
 // Add one feature: piece(color,type) on sq.
-func (acc *Accumulator) addPiece(color, pt, sq int) {
-	idx0 := color*384 + pt*64 + sq
-	idx1 := (color^1)*384 + pt*64 + (sq ^ 56)
+func (acc *Accumulator) addPiece(color, pt, sq, k0, k1 int) {
+	idx0 := featureIndex(color, pt, sq, k0, 0)
+	idx1 := featureIndex(color, pt, sq, k1, 1)
 
 	a0 := &acc.values[0]
 	a1 := &acc.values[1]
@@ -213,9 +229,9 @@ func (acc *Accumulator) addPiece(color, pt, sq int) {
 }
 
 // Remove one feature: piece(color,type) from sq.
-func (acc *Accumulator) delPiece(color, pt, sq int) {
-	idx0 := color*384 + pt*64 + sq
-	idx1 := (color^1)*384 + pt*64 + (sq ^ 56)
+func (acc *Accumulator) delPiece(color, pt, sq, k0, k1 int) {
+	idx0 := featureIndex(color, pt, sq, k0, 0)
+	idx1 := featureIndex(color, pt, sq, k1, 1)
 
 	a0 := &acc.values[0]
 	a1 := &acc.values[1]
@@ -231,22 +247,34 @@ func (acc *Accumulator) delPiece(color, pt, sq int) {
 
 // Move one piece without a capture. Loops are expensive,
 // so we use one instead of separate addition/deletion loops.
-func (acc *Accumulator) move(color, pt, from, to int) {
-	from0 := color*384 + pt*64 + from
-	to0 := color*384 + pt*64 + to
+func (acc *Accumulator) move(color, pt, from, to, k0, k1 int, refresh0, refresh1 bool) {
+	var pFrom0, pTo0, pFrom1, pTo1 *int16
 
-	from1 := (color^1)*384 + pt*64 + (from ^ 56)
-	to1 := (color^1)*384 + pt*64 + (to ^ 56)
+	if refresh0 {
+		pFrom0 = &zeroWeights[0]
+		pTo0 = &zeroWeights[0]
+	} else {
+		pFrom0 = &nnueParams.InputWeights[featureIndex(color, pt, from, k0, 0)][0]
+		pTo0 = &nnueParams.InputWeights[featureIndex(color, pt, to, k0, 0)][0]
+	}
+
+	if refresh1 {
+		pFrom1 = &zeroWeights[0]
+		pTo1 = &zeroWeights[0]
+	} else {
+		pFrom1 = &nnueParams.InputWeights[featureIndex(color, pt, from, k1, 1)][0]
+		pTo1 = &nnueParams.InputWeights[featureIndex(color, pt, to, k1, 1)][0]
+	}
 
 	moveFunction(
 		&acc.values[0][0],
 		&acc.values[1][0],
 
-		&nnueParams.InputWeights[from0][0],
-		&nnueParams.InputWeights[to0][0],
+		pFrom0,
+		pTo0,
 
-		&nnueParams.InputWeights[from1][0],
-		&nnueParams.InputWeights[to1][0],
+		pFrom1,
+		pTo1,
 	)
 
 }
@@ -254,138 +282,220 @@ func (acc *Accumulator) move(color, pt, from, to int) {
 func (acc *Accumulator) capture(
 	moverColor, moverPT, from, to int,
 	capturedColor, capturedPT, capturedSq int,
+	k0, k1 int, refresh0, refresh1 bool,
 ) {
-	from0 := moverColor*384 + moverPT*64 + from
-	to0 := moverColor*384 + moverPT*64 + to
-	cap0 := capturedColor*384 + capturedPT*64 + capturedSq
+	var pTo0, pFrom0, pCap0, pTo1, pFrom1, pCap1 *int16
 
-	from1 := (moverColor^1)*384 + moverPT*64 + (from ^ 56)
-	to1 := (moverColor^1)*384 + moverPT*64 + (to ^ 56)
-	cap1 := (capturedColor^1)*384 + capturedPT*64 + (capturedSq ^ 56)
+	if refresh0 {
+		pTo0 = &zeroWeights[0]
+		pFrom0 = &zeroWeights[0]
+		pCap0 = &zeroWeights[0]
+	} else {
+		pTo0 = &nnueParams.InputWeights[featureIndex(moverColor, moverPT, to, k0, 0)][0]
+		pFrom0 = &nnueParams.InputWeights[featureIndex(moverColor, moverPT, from, k0, 0)][0]
+		pCap0 = &nnueParams.InputWeights[featureIndex(capturedColor, capturedPT, capturedSq, k0, 0)][0]
+	}
+
+	if refresh1 {
+		pTo1 = &zeroWeights[0]
+		pFrom1 = &zeroWeights[0]
+		pCap1 = &zeroWeights[0]
+	} else {
+		pTo1 = &nnueParams.InputWeights[featureIndex(moverColor, moverPT, to, k1, 1)][0]
+		pFrom1 = &nnueParams.InputWeights[featureIndex(moverColor, moverPT, from, k1, 1)][0]
+		pCap1 = &nnueParams.InputWeights[featureIndex(capturedColor, capturedPT, capturedSq, k1, 1)][0]
+	}
 
 	captureFunction(
 		&acc.values[0][0],
 		&acc.values[1][0],
 
-		&nnueParams.InputWeights[to0][0],
-		&nnueParams.InputWeights[from0][0],
-		&nnueParams.InputWeights[cap0][0],
+		pTo0,
+		pFrom0,
+		pCap0,
 
-		&nnueParams.InputWeights[to1][0],
-		&nnueParams.InputWeights[from1][0],
-		&nnueParams.InputWeights[cap1][0],
+		pTo1,
+		pFrom1,
+		pCap1,
 	)
 
 }
 
 func (acc *Accumulator) castle(
 	color, kingFrom, kingTo, rookFrom, rookTo int,
+	k0, k1 int, refresh0, refresh1 bool,
 ) {
-	kFrom0 := color*384 + K*64 + kingFrom
-	kTo0 := color*384 + K*64 + kingTo
-	rFrom0 := color*384 + R*64 + rookFrom
-	rTo0 := color*384 + R*64 + rookTo
+	var pKTo0, pKFrom0, pRTo0, pRFrom0, pKTo1, pKFrom1, pRTo1, pRFrom1 *int16
 
-	kFrom1 := (color^1)*384 + K*64 + (kingFrom ^ 56)
-	kTo1 := (color^1)*384 + K*64 + (kingTo ^ 56)
-	rFrom1 := (color^1)*384 + R*64 + (rookFrom ^ 56)
-	rTo1 := (color^1)*384 + R*64 + (rookTo ^ 56)
+	if refresh0 {
+		pKTo0 = &zeroWeights[0]
+		pKFrom0 = &zeroWeights[0]
+		pRTo0 = &zeroWeights[0]
+		pRFrom0 = &zeroWeights[0]
+	} else {
+		pKTo0 = &nnueParams.InputWeights[featureIndex(color, K, kingTo, k0, 0)][0]
+		pKFrom0 = &nnueParams.InputWeights[featureIndex(color, K, kingFrom, k0, 0)][0]
+		pRTo0 = &nnueParams.InputWeights[featureIndex(color, R, rookTo, k0, 0)][0]
+		pRFrom0 = &nnueParams.InputWeights[featureIndex(color, R, rookFrom, k0, 0)][0]
+	}
+
+	if refresh1 {
+		pKTo1 = &zeroWeights[0]
+		pKFrom1 = &zeroWeights[0]
+		pRTo1 = &zeroWeights[0]
+		pRFrom1 = &zeroWeights[0]
+	} else {
+		pKTo1 = &nnueParams.InputWeights[featureIndex(color, K, kingTo, k1, 1)][0]
+		pKFrom1 = &nnueParams.InputWeights[featureIndex(color, K, kingFrom, k1, 1)][0]
+		pRTo1 = &nnueParams.InputWeights[featureIndex(color, R, rookTo, k1, 1)][0]
+		pRFrom1 = &nnueParams.InputWeights[featureIndex(color, R, rookFrom, k1, 1)][0]
+	}
 
 	castleFunction(
 		&acc.values[0][0],
 		&acc.values[1][0],
 
-		&nnueParams.InputWeights[kFrom0][0],
-		&nnueParams.InputWeights[kTo0][0],
-		&nnueParams.InputWeights[rFrom0][0],
-		&nnueParams.InputWeights[rTo0][0],
+		pKFrom0,
+		pKTo0,
+		pRFrom0,
+		pRTo0,
 
-		&nnueParams.InputWeights[kFrom1][0],
-		&nnueParams.InputWeights[kTo1][0],
-		&nnueParams.InputWeights[rFrom1][0],
-		&nnueParams.InputWeights[rTo1][0],
+		pKFrom1,
+		pKTo1,
+		pRFrom1,
+		pRTo1,
 	)
 }
 
-func (acc *Accumulator) promotion(color, from, to, prom int) {
-	from0 := color*384 + P*64 + from
-	to0 := color*384 + prom*64 + to
+func (acc *Accumulator) promotion(color, from, to, prom int, k0, k1 int, refresh0, refresh1 bool) {
+	var pFrom0, pTo0, pFrom1, pTo1 *int16
 
-	from1 := (color^1)*384 + P*64 + (from ^ 56)
-	to1 := (color^1)*384 + prom*64 + (to ^ 56)
+	if refresh0 {
+		pFrom0 = &zeroWeights[0]
+		pTo0 = &zeroWeights[0]
+	} else {
+		pFrom0 = &nnueParams.InputWeights[featureIndex(color, P, from, k0, 0)][0]
+		pTo0 = &nnueParams.InputWeights[featureIndex(color, prom, to, k0, 0)][0]
+	}
+
+	if refresh1 {
+		pFrom1 = &zeroWeights[0]
+		pTo1 = &zeroWeights[0]
+	} else {
+		pFrom1 = &nnueParams.InputWeights[featureIndex(color, P, from, k1, 1)][0]
+		pTo1 = &nnueParams.InputWeights[featureIndex(color, prom, to, k1, 1)][0]
+	}
 
 	moveFunction(
 		&acc.values[0][0],
 		&acc.values[1][0],
 
-		&nnueParams.InputWeights[from0][0],
-		&nnueParams.InputWeights[to0][0],
+		pFrom0,
+		pTo0,
 
-		&nnueParams.InputWeights[from1][0],
-		&nnueParams.InputWeights[to1][0],
+		pFrom1,
+		pTo1,
 	)
 }
 
-func (acc *Accumulator) promotionCapture(color, from, to, prom, captType int) {
+func (acc *Accumulator) promotionCapture(color, from, to, prom, captType int, k0, k1 int, refresh0, refresh1 bool) {
 	enemy := color ^ 1
+	var pTo0, pFrom0, pCap0, pTo1, pFrom1, pCap1 *int16
 
-	from0 := color*384 + P*64 + from
-	to0 := color*384 + prom*64 + to
-	cap0 := enemy*384 + captType*64 + to
+	if refresh0 {
+		pTo0 = &zeroWeights[0]
+		pFrom0 = &zeroWeights[0]
+		pCap0 = &zeroWeights[0]
+	} else {
+		pTo0 = &nnueParams.InputWeights[featureIndex(color, prom, to, k0, 0)][0]
+		pFrom0 = &nnueParams.InputWeights[featureIndex(color, P, from, k0, 0)][0]
+		pCap0 = &nnueParams.InputWeights[featureIndex(enemy, captType, to, k0, 0)][0]
+	}
 
-	from1 := enemy*384 + P*64 + (from ^ 56)
-	to1 := enemy*384 + prom*64 + (to ^ 56)
-	cap1 := color*384 + captType*64 + (to ^ 56)
+	if refresh1 {
+		pTo1 = &zeroWeights[0]
+		pFrom1 = &zeroWeights[0]
+		pCap1 = &zeroWeights[0]
+	} else {
+		pTo1 = &nnueParams.InputWeights[featureIndex(color, prom, to, k1, 1)][0]
+		pFrom1 = &nnueParams.InputWeights[featureIndex(color, P, from, k1, 1)][0]
+		pCap1 = &nnueParams.InputWeights[featureIndex(enemy, captType, to, k1, 1)][0]
+	}
 
 	captureFunction(
 		&acc.values[0][0],
 		&acc.values[1][0],
 
-		&nnueParams.InputWeights[to0][0],
-		&nnueParams.InputWeights[from0][0],
-		&nnueParams.InputWeights[cap0][0],
+		pTo0,
+		pFrom0,
+		pCap0,
 
-		&nnueParams.InputWeights[to1][0],
-		&nnueParams.InputWeights[from1][0],
-		&nnueParams.InputWeights[cap1][0],
+		pTo1,
+		pFrom1,
+		pCap1,
 	)
 }
 
 // apply full nnue accumulator update
-func (acc *Accumulator) applyPendingChanges(u *Update) {
+func (acc *Accumulator) applyPendingChanges(p *Pos, u *Update) {
 
 	// already applied
 	if !u.dirty {
 		return
 	}
 
+	k0 := p.kingSq[White]
+	k1 := p.kingSq[Black]
+	refresh0 := false
+	refresh1 := false
+
+	if singleOptionValue[HorizontalMirroring] == 1 && u.movingType == K {
+		if u.color == White {
+			refresh0 = (u.from%8 > 3) != (u.to%8 > 3)
+		} else {
+			refresh1 = (u.from%8 > 3) != (u.to%8 > 3)
+		}
+	}
+
 	switch u.flag {
 	case uNORMAL, uEP_SET:
-		acc.move(u.color, u.movingType, u.from, u.to)
+		acc.move(u.color, u.movingType, u.from, u.to, k0, k1, refresh0, refresh1)
 
 	case uCAPTURE:
-		acc.capture(u.color, u.movingType, u.from, u.to, u.color^1, u.captType, u.capSq)
+		acc.capture(u.color, u.movingType, u.from, u.to, u.color^1, u.captType, u.capSq, k0, k1, refresh0, refresh1)
 
 	case uEP_CAP:
-		acc.capture(u.color, P, u.from, u.to, u.color^1, P, u.capSq)
+		acc.capture(u.color, P, u.from, u.to, u.color^1, P, u.capSq, k0, k1, refresh0, refresh1)
 
 	case uCASTLE:
-		acc.castle(u.color, u.from, u.to, u.rookFrom, u.rookTo)
+		acc.castle(u.color, u.from, u.to, u.rookFrom, u.rookTo, k0, k1, refresh0, refresh1)
 
 	case uPROMO:
-		acc.promotion(u.color, u.from, u.to, u.prom)
+		acc.promotion(u.color, u.from, u.to, u.prom, k0, k1, refresh0, refresh1)
 
 	case uPROMCAPT:
-		acc.promotionCapture(u.color, u.from, u.to, u.prom, u.captType)
+		acc.promotionCapture(u.color, u.from, u.to, u.prom, u.captType, k0, k1, refresh0, refresh1)
 
+	}
+
+	if refresh0 {
+		refreshPerspective(p, acc, 0)
+	}
+	if refresh1 {
+		refreshPerspective(p, acc, 1)
 	}
 
 	u.dirty = false
 }
 
-// Rebuild the accumulator from the current board.
-func refresh(p *Pos, acc *Accumulator) {
-	acc.clear()
+func refreshPerspective(p *Pos, acc *Accumulator, perspective int) {
+	kSq := p.kingSq[perspective]
+	
+	a := &acc.values[perspective]
+	biases := &nnueParams.InputBiases
+	for i := 0; i < NNUEHiddenSize; i++ {
+		a[i] = biases[i]
+	}
 
 	for sq := 0; sq < 64; sq++ {
 		piece := p.board[sq]
@@ -395,7 +505,31 @@ func refresh(p *Pos, acc *Accumulator) {
 
 		color := colorOf(piece)
 		pt := typeOf(piece)
-		acc.addPiece(color, pt, sq)
+		
+		idx := featureIndex(color, pt, sq, kSq, perspective)
+		w := &nnueParams.InputWeights[idx]
+		for i := 0; i < NNUEHiddenSize; i++ {
+			a[i] += w[i]
+		}
+	}
+}
+
+// Rebuild the accumulator from the current board.
+func refresh(p *Pos, acc *Accumulator) {
+	acc.clear()
+
+	k0 := p.kingSq[White]
+	k1 := p.kingSq[Black]
+
+	for sq := 0; sq < 64; sq++ {
+		piece := p.board[sq]
+		if piece == NO_PC {
+			continue
+		}
+
+		color := colorOf(piece)
+		pt := typeOf(piece)
+		acc.addPiece(color, pt, sq, k0, k1)
 	}
 }
 
