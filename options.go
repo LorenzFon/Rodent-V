@@ -75,7 +75,7 @@ func init() {
 
 	guideBookPath = "books/empty.bin"
 	mainBookPath = "books/empty.bin"
-	nnuePath = "nets/rodent_v_512hl_6.bin"
+	nnuePath = "nets/rodent_hm_512hl_1.bin"
 
 	registerSingleOption(HcePerc, "hceWeight", 0, 0, 256)
 	registerSingleOption(NnuePerc, "nnueWeight", 100, 0, 256)
@@ -84,7 +84,7 @@ func init() {
 	registerSingleOption(LikesClosed, "likesClosed", 0, 0, 256)
 	registerSingleOption(KingTropism, "kingTropism", 0, 0, 256)
 	registerSingleOption(Forwardness, "forwardness", 0, 0, 256)
-	registerSingleOption(HorizontalMirroring, "horizontalMirroring", 0, 0, 1)
+	registerSingleOption(HorizontalMirroring, "horizontalMirroring", 1, 0, 1)
 
 	pestoEval = false
 	adjustEvalByCorrhist = true

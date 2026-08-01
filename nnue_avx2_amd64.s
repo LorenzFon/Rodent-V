@@ -1,5 +1,45 @@
 #include "textflag.h"
 
+// func addAVX2_512(
+//     a0, a1 *int16,
+//     w0, w1 *int16,
+// )
+//
+// Add one feature row to both accumulators:
+//
+//     a0[i] += w0[i]
+//     a1[i] += w1[i]
+//
+// 512 int16 neurons = 1024 bytes.
+// Each loop iteration processes 16 neurons = 32 bytes.
+TEXT ·addAVX2_512(SB), NOSPLIT, $0-32
+	MOVQ a0+0(FP), AX
+	MOVQ a1+8(FP), BX
+	MOVQ w0+16(FP), CX
+	MOVQ w1+24(FP), DX
+
+	XORQ R8, R8
+
+add512_loop:
+	// Perspective 0:
+	// a0 += w0
+	VMOVDQU (AX)(R8*1), Y0
+	VPADDW  (CX)(R8*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R8*1)
+
+	// Perspective 1:
+	// a1 += w1
+	VMOVDQU (BX)(R8*1), Y1
+	VPADDW  (DX)(R8*1), Y1, Y1
+	VMOVDQU Y1, (BX)(R8*1)
+
+	ADDQ $32, R8
+	CMPQ R8, $1024
+	JB add512_loop
+
+	VZEROUPPER
+	RET
+
 // Each array contains 64 int16 values = 128 bytes.
 // One YMM register holds 16 int16 values = 32 bytes.
 // Therefore the loop executes four times.

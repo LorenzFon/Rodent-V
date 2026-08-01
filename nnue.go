@@ -32,7 +32,7 @@ import (
 	"golang.org/x/sys/cpu"
 )
 
-//go:embed nets/rodent_v_512hl_6.bin
+//go:embed nets/rodent_hm_512hl_1.bin
 var embeddedNet []byte
 
 // NNUE size and scale. AVX2 code supports following net sizes:
@@ -101,6 +101,11 @@ type NNUEState struct {
 
 // Interface to cater for assembly code for various net sizes.
 
+type addFunc func (
+	a0, a1 *int16,
+	w0, w1 *int16,
+)
+
 type captureFunc func(
 	a0, a1 *int16,
 	wTo0, wFrom0, wCap0 *int16,
@@ -125,6 +130,7 @@ type evalFunc func(
 	sum *int32,
 )
 
+var addFunction addFunc
 var captureFunction captureFunc
 var moveFunction moveFunc
 var castleFunction castleFunc
@@ -133,6 +139,7 @@ var evalFunction evalFunc
 // init picks the correct assembly routines for the configured NNUE size.
 func init() {
 	// Safe fallback.
+	addFunction = addScalar
 	moveFunction = moveScalar
 	captureFunction = captureScalar
 	castleFunction = castleScalar
@@ -172,6 +179,7 @@ func init() {
 		captureFunction = captureAVX2_512
 		castleFunction = castleAVX2_512
 		evalFunction = getEvalAVX2_512
+		addFunction = addAVX2_512
 
 	default:
 		panic("unsupported NNUE hidden size")
@@ -216,16 +224,12 @@ func (acc *Accumulator) addPiece(color, pt, sq, k0, k1 int) {
 	idx0 := featureIndex(color, pt, sq, k0, 0)
 	idx1 := featureIndex(color, pt, sq, k1, 1)
 
-	a0 := &acc.values[0]
-	a1 := &acc.values[1]
-
-	w0 := &nnueParams.InputWeights[idx0]
-	w1 := &nnueParams.InputWeights[idx1]
-
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] += w0[i]
-		a1[i] += w1[i]
-	}
+	addFunction(
+		&acc.values[0][0],
+		&acc.values[1][0],
+		&nnueParams.InputWeights[idx0][0],
+		&nnueParams.InputWeights[idx1][0],
+	)
 }
 
 // Remove one feature: piece(color,type) from sq.
