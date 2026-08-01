@@ -219,9 +219,9 @@ func (acc *Accumulator) copyFrom(src *Accumulator) {
 }
 
 // Add one feature: piece(color,type) on sq.
-func (acc *Accumulator) addPiece(color, pt, sq int) {
-	idx0 := color*384 + pt*64 + sq
-	idx1 := (color^1)*384 + pt*64 + (sq ^ 56)
+func (acc *Accumulator) addPiece(color, pt, sq, k0, k1 int) {
+	idx0 := featureIndex(color, pt, sq, k0, 0)
+	idx1 := featureIndex(color, pt, sq, k1, 1)
 
 	a0 := &acc.values[0]
 	a1 := &acc.values[1]
@@ -509,6 +509,9 @@ func refreshPerspective(p *Pos, acc *Accumulator, perspective int) {
 func refresh(p *Pos, acc *Accumulator) {
 	acc.clear()
 
+	k0 := p.kingSq[White]
+	k1 := p.kingSq[Black]
+
 	for sq := 0; sq < 64; sq++ {
 		piece := p.board[sq]
 		if piece == NO_PC {
@@ -517,7 +520,7 @@ func refresh(p *Pos, acc *Accumulator) {
 
 		color := colorOf(piece)
 		pt := typeOf(piece)
-		acc.addPiece(color, pt, sq)
+		acc.addPiece(color, pt, sq, k0, k1)
 	}
 }
 
