@@ -1,41 +1,29 @@
 #include "textflag.h"
 
-// func addAVX2_512(
-//     a0, a1 *int16,
-//     w0, w1 *int16,
+// func addSingleAVX2_512(
+//     a, w *int16,
 // )
 //
-// Add one feature row to both accumulators:
+// Add one feature row to one accumulator perspective:
 //
-//     a0[i] += w0[i]
-//     a1[i] += w1[i]
+//     a[i] += w[i]
 //
 // 512 int16 neurons = 1024 bytes.
 // Each loop iteration processes 16 neurons = 32 bytes.
-TEXT ·addAVX2_512(SB), NOSPLIT, $0-32
-	MOVQ a0+0(FP), AX
-	MOVQ a1+8(FP), BX
-	MOVQ w0+16(FP), CX
-	MOVQ w1+24(FP), DX
+TEXT ·addSingleAVX2_512(SB), NOSPLIT, $0-16
+	MOVQ a+0(FP), AX
+	MOVQ w+8(FP), CX
 
 	XORQ R8, R8
 
-add512_loop:
-	// Perspective 0:
-	// a0 += w0
+addsingle512_loop:
 	VMOVDQU (AX)(R8*1), Y0
 	VPADDW  (CX)(R8*1), Y0, Y0
 	VMOVDQU Y0, (AX)(R8*1)
 
-	// Perspective 1:
-	// a1 += w1
-	VMOVDQU (BX)(R8*1), Y1
-	VPADDW  (DX)(R8*1), Y1, Y1
-	VMOVDQU Y1, (BX)(R8*1)
-
 	ADDQ $32, R8
 	CMPQ R8, $1024
-	JB add512_loop
+	JB addsingle512_loop
 
 	VZEROUPPER
 	RET

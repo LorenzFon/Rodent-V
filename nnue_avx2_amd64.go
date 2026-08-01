@@ -5,9 +5,8 @@ package main
 // ADD
 
 //go:noescape
-func addAVX2_512(
-	a0, a1 *int16,
-	w0, w1 *int16,
+func addSingleAVX2_512(
+	a, w *int16,
 )
 
 // CAPTURE

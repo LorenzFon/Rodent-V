@@ -101,9 +101,8 @@ type NNUEState struct {
 
 // Interface to cater for assembly code for various net sizes.
 
-type addFunc func (
-	a0, a1 *int16,
-	w0, w1 *int16,
+type addSingleFunc func(
+	a, w *int16,
 )
 
 type captureFunc func(
@@ -130,7 +129,7 @@ type evalFunc func(
 	sum *int32,
 )
 
-var addFunction addFunc
+var addSingleFunction addSingleFunc
 var captureFunction captureFunc
 var moveFunction moveFunc
 var castleFunction castleFunc
@@ -139,7 +138,7 @@ var evalFunction evalFunc
 // init picks the correct assembly routines for the configured NNUE size.
 func init() {
 	// Safe fallback.
-	addFunction = addScalar
+	addSingleFunction = addSingleScalar
 	moveFunction = moveScalar
 	captureFunction = captureScalar
 	castleFunction = castleScalar
@@ -179,7 +178,7 @@ func init() {
 		captureFunction = captureAVX2_512
 		castleFunction = castleAVX2_512
 		evalFunction = getEvalAVX2_512
-		addFunction = addAVX2_512
+		addSingleFunction = addSingleAVX2_512
 
 	default:
 		panic("unsupported NNUE hidden size")
@@ -220,22 +219,9 @@ func (acc *Accumulator) copyFrom(src *Accumulator) {
 }
 
 // Add one feature: piece(color,type) on sq.
-func (acc *Accumulator) addPiece(color, pt, sq, k0, k1 int) {
-	idx0 := featureIndex(color, pt, sq, k0, 0)
-	idx1 := featureIndex(color, pt, sq, k1, 1)
-
-	addFunction(
-		&acc.values[0][0],
-		&acc.values[1][0],
-		&nnueParams.InputWeights[idx0][0],
-		&nnueParams.InputWeights[idx1][0],
-	)
-}
-
-// Remove one feature: piece(color,type) from sq.
-func (acc *Accumulator) delPiece(color, pt, sq, k0, k1 int) {
-	idx0 := featureIndex(color, pt, sq, k0, 0)
-	idx1 := featureIndex(color, pt, sq, k1, 1)
+func (acc *Accumulator) addPiece(color, pt, sq int) {
+	idx0 := color*384 + pt*64 + sq
+	idx1 := (color^1)*384 + pt*64 + (sq ^ 56)
 
 	a0 := &acc.values[0]
 	a1 := &acc.values[1]
@@ -244,8 +230,8 @@ func (acc *Accumulator) delPiece(color, pt, sq, k0, k1 int) {
 	w1 := &nnueParams.InputWeights[idx1]
 
 	for i := 0; i < NNUEHiddenSize; i++ {
-		a0[i] -= w0[i]
-		a1[i] -= w1[i]
+		a0[i] += w0[i]
+		a1[i] += w1[i]
 	}
 }
 
@@ -494,12 +480,14 @@ func (acc *Accumulator) applyPendingChanges(p *Pos, u *Update) {
 
 func refreshPerspective(p *Pos, acc *Accumulator, perspective int) {
 	kSq := p.kingSq[perspective]
-	
-	a := &acc.values[perspective]
-	biases := &nnueParams.InputBiases
-	for i := 0; i < NNUEHiddenSize; i++ {
-		a[i] = biases[i]
-	}
+
+	a := &acc.values[perspective][0]
+
+	// Initialize accumulator from biases.
+	copy(
+		acc.values[perspective][:NNUEHiddenSize],
+		nnueParams.InputBiases[:NNUEHiddenSize],
+	)
 
 	for sq := 0; sq < 64; sq++ {
 		piece := p.board[sq]
@@ -509,12 +497,11 @@ func refreshPerspective(p *Pos, acc *Accumulator, perspective int) {
 
 		color := colorOf(piece)
 		pt := typeOf(piece)
-		
+
 		idx := featureIndex(color, pt, sq, kSq, perspective)
-		w := &nnueParams.InputWeights[idx]
-		for i := 0; i < NNUEHiddenSize; i++ {
-			a[i] += w[i]
-		}
+		w := &nnueParams.InputWeights[idx][0]
+
+		addSingleFunction(a, w)
 	}
 }
 
@@ -522,9 +509,6 @@ func refreshPerspective(p *Pos, acc *Accumulator, perspective int) {
 func refresh(p *Pos, acc *Accumulator) {
 	acc.clear()
 
-	k0 := p.kingSq[White]
-	k1 := p.kingSq[Black]
-
 	for sq := 0; sq < 64; sq++ {
 		piece := p.board[sq]
 		if piece == NO_PC {
@@ -533,7 +517,7 @@ func refresh(p *Pos, acc *Accumulator) {
 
 		color := colorOf(piece)
 		pt := typeOf(piece)
-		acc.addPiece(color, pt, sq, k0, k1)
+		acc.addPiece(color, pt, sq)
 	}
 }
 
