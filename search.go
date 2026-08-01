@@ -554,7 +554,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 			// Update NNUE accumulator once we know that move is legal.
 			if childAcc != nil {
-				childAcc.applyPendingChanges(u)
+				childAcc.applyPendingChanges(p, u)
 			}
 
 			score = -ss.quiesce(p, ply+1, -probcutBeta, -probcutBeta+1, probcutPv[:])
@@ -720,7 +720,7 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// Update nnue accumulator now that we know
 		// that move is legal and hasn't been pruned.
 		if ss.isUsingNNUE {
-			childAcc.applyPendingChanges(u)
+			childAcc.applyPendingChanges(p, u)
 		}
 
 		// Count quiet moves
@@ -1063,7 +1063,7 @@ func (ss *SearchState) quiesce(p *Pos, ply, alpha, beta int, pv []int) int {
 
 		// Update NNUE accumulator once we know move is legal
 		if childAcc != nil {
-			childAcc.applyPendingChanges(u)
+			childAcc.applyPendingChanges(p, u)
 		}
 
 		score := -ss.quiesce(p, ply+1, -beta, -alpha, childPv[:])

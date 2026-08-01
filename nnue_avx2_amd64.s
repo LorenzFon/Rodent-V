@@ -1,5 +1,33 @@
 #include "textflag.h"
 
+// func addSingleAVX2_512(
+//     a, w *int16,
+// )
+//
+// Add one feature row to one accumulator perspective:
+//
+//     a[i] += w[i]
+//
+// 512 int16 neurons = 1024 bytes.
+// Each loop iteration processes 16 neurons = 32 bytes.
+TEXT ·addSingleAVX2_512(SB), NOSPLIT, $0-16
+	MOVQ a+0(FP), AX
+	MOVQ w+8(FP), CX
+
+	XORQ R8, R8
+
+addsingle512_loop:
+	VMOVDQU (AX)(R8*1), Y0
+	VPADDW  (CX)(R8*1), Y0, Y0
+	VMOVDQU Y0, (AX)(R8*1)
+
+	ADDQ $32, R8
+	CMPQ R8, $1024
+	JB addsingle512_loop
+
+	VZEROUPPER
+	RET
+
 // Each array contains 64 int16 values = 128 bytes.
 // One YMM register holds 16 int16 values = 32 bytes.
 // Therefore the loop executes four times.
@@ -1048,18 +1076,6 @@ eval384_loop:
 //     w0, w1 *int16,
 //     sum *int32,
 // )
-//
-// For every neuron:
-//
-//     v = clamp(acc, 0, 255)
-//     sum += v * v * weight
-//
-// Lizard-style exact split:
-//
-//     v² = v * floor(v/2) + v * ceil(v/2)
-//
-// 512 int16 neurons = 1024 bytes.
-// Each loop iteration processes 16 neurons per perspective.
 TEXT ·getEvalAVX2_512(SB), NOSPLIT, $0-40
 	MOVQ a0+0(FP), AX
 	MOVQ a1+8(FP), BX
@@ -1075,7 +1091,7 @@ TEXT ·getEvalAVX2_512(SB), NOSPLIT, $0-40
 	VMOVD R8, X15
 	VPBROADCASTW X15, Y15
 
-	// Y13 = sixteen int16 values equal to 1.
+	// Y13 = sixteen int16 values equal to 1 for ceil calculation.
 	MOVL $1, R8
 	VMOVD R8, X13
 	VPBROADCASTW X13, Y13
@@ -1085,9 +1101,9 @@ TEXT ·getEvalAVX2_512(SB), NOSPLIT, $0-40
 
 	XORQ R9, R9
 
-geteval_512_loop:
+eval512_loop:
 	// ------------------------------------------------------------
-	// Perspective 0
+	// Perspective 0 (all 16 neurons in one go)
 	// ------------------------------------------------------------
 
 	// Load 16 accumulator values and 16 signed weights.
@@ -1113,11 +1129,12 @@ geteval_512_loop:
 	VPMADDWD Y1, Y2, Y2
 	VPMADDWD Y1, Y3, Y3
 
+	// Accumulate into Y8
 	VPADDD Y2, Y8, Y8
 	VPADDD Y3, Y8, Y8
 
 	// ------------------------------------------------------------
-	// Perspective 1
+	// Perspective 1 (all 16 neurons in one go)
 	// ------------------------------------------------------------
 
 	VMOVDQU (BX)(R9*1), Y0
@@ -1133,40 +1150,38 @@ geteval_512_loop:
 	VPADDW Y13, Y0, Y3
 	VPSRLW $1, Y3, Y3
 
-	// Partial SCReLU products.
+	// Y2 = v * floor(v / 2)
+	// Y3 = v * ceil(v / 2)
 	VPMULLW Y0, Y2, Y2
 	VPMULLW Y0, Y3, Y3
 
-	// Multiply by output weights and accumulate.
+	// Multiply partial products by output weights and horizontally add pairs.
 	VPMADDWD Y1, Y2, Y2
 	VPMADDWD Y1, Y3, Y3
 
+	// Accumulate into Y8
 	VPADDD Y2, Y8, Y8
 	VPADDD Y3, Y8, Y8
 
-	// 16 int16 neurons = 32 bytes.
+	// 16 int16 neurons = 32 bytes
 	ADDQ $32, R9
 
-	// 512 int16 neurons = 1024 bytes.
+	// 512 int16 neurons = 1024 bytes
 	CMPQ R9, $1024
-	JB geteval_512_loop
+	JL eval512_loop
 
-	// Horizontally reduce eight int32 lanes to one int32.
+	// Horizontal sum of eight int32 lanes in Y8.
 	VEXTRACTI128 $1, Y8, X1
 	VPADDD X1, X8, X8
 
-	// [a,b,c,d] + [c,d,a,b]
 	VPSHUFD $0x4E, X8, X1
 	VPADDD X1, X8, X8
 
-	// [a,b,...] + [b,a,...]
 	VPSHUFD $0xB1, X8, X1
 	VPADDD X1, X8, X8
 
-	// Store the low int32 result.
 	VMOVD X8, R8
 	MOVL R8, (SI)
 
 	VZEROUPPER
 	RET
-	

@@ -133,10 +133,7 @@ func (ss *SearchState) evalHCE(p *Pos, ply int) int {
 }
 
 func (ss *SearchState) evalNNUE(p *Pos, ply int) int {
-	//return evaluateNNUE(p, &ss.accStack[ply])
-
-	// actually no evaltt is faster up to 256hl
-	return ss.accStack[ply].getEval(p.side) * singleOptionValue[NnuePerc] / 100
+	return evaluateNNUE(p, &ss.accStack[ply])
 }
 
 func (ss *SearchState) evalHybrid(p *Pos, ply int) int {

@@ -2,6 +2,32 @@ package main
 
 import "unsafe"
 
+func addSingleScalar(
+    a, w *int16,
+) {
+    acc := unsafe.Slice(a, NNUEHiddenSize)
+    ww := unsafe.Slice(w, NNUEHiddenSize)
+
+    for i := 0; i < NNUEHiddenSize; i++ {
+        acc[i] += ww[i]
+    }
+}
+
+func addScalar(
+	a0, a1 *int16,
+	w0, w1 *int16,
+) {
+	acc0 := unsafe.Slice(a0, NNUEHiddenSize)
+	acc1 := unsafe.Slice(a1, NNUEHiddenSize)
+	ww0 := unsafe.Slice(w0, NNUEHiddenSize)
+	ww1 := unsafe.Slice(w1, NNUEHiddenSize)
+
+	for i := 0; i < NNUEHiddenSize; i++ {
+		acc0[i] += ww0[i]
+		acc1[i] += ww1[i]
+	}
+}
+
 func moveScalar(
 	a0, a1 *int16,
 	wFrom0, wTo0 *int16,
