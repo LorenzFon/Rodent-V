@@ -282,6 +282,30 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
+	case strings.EqualFold(name, "nodesLimit"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptionValue[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
+		}
+		return
+
+	case strings.EqualFold(name, "nnueScale"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptionValue[NnueScale] = limitValue(n, 10, 2000)
+		}
+		return
+
+	case strings.EqualFold(name, "hceWeight"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptionValue[HcePerc] = limitValue(n, 0, 256)
+		}
+		return
+
+	case strings.EqualFold(name, "nnueWeight"):
+		if n, err := strconv.Atoi(value); err == nil {
+			singleOptionValue[NnuePerc] = limitValue(n, 0, 256)
+		}
+		return
+
 	case strings.EqualFold(name, "nnuePath"):
 		if value == "" {
 			fmt.Println("info string NNUE file path is empty")
@@ -667,27 +691,29 @@ func measureScale(path string) {
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if line == "" { continue }
-		
+		if line == "" {
+			continue
+		}
+
 		var p Pos
 		parseFEN(&p, line)
-		
+
 		refresh(&p, &acc)
 		eval := acc.getEval(p.side)
-		
+
 		absEval := eval
 		if absEval < 0 {
 			absEval = -absEval
 		}
-		
+
 		totalAbs += int64(absEval)
 		count++
-		
-		if count % 100000 == 0 {
+
+		if count%100000 == 0 {
 			fmt.Printf("info string Processed %d positions...\n", count)
 		}
 	}
-	
+
 	if count > 0 {
 		absMean := float64(totalAbs) / float64(count)
 		fmt.Printf("info string Positions: %d\n", count)
