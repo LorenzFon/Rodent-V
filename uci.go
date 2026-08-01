@@ -50,6 +50,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/sys/cpu"
 )
 
 // ---- UCI main loop ----
@@ -94,7 +96,11 @@ func uciLoop() {
 
 		switch tokens[0] {
 		case "uci":
-			fmt.Println("id name Rodent V s13")
+			arch := "Scalar"
+			if cpu.X86.HasAVX2 {
+				arch = "AVX2"
+			}
+			fmt.Printf("id name Rodent V 1.0 %s\n", arch)
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			if nnue.Loaded {
 				fmt.Printf("info string Loaded NNUE network: %s\n", nnuePath)
@@ -179,6 +185,16 @@ func uciLoop() {
 			stopSearch()
 			os.Exit(0)
 
+		case "bench":
+			stopSearch()
+			depth := 14 // default bench depth
+			if len(tokens) > 1 {
+				if d, err := strconv.Atoi(tokens[1]); err == nil {
+					depth = d
+				}
+			}
+			runBench(depth, states[0])
+
 		case "perft":
 			stopSearch()
 			depth := 1
@@ -200,6 +216,16 @@ func uciLoop() {
 
 		case "eval":
 			eval_trace(&p)
+
+		case "help":
+			fmt.Println("Available commands:")
+			fmt.Println("  uci        - Enter UCI mode (standard GUI communication)")
+			fmt.Println("  isready    - Check if the engine is ready")
+			fmt.Println("  bench      - Run a performance benchmark over standard FENs")
+			fmt.Println("  eval       - Show static evaluation for the current position")
+			fmt.Println("  print      - Display the current board")
+			fmt.Println("  perft <d>  - Run perft to depth <d>")
+			fmt.Println("  quit       - Exit the engine")
 
 		case "nnue":
 			{
@@ -373,13 +399,14 @@ func parsePosition(p *Pos, tokens []string) {
 		return
 	}
 	i := 0
-	if tokens[i] == "startpos" {
+	switch tokens[i] {
+	case "startpos":
 		parseFEN(p, startFEN)
 		i++
-	} else if tokens[i] == "m8" {
+	case "m8":
 		parseFEN(p, m8FEN)
 		i++
-	} else if tokens[i] == "fen" {
+	case "fen":
 		i++
 		var parts []string
 		for i < len(tokens) && tokens[i] != "moves" {

@@ -91,13 +91,14 @@ func (vb *ViriBuffer) WriteMoveEval(move int, eval int) {
 		vType = 1
 	} else if mType == CASTLE {
 		vType = 2
-		if to == G1 {
+		switch to {
+		case G1:
 			to = H1
-		} else if to == C1 {
+		case C1:
 			to = A1
-		} else if to == G8 {
+		case G8:
 			to = H8
-		} else if to == C8 {
+		case C8:
 			to = A8
 		}
 	} else if mType >= N_PROM {

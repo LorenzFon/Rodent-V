@@ -1168,8 +1168,10 @@ func (ss *SearchState) reportInfo(score int, pv []int) {
 
 	// Output
 	hashfull := ttHashfull()
-	fmt.Printf("info depth %d seldepth %d time %d nodes %d nps %d hashfull %d score %s %d pv %s\n",
-		rootDepth, ss.selDepth, elapsed, ss.nodes, nps, hashfull, scoreType, score, pvString(pv))
+	if !IsBenchMode {
+		fmt.Printf("info depth %d seldepth %d time %d nodes %d nps %d hashfull %d score %s %d pv %s\n",
+			rootDepth, ss.selDepth, elapsed, ss.nodes, nps, hashfull, scoreType, score, pvString(pv))
+	}
 }
 
 // checkTime tests periodically (every 1024 nodes) whether

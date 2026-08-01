@@ -117,6 +117,16 @@ func main() {
 	// default is no opening books
 	initBooks("books/empty.bin", "books/empty.bin")
 
+	fmt.Println(`
+   ___          __         __   _   __
+  / _ \___  ___/ /__ ___  / /_ | | / /
+ / , _/ _ \/ _  / -_) _ \/ __/ | |/ / 
+/_/|_|\___/\_,_/\__/_//_/\__/  |___/  
+
+         Rodent V 1.0
+      Type 'uci' or 'help'
+	`)
+
 	// main program loop
 	uciLoop()
 }

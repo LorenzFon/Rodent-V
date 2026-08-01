@@ -240,9 +240,10 @@ func dgPlayGame(rng *rand.Rand, ss *SearchState, nodesPerMove int, bookFENs []st
 	}
 
 	wdl := 1
-	if result == 1.0 {
+	switch result {
+	case 1.0:
 		wdl = 2
-	} else if result == 0.0 {
+	case 0.0:
 		wdl = 0
 	}
 	vb.PatchWDL(wdl)
