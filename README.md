@@ -143,19 +143,10 @@ Nodes: 4865609
 
 ---
 
-## ELO Progress
-
-See [ELO.md](ELO.md).
-
-## Roadmap
-
-See [ROADMAP.md](ROADMAP.md).
-
----
 
 ## Credits
 
 - **Sungorus 1.4** — Pablo Vazquez (original C engine)
 - **Rodent V** — Naman Thanki and Pawel Koziol
 - **JohnathanHallstorm (chef)** ([@JonathanHallstrom](https://github.com/JonathanHallstrom)) — For earlier parts of datagenning of Rodent-V to speed up development.
-- **Joshua Shriver** ([@jshriver](https://github.com/jshriver)) — For earlier parts of datagenning of Rodent-V before the 512HL network regeneration.
+- **Joshua Shriver** ([@jshriver](https://github.com/jshriver)) — For earlier parts of datagenning of Rodent-V to speed up development.
