@@ -146,14 +146,3 @@ func flairForward(p *Pos) int {
 func distBonus(s1, s2 int) int {
 	return 7 - chebyshev(s1, s2)
 }
-
-/*
-   if (SqBb(sq) & Mask.away[sd]) {                          // forwardness (based on Toga II 3.0)
-       fwd_weight += V(N_FWD);
-       fwd_cnt += 1;
-   }
-	   finalize
-
-	   Add(e, sd, (V(W_FWD) * fwd_bonus[fwd_cnt] * fwd_weight) / 100, 0);
-
-*/
