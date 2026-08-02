@@ -365,7 +365,7 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
-	case strings.EqualFold(name, "mainBook"):
+	case strings.EqualFold(name, "mainBook") || strings.EqualFold(name, "mainBookPath"):
 		if value == "" {
 			fmt.Println("info string main book file path is empty")
 			return
@@ -378,7 +378,7 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
-	case strings.EqualFold(name, "guideBook"):
+	case strings.EqualFold(name, "guideBook") || strings.EqualFold(name, "guideBookPath"):
 		if value == "" {
 			fmt.Println("info string guide book file path is empty")
 			return
