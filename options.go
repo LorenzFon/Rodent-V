@@ -27,6 +27,8 @@ import (
 	"strings"
 )
 
+var readPersonalityFiles bool
+var personalityFile string // default path to personality file
 var nnuePath string      // default path to NNUE file
 var guideBookPath string // path to repertoire Polyglot book, default is empty
 var mainBookPath string  // path to main Polyglot book, default is empty
@@ -58,6 +60,7 @@ var singleOptionName [NofSingleOptions]string
 var singleOptionValue [NofSingleOptions]int
 var singleOptionMin [NofSingleOptions]int
 var singleOptionMax [NofSingleOptions]int
+var singleOptionVisible[NofSingleOptions] bool
 
 // Asymmetric, side-dependent options (EvaComponent) are defined
 // in EvalData. They need to be indexed by engine/non engine side,
@@ -73,18 +76,20 @@ const weightOpp = 1
 // default settings
 func init() {
 
+	readPersonalityFiles = true
+	personalityFile = "personalities/rodent.txt" 
 	guideBookPath = "books/empty.bin"
 	mainBookPath = "books/empty.bin"
 	nnuePath = "nets/rodent_hm_512hl_1.bin"
 
-	registerSingleOption(HcePerc, "hceWeight", 0, 0, 256)
-	registerSingleOption(NnuePerc, "nnueWeight", 100, 0, 256)
-	registerSingleOption(NnueScale, "nnueScale", 400, 10, 2000)
-	registerSingleOption(NodesLimit, "nodesLimit", 0, 0, 1000*1000*1000)
-	registerSingleOption(LikesClosed, "likesClosed", 0, 0, 256)
-	registerSingleOption(KingTropism, "kingTropism", 0, 0, 256)
-	registerSingleOption(Forwardness, "forwardness", 0, 0, 256)
-	registerSingleOption(HorizontalMirroring, "horizontalMirroring", 1, 0, 1)
+	registerSingleOption(HcePerc, "hceWeight", 0, 0, 256, !readPersonalityFiles)
+	registerSingleOption(NnuePerc, "nnueWeight", 100, 0, 256, !readPersonalityFiles)
+	registerSingleOption(NnueScale, "nnueScale", 400, 10, 2000, !readPersonalityFiles)
+	registerSingleOption(NodesLimit, "nodesLimit", 0, 0, 1000*1000*1000, !readPersonalityFiles)
+	registerSingleOption(LikesClosed, "likesClosed", 0, 0, 256, !readPersonalityFiles)
+	registerSingleOption(KingTropism, "kingTropism", 0, 0, 256, !readPersonalityFiles)
+	registerSingleOption(Forwardness, "forwardness", 0, 0, 256, !readPersonalityFiles)
+	registerSingleOption(HorizontalMirroring, "horizontalMirroring", 1, 0, 1, !readPersonalityFiles)
 
 	pestoEval = false
 	adjustEvalByCorrhist = true
@@ -102,11 +107,13 @@ func registerSingleOption(
 	defaultValue int,
 	minValue int,
 	maxValue int,
+	visible bool,
 ) {
 	singleOptionName[option] = name
 	singleOptionValue[option] = defaultValue
 	singleOptionMin[option] = minValue
 	singleOptionMax[option] = maxValue
+	singleOptionVisible[option] = visible
 }
 
 // saveOptions writes the current engine options as UCI setoption commands,
@@ -252,7 +259,9 @@ func readOptions(path string) error {
 // printUciOptionsPerColor prints color-separated options
 func printUciOptionsPerColor() {
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
-		printPerColorOption(c)
+		if (!readPersonalityFiles) {
+			printPerColorOption(c)
+		}
 	}
 }
 
@@ -282,10 +291,12 @@ func setPerColorOption(name, value string) bool {
 		switch {
 		case strings.EqualFold(name, "Own"+evalComponentName[c]):
 			optionPerColorValues[weightOwn][c] = limitValue(v, 0, 500)
+			//fmt.Println("info string setting Own"+evalComponentName[c],"at",v)
 			return true
 
 		case strings.EqualFold(name, "Opp"+evalComponentName[c]):
 			optionPerColorValues[weightOpp][c] = limitValue(v, 0, 500)
+			//fmt.Println("info string setting Opp"+evalComponentName[c],"at",v)
 			return true
 		}
 	}
@@ -296,12 +307,14 @@ func setPerColorOption(name, value string) bool {
 // prints spin option applicable to both sides
 // NOTE: we are relying on Println adding spaces between arguments
 func printSingleOption(option SingleOption) {
-	fmt.Println(
-		"option name", singleOptionName[option],
-		"type spin default", singleOptionValue[option],
-		"min", singleOptionMin[option],
-		"max", singleOptionMax[option],
-	)
+	if (!readPersonalityFiles) {
+		fmt.Println(
+			"option name", singleOptionName[option],
+			"type spin default", singleOptionValue[option],
+			"min", singleOptionMin[option],
+			"max", singleOptionMax[option],
+		)
+	}
 }
 
 func setSingleOption(name, value string) bool {

@@ -107,15 +107,19 @@ func uciLoop() {
 			}
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
-			fmt.Println("option name PestoEval type check default false")
-			fmt.Println("option name Save Personality type button")
+			//fmt.Println("option name PestoEval type check default false")
+			//fmt.Println("option name Save Personality type button")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
 			printSingleOption(NodesLimit)
 			printSingleOption(HcePerc)
 			printSingleOption(NnuePerc)
-			fmt.Println("option name NnuePath type string default", nnuePath)
-			fmt.Println("option name MainBook type string default", mainBookPath)
-			fmt.Println("option name GuideBook type string default", guideBookPath)
+			if (readPersonalityFiles) {
+				fmt.Println("option name PersonalityFile type string default", personalityFile)
+			} else {
+				fmt.Println("option name NnuePath type string default", nnuePath)
+				fmt.Println("option name MainBook type string default", mainBookPath)
+				fmt.Println("option name GuideBook type string default", guideBookPath)
+			}
 
 			printUciOptionsPerColor()
 
@@ -333,6 +337,20 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
+	case strings.EqualFold(name, "personalityFile"):
+		if value == "" {
+			fmt.Println("info string personality not found")
+			return
+		}
+
+		if readOptions(value) == nil {
+			personalityFile = value // only correct values are saved
+			fmt.Printf("info string loaded personality: %s\n", value)
+		} else {
+			fmt.Printf("info string failed to load personality: %s\n", value)
+		}
+		return
+
 	case strings.EqualFold(name, "nnuePath"):
 		if value == "" {
 			fmt.Println("info string NNUE file path is empty")
@@ -347,7 +365,7 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
-	case strings.EqualFold(name, "mainBook"):
+	case strings.EqualFold(name, "mainBook") || strings.EqualFold(name, "mainBookPath"):
 		if value == "" {
 			fmt.Println("info string main book file path is empty")
 			return
@@ -360,7 +378,7 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
-	case strings.EqualFold(name, "guideBook"):
+	case strings.EqualFold(name, "guideBook") || strings.EqualFold(name, "guideBookPath"):
 		if value == "" {
 			fmt.Println("info string guide book file path is empty")
 			return
