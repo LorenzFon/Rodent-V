@@ -32,6 +32,7 @@ var personalityFile string // default path to personality file
 var nnuePath string      // default path to NNUE file
 var guideBookPath string // path to repertoire Polyglot book, default is empty
 var mainBookPath string  // path to main Polyglot book, default is empty
+var ownBook bool = false // whether to use the internal opening book
 
 var pestoEval bool            // are we using pesto eval?
 var adjustEvalByCorrhist bool // are we using corrhist

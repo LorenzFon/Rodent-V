@@ -109,6 +109,7 @@ func uciLoop() {
 			fmt.Println("option name Clear Hash type button")
 			//fmt.Println("option name PestoEval type check default false")
 			//fmt.Println("option name Save Personality type button")
+			fmt.Println("option name OwnBook type check default false")
 			fmt.Println("option name Threads type spin default 1 min 1 max 256")
 			printSingleOption(NodesLimit)
 			printSingleOption(HcePerc)
@@ -152,9 +153,11 @@ func uciLoop() {
 			stopSearch()
 
 			move := 0
-			move = guideBook.getMove(&p)
-			if move == 0 {
-				move = mainBook.getMove(&p)
+			if ownBook {
+				move = guideBook.getMove(&p)
+				if move == 0 {
+					move = mainBook.getMove(&p)
+				}
 			}
 			if move != 0 {
 				fmt.Printf("bestmove %s\n", moveToStr(move))
@@ -390,6 +393,10 @@ func parseSetOption(tokens []string) {
 			fmt.Printf("info string failed to load guide book %q\n", value)
 		}
 
+		return
+		
+	case strings.EqualFold(name, "OwnBook"):
+		ownBook = strings.EqualFold(value, "true")
 		return
 	}
 
