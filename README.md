@@ -16,6 +16,47 @@ for the title of the strongest chess engine written in go.
 
 ---
 
+## Gameplay
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="gifs/Rodent-V 1.0 vs Stash 35.gif" />
+      <br />
+      <em>Rodent-V 1.0 vs Stash 35 1-0</em>
+    </td>
+    <td align="center">
+      <img src="gifs/Rodent-V Anand vs Chal 1.4.1.gif" />
+      <br />
+      <em>Rodent-V Anand vs Chal 1.4.1 1-0</em>
+    </td>
+    <td align="center">
+      <img src="gifs/Rodent-V Anand vs Rodent-V Nakamura.gif" />
+      <br />
+      <em>Rodent-V Anand vs Rodent-V Nakamura 0-1</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="gifs/Rodent-V Anand vs Stash 35.gif" />
+      <br />
+      <em>Rodent-V Anand vs Stash 35 1-0</em>
+    </td>
+    <td align="center">
+      <img src="gifs/Rodent-V Nakamura vs Fruit 2.1.gif" />
+      <br />
+      <em>Rodent-V Nakamura vs Fruit 2.1 1-0</em>
+    </td>
+    <td align="center">
+      <img src="gifs/Rodent-V Tal vs Fruit 2.1.gif" />
+      <br />
+      <em>Rodent-V Tal vs Fruit 2.1 1-0</em>
+    </td>
+  </tr>
+</table>
+
+---
+
 ## Features
 
 - Rodent can use NNUE, handcrafted eval (HCE) or their weighted average
