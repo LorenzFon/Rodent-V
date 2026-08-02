@@ -1,5 +1,9 @@
+; Tal personality for Rodent V
+;
+; created by Naman Thanki, tweaked by Pawel Koziol
+;
 setoption name nnuePath value nets/rodent_hm_512hl_1.bin
-setoption name mainBookPath value books/ph-tal2.bin
+setoption name mainBookPath value books/active.bin
 setoption name guideBookPath value books/empty.bin
 setoption name hceWeight value 80
 setoption name nnueWeight value 40
