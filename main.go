@@ -103,6 +103,10 @@ func main() {
 				fmt.Println("Error:", err)
 			}
 			return
+		case "alloptions":
+			// Engine will hide personality path and print UCI options.
+			// No return statement, we want to use Rodent like that!
+			readPersonalityFiles = false 
 
 			// case "loadsnapshot":
 			// 	if len(os.Args) < 3 {

@@ -27,7 +27,7 @@ import (
 	"strings"
 )
 
-var readPersonalityFiles bool
+var readPersonalityFiles bool = true
 var personalityFile string // default path to personality file
 var nnuePath string      // default path to NNUE file
 var guideBookPath string // path to repertoire Polyglot book, default is empty
@@ -76,7 +76,6 @@ const weightOpp = 1
 // default settings
 func init() {
 
-	readPersonalityFiles = true
 	personalityFile = "personalities/rodent.txt" 
 	guideBookPath = "books/empty.bin"
 	mainBookPath = "books/empty.bin"
