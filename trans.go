@@ -124,7 +124,13 @@ func (t *TTable) alloc(mbSize int) {
 		size *= 2
 	}
 	// Each entry is 16 bytes; allocate (size/2) MiB worth.
-	t.size = ((size / 2) << 20) / 16
+	newSize := ((size / 2) << 20) / 16
+	
+	if t.size == newSize {
+		return // Size unchanged, don't reallocate or wipe the TT
+	}
+	
+	t.size = newSize
 	t.mask = t.size - 4
 	t.entries = make([]Entry, t.size)
 	t.clear()
