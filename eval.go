@@ -138,7 +138,7 @@ func evaluate(p *Pos, acc *Accumulator) int {
 		nnueScore := 0
 		hceScore := 0
 		if singleOptionValue[NnuePerc] > 0 {
-			nnueScore = acc.getEval(p.side) * singleOptionValue[NnuePerc] / 100
+			nnueScore = evaluateScaledNNUE(p, acc)
 		}
 		if singleOptionValue[HcePerc] > 0 {
 			hceScore = eval_internal(p, false) * singleOptionValue[HcePerc] / 100
@@ -177,9 +177,26 @@ func evaluateNNUE(p *Pos, acc *Accumulator) int {
 	if score, ok := probeEvalHash(p.key); ok {
 		return score
 	}
-	score := acc.getEval(p.side) * singleOptionValue[NnuePerc] / 100
+	score := evaluateScaledNNUE(p, acc)
 	storeEvalHash(p.key, score)
 	return score
+}
+
+// returns NNUE eval after all the scalings we apply
+func evaluateScaledNNUE(p *Pos, acc *Accumulator)int {
+
+	// sum of material for both sides
+	material := 100 * p.count[White][P] + 100 * p.count[Black][P] + 
+				300 * p.count[White][N] + 300 * p.count[Black][N] + 
+				300 * p.count[White][B] + 300 * p.count[White][R] + 
+				500 * p.count[White][R] + 500 * p.count[Black][R] + 
+				900 * p.count[White][Q] + 900 * p.count[Black][Q]
+
+	// percentage scaling
+	score := acc.getEval(p.side) * singleOptionValue[NnuePerc] / 100
+
+	// decrease score as material disappears
+	return score * (25000 + material) / 32768;
 }
 
 // eval_trace describes engine's hce evaluation
