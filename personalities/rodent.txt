@@ -1,5 +1,5 @@
 ; Rodent V options
-setoption name nnuePath value nets/rodent_v_512hl_6.bin
+setoption name nnuePath value nets/rodent_hm_512hl_1.bin
 setoption name mainBookPath value books/rodent.bin
 setoption name guideBookPath value books/empty.bin
 setoption name hceWeight value 0
