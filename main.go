@@ -115,6 +115,18 @@ func main() {
 			// 	}
 			// 	loadSnapshotFile(os.Args[2])
 			// 	return
+		case "bench":
+			depth := 14
+			if len(os.Args) > 2 {
+				if d, err := strconv.Atoi(os.Args[2]); err == nil {
+					depth = d
+				}
+			}
+			allocTT(16)
+			ss := new(SearchState)
+			ss.tt = &mainTT
+			runBench(depth, ss, true)
+			return
 		}
 	}
 
