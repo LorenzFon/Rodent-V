@@ -100,7 +100,7 @@ func uciLoop() {
 			if cpu.X86.HasAVX2 {
 				arch = "AVX2"
 			}
-			fmt.Printf("id name Rodent V 1.0 %s\n", arch)
+			fmt.Printf("id name Rodent V %s %s\n", versionString, arch)
 			fmt.Println("id author Naman Thanki, Pawel Koziol, based on Sungorus by Pablo Vazquez")
 			if nnue.Loaded {
 				fmt.Printf("info string Loaded NNUE network: %s\n", nnuePath)
