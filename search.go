@@ -186,6 +186,11 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	var wg sync.WaitGroup
 	for i := 1; i < numThreads && i < len(states); i++ {
 		h := states[i]
+		if h == nil {
+			h = new(SearchState)
+			h.tt = &mainTT
+			states[i] = h
+		}
 		h.clearHistory()
 		h.resetForSearch(p)
 		refresh(p, &h.accStack[0])

@@ -67,10 +67,8 @@ func uciLoop() {
 	// we never allocate during a search.
 	const maxAllowedThreads = 256
 	states := make([]*SearchState, maxAllowedThreads)
-	for i := range states {
-		states[i] = new(SearchState)
-		states[i].tt = &mainTT
-	}
+	states[0] = new(SearchState)
+	states[0].tt = &mainTT
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 65536), 65536)
@@ -141,7 +139,9 @@ func uciLoop() {
 			stopSearch()
 			clearTT()
 			for i := 0; i < numThreads; i++ {
-				states[i].clearHistory()
+				if states[i] != nil {
+					states[i].clearHistory()
+				}
 			}
 			parseFEN(&p, startFEN)
 
