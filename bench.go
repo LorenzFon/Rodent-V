@@ -62,8 +62,10 @@ var benchFENs = []string{
 }
 
 // runBench runs a search to the specified maxDepth on standard bench positions.
-func runBench(maxDepth int, ss *SearchState) {
-	fmt.Printf("Running bench to depth %d...\n\n", maxDepth)
+func runBench(maxDepth int, ss *SearchState, quiet bool) {
+	if !quiet {
+		fmt.Printf("Running bench to depth %d...\n\n", maxDepth)
+	}
 
 	totalNodes := int64(0)
 	start := time.Now()
@@ -88,8 +90,10 @@ func runBench(maxDepth int, ss *SearchState) {
 			ss.search(&p, 0, -inf, inf, d, false, dummyPV[:])
 		}
 		
-		fmt.Printf("Position %d/50: %s\n", i+1, fen)
-		fmt.Printf(" -> %d nodes\n", ss.nodes)
+		if !quiet {
+			fmt.Printf("Position %d/50: %s\n", i+1, fen)
+			fmt.Printf(" -> %d nodes\n", ss.nodes)
+		}
 
 		totalNodes += int64(ss.nodes)
 	}
@@ -101,8 +105,11 @@ func runBench(maxDepth int, ss *SearchState) {
 		nps = int64(float64(totalNodes) / elapsedSeconds)
 	}
 
-	fmt.Printf("\nBench Complete!\n")
-	fmt.Printf("Total Nodes : %d\n", totalNodes)
-	fmt.Printf("Total Time  : %d ms\n", elapsed.Milliseconds())
-	fmt.Printf("Total NPS   : %d\n", nps)
+	if !quiet {
+		fmt.Printf("\nBench Complete!\n")
+		fmt.Printf("Total Nodes : %d\n", totalNodes)
+		fmt.Printf("Total Time  : %d ms\n", elapsed.Milliseconds())
+		fmt.Printf("Total NPS   : %d\n", nps)
+	}
+	fmt.Printf("%d nodes %d nps\n", totalNodes, nps)
 }

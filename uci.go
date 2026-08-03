@@ -200,7 +200,7 @@ func uciLoop() {
 					depth = d
 				}
 			}
-			runBench(depth, states[0])
+			runBench(depth, states[0], false)
 
 		case "perft":
 			stopSearch()
