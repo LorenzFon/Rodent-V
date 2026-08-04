@@ -27,6 +27,7 @@ import (
 	"strings"
 )
 
+var noOptions = false // mode for testers, disabling options
 var readPersonalityFiles bool = true
 var personalityFile string // default path to personality file
 var nnuePath string      // default path to NNUE file
@@ -282,6 +283,9 @@ func printPerColorOption(component EvalComponent) {
 }
 
 func setPerColorOption(name, value string) bool {
+	if noOptions {
+		return false
+	}
 	v, err := strconv.Atoi(value)
 	if err != nil {
 		return false
@@ -318,6 +322,9 @@ func printSingleOption(option SingleOption) {
 }
 
 func setSingleOption(name, value string) bool {
+	if noOptions {
+		return false
+	}
 	for option := SingleOption(0); option < NofSingleOptions; option++ {
 		if !strings.EqualFold(name, singleOptionName[option]) {
 			continue

@@ -109,6 +109,10 @@ func main() {
 			// Engine will hide personality path and print UCI options.
 			// No return statement, we want to use Rodent like that!
 			readPersonalityFiles = false 
+		case "nooptions":
+			// Engine will hide all the personality options.
+			// No return statement, we want to use Rodent like that!
+			noOptions = true 
 
 			// case "loadsnapshot":
 			// 	if len(os.Args) < 3 {
