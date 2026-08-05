@@ -66,21 +66,61 @@ of them have 512 hidden neurons, but one type can use horizontal
 mirrorring, and the other cannot. Technically, horizontal mirrorring
 allows the network to transfer the patterns it has learned on the 
 kingside to the queenside (or another way round). Practically, it
-means that that you cannot mix both types of networks. Because
-Rodent has no autodetection system, it relies on correct setting of
-horizontalMirroring option. For that reason, it is discouraged to rename
-networks, or change that setting for an existing network.
+means that that you cannot mix up both types of networks at risk 
+of debilitating the engine. 
+
+Because Rodent has no autodetection system, it relies on correct 
+setting of horizontalMirroring option. For that reason, it is 
+discouraged to rename networks, or change horizontalMirroring setting 
+for an existing network.
 
 Rodent's networks are trained using excellent bullet trainer
 (https://github.com/jw1912/bullet) and it is the responsibility
 of the person who trained them to enforce correct value of 
 horizontalMirroring option.
 
+## Eval philosophy
+
+Rodent's personalities are based on an unusual idea that you can
+run both neural network and traditional handcrafted eval (HCE)
+at the same time. This does not help playing strength (even though
+it does not hurt as much as the loss of speed indicates), but creates
+additional possibilities for creating distinct personalities.
+
+Personality can be created solely by tweaking HCE parameters,
+without NNUE or with its small contribution to overall score.
+Or it can be based entirely on a custom made neural network.
+
+These personality networks are made primarily for fun, so test
+them only if you are aware that this is not the strongest personality.
+of course, happy incidents happen (for Rodent 1.1 it was Anand net,
+winning over default with a huge margin) 
+
 ## Options
 
-(TODO)
+This section is for users who attempt to tune Rodent. It describes
 
-Note: OwnKingSafety means: how safe is engine's king, and should
+nnuePath - path to selected neural network. If no network is found,
+Rodent will default to HCE, which will make it weaker or unusable,
+depending on other personality settings.
+
+mainBookPath/mainBook - path to engine's main opening book. Books
+are in Polyglot format, because open source.
+
+guideBookPath/guideBook - path to engine's guide book, typically
+smaller, designed to direct opening play rather than churn out
+long lines.
+
+hceWeight - contribution of HCE eval to total score. All other
+eval options except of nnueWeight will be scaled by that coefficient.
+
+nnueWeight - contribution of NNUE eval to total score.
+
+nodesLimit - DEPRECATED
+
+OwnKingSafety, OppKingSafety
+
+OwnKingSafety means: how safe is engine's king, and should
 be raised for defence-oriented personalities; OppKingSafety means:
 how safe is opponent's king, and should be raised for attacking
 personalities. 

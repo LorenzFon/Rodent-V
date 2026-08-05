@@ -22,11 +22,14 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
 )
 
+var engineElo = 0
+var timeoutTestPeriod int64 = 1023
 var noOptions = false // mode for testers, disabling options
 var readPersonalityFiles bool = true
 var personalityFile string // default path to personality file
@@ -99,6 +102,32 @@ func init() {
 		optionPerColorValues[weightOwn][c] = 100
 		optionPerColorValues[weightOpp][c] = 100
 	}
+}
+
+func eloToNodesLimit(elo int) int {
+	// Full strength.
+	if elo == 0 || elo == 3500 {
+		timeoutTestPeriod = 1023
+		return 0
+	}
+
+	exponent := (float64(elo) + 271.0) / 252.0
+	nodesPerMove := int(math.Exp(exponent)) + elo
+
+	timeoutTestPeriod = 1023
+
+	switch {
+	case nodesPerMove < 500:
+		timeoutTestPeriod = 63
+	case nodesPerMove < 1000:
+		timeoutTestPeriod = 127
+	case nodesPerMove < 2000:
+		timeoutTestPeriod = 255
+	case nodesPerMove < 4000:
+		timeoutTestPeriod = 511
+	}
+
+	return nodesPerMove
 }
 
 // set value, min, max and name for an option
