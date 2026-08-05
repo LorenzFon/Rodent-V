@@ -28,6 +28,7 @@ import (
 	"strings"
 )
 
+var limitStrength = false
 var engineElo = 0
 var timeoutTestPeriod int64 = 1023
 var noOptions = false // mode for testers, disabling options
@@ -89,7 +90,7 @@ func init() {
 	registerSingleOption(HcePerc, "hceWeight", 0, 0, 256, !readPersonalityFiles)
 	registerSingleOption(NnuePerc, "nnueWeight", 100, 0, 256, !readPersonalityFiles)
 	registerSingleOption(NnueScale, "nnueScale", 400, 10, 2000, !readPersonalityFiles)
-	registerSingleOption(NodesLimit, "nodesLimit", 0, 0, 1000*1000*1000, !readPersonalityFiles)
+	registerSingleOption(NodesLimit, "nodesLimit", 0, 0, 1000*1000*1000, false) // set by Uci_Elo
 	registerSingleOption(LikesClosed, "likesClosed", 0, -256, 256, !readPersonalityFiles)
 	registerSingleOption(KingTropism, "kingTropism", 0, -256, 256, !readPersonalityFiles)
 	registerSingleOption(Forwardness, "forwardness", 0, -256, 256, !readPersonalityFiles)
@@ -101,6 +102,17 @@ func init() {
 	for c := EvalComponent(0); c < EvalComponentN; c++ {
 		optionPerColorValues[weightOwn][c] = 100
 		optionPerColorValues[weightOpp][c] = 100
+	}
+}
+
+// configureEngineStrength cets nodes limit based on engineElo
+// and determines timeoutTestPeriod
+func configureEngineStrength() {
+	if limitStrength {
+		singleOptionValue[NodesLimit] = eloToNodesLimit(engineElo)
+	} else {
+		singleOptionValue[NodesLimit] = 0
+		timeoutTestPeriod = 1023
 	}
 }
 

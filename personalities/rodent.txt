@@ -1,10 +1,10 @@
-; Rodent V options
+; Rodent V - default settings
+;
 setoption name nnuePath value nets/rodent_hm_512hl_1.bin
 setoption name mainBookPath value books/rodent.bin
 setoption name guideBookPath value books/empty.bin
 setoption name hceWeight value 0
 setoption name nnueWeight value 100
-setoption name nodesLimit value 0
 setoption name nnueScale value 400
 setoption name likesClosed value 0
 setoption name kingTropism value 0

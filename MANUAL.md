@@ -14,7 +14,7 @@ it within a GUI, make sure to append "nooptions" to the engine
 path.
 
 Rodent V in nooptions mode allows to set hash size, number of
-threads, and nothing more. It also informs user whether the NNUE
+threads, Uci_Elo and nothing more. It also informs user whether NNUE
 (neural network) has been loaded. It is the safest mode, designed
 to protect engine from any interferences, intentional or otherwise.
 
@@ -59,6 +59,12 @@ from one computer to another, they need repeatable paths. For that
 reason they assume that there are three specific subfolders in Rodent
 folder: "personalities", "books" and "nets"
 
+## Playing strength
+
+Because Rodent implements UCI_Elo, personality files do not determine
+strength. We thought it is fun to be able to play against a weaker
+version of Tal.
+
 ## Neural networks
 
 Currently Rodent V is able to use two kinds of neural networks. Both
@@ -98,7 +104,9 @@ winning over default with a huge margin)
 
 ## Options
 
-This section is for users who attempt to tune Rodent. It describes
+This section is for users who attempt to tune Rodent.
+
+# Side-independent options
 
 nnuePath - path to selected neural network. If no network is found,
 Rodent will default to HCE, which will make it weaker or unusable,
@@ -116,14 +124,68 @@ eval options except of nnueWeight will be scaled by that coefficient.
 
 nnueWeight - contribution of NNUE eval to total score.
 
-nodesLimit - DEPRECATED
+nnueScale - used to regulate internal scaling of a neural network;
+thanks to it, impact of nnueWeight on each net will be roughly 
+the same. Please do not change, unless you change the network.
+
+likesClosed, kingTropism, forwardness - see chapter about Flairs 
+
+horizontalMirroring - se chapter about neural networks (and change
+only together with the network)
+
+# Side-dependent options
+
+It is much more interesting if evaluation is asymmetric, and
+program can care for some property of its position, ignoring
+the same property of opponent's position. That's why some
+options are made asymmetric. "Own" options refer to the engine's 
+side, "Opp" options to its opponent.
+
+OwnMaterial, OppMaterial 
+
+Weight of piece values. Should be decreased if a personality is 
+meant to sacrifice material. Should be kept close to each other, 
+because material is by far the dominant contribution to HCE. 
+If engine is using NNUE, and nnueWeight is at 30% or above, 
+more adventurous personalities can play decent chess with material 
+set to 0 (see chaotic.txt)
+
+OwnPst, OppPst 
+
+Contribution of piece/square tables to the eval. Generally both 
+values should be kept the same. Decrease for more chaotic style.
+
+OwnMobility, OppMobility 
+
+This is where the fun begins. Mobility reflects how many moves can 
+a piece make, and generally minor pieces' contribution is greater. 
+This setting yields interesting results if it is asymmetric.
 
 OwnKingSafety, OppKingSafety
 
 OwnKingSafety means: how safe is engine's king, and should
 be raised for defence-oriented personalities; OppKingSafety means:
 how safe is opponent's king, and should be raised for attacking
-personalities. 
+personalities. This is opposite of what previous versions of Rodent
+did. Again, asymmetry is nice for the personalities.
+
+OwnPawns, OppPawns
+
+Importance of pawn structure, excluding passed pawns. Increase
+for positional personalities, decrease for chaotic ones.
+
+OwnPassers, OppPassers
+
+Importance of passed pawns.
+
+OwnThreats, OppThreats
+
+Attacks on enemy pieces. Lower symmetrically for positional 
+personalities, raise asymmetrically for attacking ones.
+
+OwnOther, OppOther
+
+Other aspects of evaluation. Generally keep them at 100 or 0.
 
 ## Flairs 
 

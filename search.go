@@ -171,13 +171,12 @@ func initLMRTable() {
 // each failure (smoother than doubling) until the window opens fully.
 func think(p *Pos, states []*SearchState, maxDepth int) {
 	engineSide = p.side
+	configureEngineStrength()
 	atomic.StoreInt32(&abortFlag, 0)
 	ss := states[0]
 	ss.tt.newDate()
 	ss.resetForSearch(p)
 	refresh(p, &ss.accStack[0])
-
-	singleOptionValue[NodesLimit] = eloToNodesLimit(engineElo)
 
 	// Emit info about node limit
 	if singleOptionValue[NodesLimit] > 0 {

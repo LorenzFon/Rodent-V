@@ -14,7 +14,6 @@ setoption name guideBookPath value books/empty.bin
 setoption name hceWeight value 80
 setoption name nnueWeight value 20
 setoption name horizontalMirroring value 0
-setoption name nodesLimit value 0
 setoption name nnueScale value 400
 setoption name likesClosed value 0
 setoption name kingTropism value 0

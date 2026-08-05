@@ -104,12 +104,13 @@ func uciLoop() {
 			// these options should be always exposed
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
+			fmt.Println("option name UCI_LimitStrength type check default false")
+			fmt.Printf("option name UCI_Elo type spin default %d min 800 max 3500\n", engineElo)
 
             if (!noOptions) {
 				//fmt.Println("option name PestoEval type check default false")
 				fmt.Println("option name OwnBook type check default false")
 				fmt.Println("option name Threads type spin default 1 min 1 max 256")
-				printSingleOption(NodesLimit)
 				printSingleOption(HcePerc)
 				printSingleOption(NnuePerc)
 				if (readPersonalityFiles) {
@@ -329,12 +330,17 @@ func parseSetOption(tokens []string) {
 		}
 		return
 
-	case strings.EqualFold(name, "nodesLimit"):
-		if noOptions {
-			return
+	case strings.EqualFold(name, "UCI_LimitStrength"):
+		if b, err := strconv.ParseBool(value); err == nil {
+			limitStrength = b
+			configureEngineStrength()
 		}
+		return
+
+	case strings.EqualFold(name, "UCI_Elo"):
 		if n, err := strconv.Atoi(value); err == nil {
-			singleOptionValue[NodesLimit] = limitValue(n, 0, 1000*1000*1000)
+			engineElo = limitValue(n, 800, 3500)
+			configureEngineStrength()
 		}
 		return
 
