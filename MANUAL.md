@@ -1,4 +1,8 @@
-### Rodent manual
+# Rodent manual
+
+## Which version to test?
+
+The strongest version of Rodent V 1.1 is rodent_v_1.1_anand
 
 ## No options mode for testers
 
@@ -110,7 +114,7 @@ winning over default with a huge margin)
 
 This section is for users who attempt to tune Rodent.
 
-# Side-independent options
+### Side-independent options
 
 nnuePath - path to selected neural network. If no network is found,
 Rodent will default to HCE, which will make it weaker or unusable,
@@ -137,7 +141,7 @@ likesClosed, kingTropism, forwardness - see chapter about Flairs
 horizontalMirroring - se chapter about neural networks (and change
 only together with the network)
 
-# Side-dependent options
+### Side-dependent options
 
 It is much more interesting if evaluation is asymmetric, and
 program can care for some property of its position, ignoring
