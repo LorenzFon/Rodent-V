@@ -28,7 +28,9 @@ Again: type it directly in the console mode, append to the engine
 path calling it from the GUI or use whatever method GUI has to offer
 instead. 
 
-[image: Arena method of adding commandline parameters]
+<p align="center">
+  <img src="img/parameter.png" alt="Adding alloptions parameter under Arena" width="300">
+</p>
 
 This exposes everything that Rodent V has to offer. You can tweak 
 the options to your liking using whatever controls GUI has to offer, 
@@ -36,7 +38,9 @@ and then click the button and save personality.txt in the folder
 where the engine is located. Just note there are no safeguards 
 against overwriting!
 
-[image: UCI options in alloptions mode]
+<p align="center">
+  <img src="img/alloptions.png" alt="UCI options in alloptions mode" width="300">
+</p>
 
 ## Default mode
 

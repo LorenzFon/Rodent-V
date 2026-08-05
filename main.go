@@ -43,7 +43,7 @@ import (
 	"strconv"
 )
 
-const versionString = "1.0.01"
+const versionString = "1.1"
 
 // init() is guaranteed to run before main()
 func init() {

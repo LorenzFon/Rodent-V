@@ -30,6 +30,7 @@ import (
 
 var limitStrength = false
 var engineElo = 0
+var maxBookDepth = 128
 var timeoutTestPeriod int64 = 1023
 var noOptions = false // mode for testers, disabling options
 var readPersonalityFiles bool = true
@@ -105,20 +106,24 @@ func init() {
 	}
 }
 
-// configureEngineStrength cets nodes limit based on engineElo
+// configureEngineStrength sets nodes limit based on engineElo
 // and determines timeoutTestPeriod
 func configureEngineStrength() {
 	if limitStrength {
 		singleOptionValue[NodesLimit] = eloToNodesLimit(engineElo)
+		maxBookDepth = eloToBookDepth(engineElo)
 	} else {
 		singleOptionValue[NodesLimit] = 0
 		timeoutTestPeriod = 1023
+		maxBookDepth = 128
 	}
 }
 
+// eloToNodesLimit calculates nodes limit needed to play
+// at certain strength
 func eloToNodesLimit(elo int) int {
 	// Full strength.
-	if elo == 0 || elo == 3500 {
+	if elo == 0 || elo == 3000 {
 		timeoutTestPeriod = 1023
 		return 0
 	}
@@ -140,6 +145,18 @@ func eloToNodesLimit(elo int) int {
 	}
 
 	return nodesPerMove
+}
+
+// at lower elo, reduce opening book knowledge
+// UNUSED!!!
+func eloToBookDepth(elo int) int {
+
+	// Full strength.
+	if elo == 0 || elo == 3000 {
+		return 128
+	}
+
+	return elo / 150
 }
 
 // set value, min, max and name for an option

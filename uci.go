@@ -105,7 +105,7 @@ func uciLoop() {
 			fmt.Println("option name Hash type spin default 16 min 1 max 4096")
 			fmt.Println("option name Clear Hash type button")
 			fmt.Println("option name UCI_LimitStrength type check default false")
-			fmt.Printf("option name UCI_Elo type spin default %d min 800 max 3500\n", engineElo)
+			fmt.Printf("option name UCI_Elo type spin default %d min 800 max 3000\n", engineElo)
 
             if (!noOptions) {
 				//fmt.Println("option name PestoEval type check default false")
