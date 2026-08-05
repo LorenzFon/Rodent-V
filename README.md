@@ -12,7 +12,8 @@ Based on **Sungorus 1.4** by Pablo Vazquez.
 
 Rodent is back! Rewritten in go, supplied with NNUE and developed by two
 programmers, ready both to give endless fun with personalities and to contend
-for the title of the strongest chess engine written in go.
+for the title of the strongest chess engine written in go. To learn about
+its options, go to MANUAL.md
 
 ---
 

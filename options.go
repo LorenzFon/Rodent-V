@@ -22,11 +22,17 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
 )
 
+var limitStrength = false
+var engineElo = 0
+var maxBookDepth = 128
+var timeoutTestPeriod int64 = 1023
+var noOptions = false // mode for testers, disabling options
 var readPersonalityFiles bool = true
 var personalityFile string // default path to personality file
 var nnuePath string      // default path to NNUE file
@@ -85,7 +91,7 @@ func init() {
 	registerSingleOption(HcePerc, "hceWeight", 0, 0, 256, !readPersonalityFiles)
 	registerSingleOption(NnuePerc, "nnueWeight", 100, 0, 256, !readPersonalityFiles)
 	registerSingleOption(NnueScale, "nnueScale", 400, 10, 2000, !readPersonalityFiles)
-	registerSingleOption(NodesLimit, "nodesLimit", 0, 0, 1000*1000*1000, !readPersonalityFiles)
+	registerSingleOption(NodesLimit, "nodesLimit", 0, 0, 1000*1000*1000, false) // set by Uci_Elo
 	registerSingleOption(LikesClosed, "likesClosed", 0, -256, 256, !readPersonalityFiles)
 	registerSingleOption(KingTropism, "kingTropism", 0, -256, 256, !readPersonalityFiles)
 	registerSingleOption(Forwardness, "forwardness", 0, -256, 256, !readPersonalityFiles)
@@ -98,6 +104,59 @@ func init() {
 		optionPerColorValues[weightOwn][c] = 100
 		optionPerColorValues[weightOpp][c] = 100
 	}
+}
+
+// configureEngineStrength sets nodes limit based on engineElo
+// and determines timeoutTestPeriod
+func configureEngineStrength() {
+	if limitStrength {
+		singleOptionValue[NodesLimit] = eloToNodesLimit(engineElo)
+		maxBookDepth = eloToBookDepth(engineElo)
+	} else {
+		singleOptionValue[NodesLimit] = 0
+		timeoutTestPeriod = 1023
+		maxBookDepth = 128
+	}
+}
+
+// eloToNodesLimit calculates nodes limit needed to play
+// at certain strength
+func eloToNodesLimit(elo int) int {
+	// Full strength.
+	if elo == 0 || elo == 3000 {
+		timeoutTestPeriod = 1023
+		return 0
+	}
+
+	exponent := (float64(elo) + 271.0) / 252.0
+	nodesPerMove := int(math.Exp(exponent)) + elo
+
+	timeoutTestPeriod = 1023
+
+	switch {
+	case nodesPerMove < 500:
+		timeoutTestPeriod = 63
+	case nodesPerMove < 1000:
+		timeoutTestPeriod = 127
+	case nodesPerMove < 2000:
+		timeoutTestPeriod = 255
+	case nodesPerMove < 4000:
+		timeoutTestPeriod = 511
+	}
+
+	return nodesPerMove
+}
+
+// at lower elo, reduce opening book knowledge
+// UNUSED!!!
+func eloToBookDepth(elo int) int {
+
+	// Full strength.
+	if elo == 0 || elo == 3000 {
+		return 128
+	}
+
+	return elo / 150
 }
 
 // set value, min, max and name for an option
@@ -282,6 +341,9 @@ func printPerColorOption(component EvalComponent) {
 }
 
 func setPerColorOption(name, value string) bool {
+	if noOptions {
+		return false
+	}
 	v, err := strconv.Atoi(value)
 	if err != nil {
 		return false
@@ -318,6 +380,9 @@ func printSingleOption(option SingleOption) {
 }
 
 func setSingleOption(name, value string) bool {
+	if noOptions {
+		return false
+	}
 	for option := SingleOption(0); option < NofSingleOptions; option++ {
 		if !strings.EqualFold(name, singleOptionName[option]) {
 			continue

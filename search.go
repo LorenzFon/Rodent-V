@@ -171,6 +171,7 @@ func initLMRTable() {
 // each failure (smoother than doubling) until the window opens fully.
 func think(p *Pos, states []*SearchState, maxDepth int) {
 	engineSide = p.side
+	configureEngineStrength()
 	atomic.StoreInt32(&abortFlag, 0)
 	ss := states[0]
 	ss.tt.newDate()
@@ -738,7 +739,8 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 		// LMR of quiet nodes
 		if useLMR && stage == StageQuiet && depth >= minLmrDepth &&
-			!nodeInCheck && movesTried >= 4 {
+			!nodeInCheck && movesTried >= 4 &&
+			singleOptionValue[NodesLimit] == 0 {
 			// Read base reduction value.
 			reduction := lmr[min(depth, 63)][min(movesTried, 63)]
 			if reduction > 0 {
@@ -769,7 +771,8 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 
 		// LMR of bad captures
 		if useLMR && stage == StageBadCaptures && depth >= minLmrDepth &&
-			!nodeInCheck && !givesCheck && movesTried >= 4 {
+			!nodeInCheck && !givesCheck && movesTried >= 4 &&
+			singleOptionValue[NodesLimit] == 0 {
 			reduction := 1
 			if reduction > 0 {
 				if !isPv {
@@ -1189,7 +1192,7 @@ func (ss *SearchState) checkTime() {
 		return
 	}
 
-	if ss.nodes&1023 != 0 || rootDepth == 1 {
+	if ss.nodes&timeoutTestPeriod != 0 || rootDepth == 1 {
 		return
 	}
 

@@ -9,7 +9,6 @@ setoption name mainBookPath value books/tricky.bin
 setoption name guideBookPath value books/empty.bin
 setoption name hceWeight value 60
 setoption name nnueWeight value 40
-setoption name nodesLimit value 0
 setoption name horizontalMirroring value 0
 setoption name nnueScale value 400
 setoption name likesClosed value 0
