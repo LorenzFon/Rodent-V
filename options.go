@@ -29,7 +29,7 @@ import (
 )
 
 var limitStrength = false
-var engineElo = 0
+var engineElo = 3000
 var maxBookDepth = 128
 var timeoutTestPeriod int64 = 1023
 var noOptions = false // mode for testers, disabling options
@@ -123,7 +123,7 @@ func configureEngineStrength() {
 // at certain strength
 func eloToNodesLimit(elo int) int {
 	// Full strength.
-	if elo == 0 || elo == 3000 {
+	if !limitStrength {
 		timeoutTestPeriod = 1023
 		return 0
 	}
@@ -152,7 +152,7 @@ func eloToNodesLimit(elo int) int {
 func eloToBookDepth(elo int) int {
 
 	// Full strength.
-	if elo == 0 || elo == 3000 {
+	if !limitStrength {
 		return 128
 	}
 
