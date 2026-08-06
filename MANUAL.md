@@ -2,7 +2,17 @@
 
 ## Which version to test?
 
-The strongest version of Rodent V 1.1 is rodent_v_1.1_anand
+The strongest version of Rodent V 1.1 is the one with Anand neural
+network. For testers, we have prepared rodent_v_1.1_testers, using
+precisely that network and locked in the no options mode (see below)
+
+## What are personalities?
+
+Personalities are text files containing UCI commands that define 
+engine's playing style. They can use either *personality nets*
+trained on player's games, or a hybrid eval which allows to customize
+the engine. You can compare both options, looking at tal_nnue
+and tal_hybrid personalities.
 
 ## No options mode for testers
 
@@ -14,8 +24,8 @@ a parameter:
 rodent_v nooptions
 
 If you use Rodent in the console mode, type it directly. If you use
-it within a GUI, make sure to append "nooptions" to the engine
-path.
+it within a GUI, use whatever way a GUI provides for entering
+commandline parameters.
 
 Rodent V in nooptions mode allows to set hash size, number of
 threads, Uci_Elo and nothing more. It also informs user whether NNUE
@@ -28,13 +38,17 @@ If you want to tweak Rodent's parameters, run it with the command
 
 rodent_v alloptions
 
-Again: type it directly in the console mode, append to the engine 
-path calling it from the GUI or use whatever method GUI has to offer
-instead. 
+Again: type it directly in the console mode or use whatever method 
+GUI allows to use. Arena has a window for GUI parameters: 
 
 <p align="center">
   <img src="img/parameter.png" alt="Adding alloptions parameter under Arena" width="300">
 </p>
+
+For cutechess-gui under Windows the workaround is to use a .bat file:
+
+@echo off
+"%~dp0rodent_v.exe" alloptions
 
 This exposes everything that Rodent V has to offer. You can tweak 
 the options to your liking using whatever controls GUI has to offer, 
