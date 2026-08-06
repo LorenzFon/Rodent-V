@@ -5,6 +5,7 @@
 ; likes closed positions, restricting opponents mobility
 ; and attacking enemy king. Plays old-fashioned, provocative
 ; openings and likes to figure them out by himself.
+; based on an old net, horizontal mirrorring must be off
 ;
 setoption name nnuePath value nets/rodent_v_512hl_6.bin
 setoption name mainBookPath value books/nimzowitsch.bin

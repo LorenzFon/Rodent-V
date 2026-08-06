@@ -3,6 +3,7 @@
 ; configured by Pawel Koziol
 ;
 ; aggressive, disregards pawn structure, tricky openings
+; based on an old net, horizontal mirrorring must be off
 ;
 setoption name nnuePath value nets/rodent_v_512hl_6.bin
 setoption name mainBookPath value books/tricky.bin
