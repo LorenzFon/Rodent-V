@@ -67,6 +67,13 @@ from one computer to another, they need repeatable paths. For that
 reason they assume that there are three specific subfolders in Rodent
 folder: "personalities", "books" and "nets"
 
+Depending on the release package, there will be several executables.
+They will offer the same capabilities, only their default styles
+will be different.
+
+The strongest of the current setup is Rodent_v_1.1_Anand and this one
+should be tested.
+
 ## Playing strength
 
 Because Rodent implements UCI_Elo, personality files do not determine
