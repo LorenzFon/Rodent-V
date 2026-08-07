@@ -1,3 +1,176 @@
+26-08-05 [feat] nodes to Elo and UCI_Elo command implemented
+
+26-08-03 [search] aggressive gravity update
+
+26-08-03 [hotfix] Fix TT wipe on Hash option and lazily allocate search threads
+
+26-08-02 [nnue] scaling nnue score by remaining material +38 Elo
+
+Results of new vs base (8+0.08, 1t, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 38.58 +/- 16.54, nElo: 64.16 +/- 27.26
+LOS: 100.00 %, DrawRatio: 46.47 %, PairsRatio: 2.04
+Games: 624, Wins: 205, Losses: 136, Draws: 283, Points: 346.5 (55.53 %)
+Ptnml(0-2): [6, 49, 145, 94, 18], WL/DD Ratio: 1.07
+LLR: 2.93 (101.5%) (-2.25, 2.89) [0.00, 10.00]
+
+26-08-02 [nnue] new 512 hl hm net and personality nets
+
+26-08-01 [feat] reading personality files
+
+26-08-01 [nnue] AVX2 speedup
+
+26-08-01 [nnue] horizontal mirrorring
+
+26.07.31 [feat] measure scale
+
+implement measure_scale option for uci which accepts 
+epd book as param and returns absolute average scale 
+which can be useful when testing directly in GUIs with different scales
+
+26-07-31 [nnue] Lizard scReLu for 512 hl networks
+
+26-07-31 [feat] Polyglot opening books handling
+
+26-07-30 [feat] additional UCI options (eval flairs)
+
+26-07-26 [search] corrhist bugfix
+it was wrong to adjust corrhist by difference between static eval 
+and search result, which already contained a corrhist component. 
+This led to score inflation along the pv.
+
+a bugfix, not a gainer, but would pass non-regression. 
+
+Results of new vs base (8+0.08, 1t, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 1.63 +/- 5.66, nElo: 2.69 +/- 9.33
+LOS: 71.39 %, DrawRatio: 44.31 %, PairsRatio: 1.04
+Games: 5322, Wins: 1363, Losses: 1338, Draws: 2621, Points: 2673.5 (50.23 %)
+Ptnml(0-2): [82, 644, 1179, 679, 77], WL/DD Ratio: 0.82
+LLR: -1.02 (-45.2%) (-2.25, 2.89) [0.00, 10.00]
+
+26-07-26 [time] implement dual soft/hard limits with best-move stability scaling
+Replace static half-budget time stopping with dynamic Soft/Hard limits
+
+- Define separate softLimit (75% base alloc) and hardLimit (4x alloc) in uci.go
+- Track best-move consistency across iterative deepening in search.go
+- Reduce soft time by 25% on stable moves (chosen 4+ consecutive depths)
+- Extend soft time by 50% on unstable moves (when best move flips)
+
+--------------------------------------------------
+Results of RodentTest vs RodentBase (8+0.08, 1t, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 43.02 +/- 12.79, nElo: 69.68 +/- 20.49
+LOS: 100.00 %, DrawRatio: 46.20 %, PairsRatio: 2.09
+Games: 1104, Wins: 382, Losses: 246, Draws: 476, Points: 620.0 (56.16 %)
+Ptnml(0-2): [10, 86, 255, 160, 41], WL/DD Ratio: 1.22
+LLR: 2.96 (100.4%) (-2.94, 2.94) [0.00, 5.00]
+
+26-07-23 [fix] assorted memory footprint reductions
+
+26-07-23 [search] LMR of checking moves, half the amount +15 Elo
+
+--------------------------------------------------
+Results of new vs base (8+0.08, 1t, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 15.54 +/- 9.97, nElo: 25.78 +/- 16.52
+LOS: 99.89 %, DrawRatio: 46.35 %, PairsRatio: 1.31
+Games: 1700, Wins: 463, Losses: 387, Draws: 850, Points: 888.0 (52.24 %)
+Ptnml(0-2): [21, 176, 394, 224, 35], WL/DD Ratio: 0.75
+LLR: 2.91 (100.7%) (-2.25, 2.89) [0.00, 10.00]
+--------------------------------------------------
+
+26-07-22 [nnue] datagen returns viriformat
+
+26-07-21 [search] LMR of bad captures +15 Elo
+--------------------------------------------------
+Results of new vs base (8+0.08, 1t, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 15.70 +/- 10.21, nElo: 24.91 +/- 16.18
+LOS: 99.87 %, DrawRatio: 44.58 %, PairsRatio: 1.34
+Games: 1772, Wins: 495, Losses: 415, Draws: 862, Points: 926.0 (52.26 %)
+Ptnml(0-2): [32, 178, 395, 240, 41], WL/DD Ratio: 0.78
+LLR: 2.89 (100.1%) (-2.25, 2.89) [0.00, 10.00]
+--------------------------------------------------
+
+26-07-21 [nnue] assorted datagen improvements
+
+26-07-19 [nnue] datagen
+
+26-07-19 [nnue] runtime scalar fallback if no AVX2
+
+26-07-18 [nnue] AVX2 for accumulator sum, huge speedup
+
+26-07-17 [nnue] choosing AVX2 based on hidden layer size
+
+26-07-17 [nnue] AVX2 for accumulator update, 5% speedup
+
+26-07-16 decoupling data for nnue update
+1
+26-07-15 [speed] board is make-unmake again, accumulator is copy-make
+
+26-07-10 [fix] LMR init bugfix
+
+sad to say: +130 Elo
+
+26-07-07 [nnue] lazy accumulator updates - 10% speedup
+
+26-07-04 [nnue] copy-make gives 7 to 10% speedup
+
+26-07-03 [nnue] hybrid 60% HCE 30% NNUE briefly outperforms NNUE
+
+26-07-03 [nnue] initial commit, 64hl
+
+--------------------------------------------------
+Results of new vs base (8+0.08, 1t, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 23.29 +/- 14.50, nElo: 28.12 +/- 17.44
+LOS: 99.92 %, DrawRatio: 37.80 %, PairsRatio: 1.25
+Games: 1524, Wins: 628, Losses: 526, Draws: 370, Points: 813.0 (53.35 %)
+Ptnml(0-2): [72, 139, 288, 141, 122], WL/DD Ratio: 5.40
+LLR: 2.91 (100.7%) (-2.25, 2.89) [0.00, 10.00]
+--------------------------------------------------
+
+26-06-26 [time] hard and soft time limit
+
+--------------------------------------------------
+Results of new vs base (8+0.08, 1t, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 105.45 +/- 27.97, nElo: 160.06 +/- 39.85
+LOS: 100.00 %, DrawRatio: 39.04 %, PairsRatio: 6.42
+Games: 292, Wins: 131, Losses: 45, Draws: 116, Points: 189.0 (64.73 %)
+Ptnml(0-2): [3, 9, 57, 53, 24], WL/DD Ratio: 1.11
+LLR: 2.90 (100.4%) (-2.25, 2.89) [0.00, 10.00]
+--------------------------------------------------
+
+26-06-20 [search] "drama queen" search config (worse at ultra-bullet, but scaling)
+
+26-06-20 [search] stricter conditions for node level pruning
+
+26-06-19 [search] RFP uses the same material condition as null move
+
+26-05-04 [search] tt store in quiesce
+
+26-05-03 [eval] bishops of opposite colors
+
+26-04-30 [eval] checkmate helper
+
+26-04-29 [eval] additional pst tables baed on central pawn structure
+
+26-04-27 [tuning] implement cosine annealing for learning rate adjustment
+
+26-04-25 [tuning] parallel tuner
+
+26-04-25 [feat] asymmetric options
+
+26-04-24 [eval] tempo eval
+
+Results of new vs base (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 9.39 +/- 7.30, nElo: 14.26 +/- 11.08
+LOS: 99.42 %, DrawRatio: 42.58 %, PairsRatio: 1.15
+Games: 3776, Wins: 1110, Losses: 1008, Draws: 1658, Points: 1939.0 (51.35 %)
+Ptnml(0-2): [80, 424, 804, 474, 106], WL/DD Ratio: 1.12
+LLR: 2.89 (100.0%) (-2.25, 2.89) [0.00, 10.00]
+
+26-04-24 [patch] remove negative extension condition for ttScore >= beta
+
+26-04-23 [patch] skip rfp directly after null move
+
+26-04-23 [patch] skip razoring directly after null move
+
 26-04-22 [search]implement negative extension when ttScore >= beta (6 Elo)
 
 Results of RodentTest vs RodentBase (8+0.08, NULL, 16MB, UHO_Lichess_4852_v1.epd):
