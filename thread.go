@@ -45,6 +45,10 @@ type SearchState struct {
 	searchStart int64 // Unix ms at the start of think()
 	rootHistLen int   // p.histLen when think() began (repetition detection)
 
+	// ---- MultiPV State ----
+	multiPVIdx        int   // current multipv index (1-based)
+	excludedRootMoves []int // slice of root moves to skip
+
 	// ---- Per-ply context (indexed by ply, reset each think) ----
 	accStack     [maxPly]Accumulator   // NNUE accumulator uses copy/makes
 	updateStack  [maxPly]Update        // data for lazy nnue accumulator updates
@@ -116,6 +120,9 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.rootHistLen = p.histLen
 	ss.contValid = [maxPly]bool{}
 	ss.killerMoves = [maxPly][2]int{}
+
+	ss.multiPVIdx = 1
+	ss.excludedRootMoves = ss.excludedRootMoves[:0]
 
 	ss.isUsingNNUE = nnue.Loaded && singleOptionValue[NnuePerc] > 0
 	ss.pickEvalFunction()

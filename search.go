@@ -200,8 +200,12 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 		}(h, pCopy)
 	}
 
-	var pv [maxPly]int
-	score := 0
+	numPV := singleOptionValue[MultiPV]
+	if numPV < 1 {
+		numPV = 1
+	}
+	pvs := make([][maxPly]int, numPV)
+	scores := make([]int, numPV)
 
 	var lastBestMove int
 	var bestMoveStability int
@@ -225,52 +229,67 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 				break
 			}
 		}
-		var iterScore int
+		ss.excludedRootMoves = ss.excludedRootMoves[:0] // Reset for this depth
 
-		//printMemory(rootDepth)
+		for pvIdx := 0; pvIdx < numPV; pvIdx++ {
+			ss.multiPVIdx = pvIdx + 1
+			var iterScore int
 
-		if rootDepth < 5 {
-			// Aspiration windows are unreliable at shallow depths.
-			iterScore = ss.search(p, 0, -inf, inf, rootDepth, false, pv[:])
-		} else {
+			//printMemory(rootDepth)
 
-			// Score-adaptive initial delta: balanced positions get a tight
-			// window; large scores widen it to reduce retry churn.
-			delta := 25 + score*score/16384
-			alpha := max(-inf, score-delta)
-			beta := min(inf, score+delta)
+			if rootDepth < 5 {
+				// Aspiration windows are unreliable at shallow depths.
+				iterScore = ss.search(p, 0, -inf, inf, rootDepth, false, pvs[pvIdx][:])
+			} else {
+				score := scores[pvIdx]
+				// Score-adaptive initial delta: balanced positions get a tight
+				// window; large scores widen it to reduce retry churn.
+				delta := 25 + score*score/16384
+				alpha := max(-inf, score-delta)
+				beta := min(inf, score+delta)
 
-			for {
-				iterScore = ss.search(p, 0, alpha, beta, rootDepth, false, pv[:])
-				if ss.isAbortingSearch() {
-					break
+				for {
+					iterScore = ss.search(p, 0, alpha, beta, rootDepth, false, pvs[pvIdx][:])
+					if ss.isAbortingSearch() {
+						break
+					}
+					if iterScore <= alpha {
+						// Fail low: collapse beta to the midpoint before widening
+						// alpha so the high side doesn't grow unnecessarily.
+						beta = (alpha + beta) / 2
+						alpha = max(-inf, alpha-delta)
+					} else if iterScore >= beta {
+						// Fail high: widen the window above and retry.
+						beta = min(inf, beta+delta)
+					} else {
+						break // score is inside the window
+					}
+					delta += delta / 2 // proportional widening (×1.5)
 				}
-				if iterScore <= alpha {
-					// Fail low: collapse beta to the midpoint before widening
-					// alpha so the high side doesn't grow unnecessarily.
-					beta = (alpha + beta) / 2
-					alpha = max(-inf, alpha-delta)
-				} else if iterScore >= beta {
-					// Fail high: widen the window above and retry.
-					beta = min(inf, beta+delta)
-				} else {
-					break // score is inside the window
-				}
-				delta += delta / 2 // proportional widening (×1.5)
 			}
+
+			if ss.isAbortingSearch() {
+				break
+			}
+
+			// If no legal moves were found (fewer legal moves than requested PVs)
+			if pvs[pvIdx][0] == 0 {
+				break
+			}
+
+			scores[pvIdx] = iterScore
+			ss.excludedRootMoves = append(ss.excludedRootMoves, pvs[pvIdx][0])
 		}
 
 		if ss.isAbortingSearch() {
 			break
 		}
 
-		score = iterScore
-
-		if pv[0] != 0 && pv[0] == lastBestMove {
+		if pvs[0][0] != 0 && pvs[0][0] == lastBestMove {
 			bestMoveStability++
 		} else {
 			bestMoveStability = 1
-			lastBestMove = pv[0]
+			lastBestMove = pvs[0][0]
 		}
 	}
 
@@ -278,10 +297,10 @@ func think(p *Pos, states []*SearchState, maxDepth int) {
 	atomic.StoreInt32(&abortFlag, 1)
 	wg.Wait()
 
-	if pv[0] != 0 {
-		best := moveToStr(pv[0])
-		if pv[1] != 0 {
-			ponder := moveToStr(pv[1])
+	if pvs[0][0] != 0 {
+		best := moveToStr(pvs[0][0])
+		if pvs[0][1] != 0 {
+			ponder := moveToStr(pvs[0][1])
 			fmt.Printf("bestmove %s ponder %s\n", best, ponder)
 		} else {
 			fmt.Printf("bestmove %s\n", best)
@@ -608,6 +627,20 @@ func (ss *SearchState) search(p *Pos, ply, alpha, beta, depth int, wasNull bool,
 		// Skip the move excluded during a singular extension search.
 		if move == ss.excludedMove[ply] {
 			continue
+		}
+
+		// Skip excluded root moves for MultiPV support
+		if isRoot {
+			skip := false
+			for _, excluded := range ss.excludedRootMoves {
+				if move == excluded {
+					skip = true
+					break
+				}
+			}
+			if skip {
+				continue
+			}
 		}
 
 		// --- Singular extension ---
@@ -1170,8 +1203,8 @@ func (ss *SearchState) reportInfo(score int, pv []int) {
 	// Output
 	hashfull := ttHashfull()
 	if !IsBenchMode {
-		fmt.Printf("info depth %d seldepth %d time %d nodes %d nps %d hashfull %d score %s %d pv %s\n",
-			rootDepth, ss.selDepth, elapsed, ss.nodes, nps, hashfull, scoreType, score, pvString(pv))
+		fmt.Printf("info depth %d seldepth %d multipv %d time %d nodes %d nps %d hashfull %d score %s %d pv %s\n",
+			rootDepth, ss.selDepth, ss.multiPVIdx, elapsed, ss.nodes, nps, hashfull, scoreType, score, pvString(pv))
 	}
 }
 
