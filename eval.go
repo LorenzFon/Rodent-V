@@ -475,7 +475,7 @@ func initCenterType(p *Pos, e *EvalData) {
 		e.center[Black] = CLASSIC_d4d5
 	}
 
-	// may be overridden by KID or Siiclian
+	// may be overridden by KID or Sicilian
 	if isOnSq(p, White, P, E4) && isOnSq(p, Black, P, E5) {
 		e.center[White] = CLASSIC_e4e5
 		e.center[Black] = CLASSIC_e4e5

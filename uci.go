@@ -768,16 +768,6 @@ func perftStack(
 	return nodes
 }
 
-func limitValue(value, min, max int) int {
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
-	return value
-}
-
 func measureScale(path string) {
 	file, err := os.Open(path)
 	if err != nil {

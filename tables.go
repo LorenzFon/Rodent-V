@@ -281,20 +281,6 @@ func opp(color int) int { return color ^ 1 }
 func lsb(bb uint64) int      { return bits.TrailingZeros64(bb) }
 func popCount(bb uint64) int { return bits.OnesCount64(bb) }
 
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-func maxOf(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // ================================================================
 // MOVE DECODING HELPERS
 // ================================================================
