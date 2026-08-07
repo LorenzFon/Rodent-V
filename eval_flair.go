@@ -40,16 +40,13 @@ func flairClosed(p *Pos) int {
 		score[side] += 2 * p.count[side][P] // max +16
 		score[side] -= 6 * p.count[side][B] // max -12
 		score[side] -= 2 * p.count[side][R] // max -4
-		//                                  // total: 0
+		//                   initial position total: 0
 	}
 
 	var result = score[White] - score[Black]
 
 	// Return score from the perspective of the side to move.
-	if p.side == White {
-		return result
-	}
-	return -result
+	return scoreFromPerspective(result, p.side)
 }
 
 // flairTropism encourages moving pieces towards enemy king.
@@ -77,9 +74,7 @@ func flairTropism(p *Pos) int {
 	}
 
 	// Clamp phase.
-	if phase > 24 {
-		phase = 24
-	}
+	phase = minOf(phase, 24)
 
 	// Interpolate between midgame/endgame scores.
 	mgScore := mg[White] - mg[Black]
@@ -87,11 +82,7 @@ func flairTropism(p *Pos) int {
 	var result = (mgScore*phase + egScore*(24-phase)) / 24
 
 	// Return score from the perspective of the side to move.
-	if p.side == White {
-		return result
-	}
-	return -result
-
+	return scoreFromPerspective(result, p.side)
 }
 
 // flairForward encourages moving pieces to enemy half
@@ -122,9 +113,7 @@ func flairForward(p *Pos) int {
 	}
 
 	// Clamp phase.
-	if phase > 24 {
-		phase = 24
-	}
+	phase = minOf(phase, 24)
 
 	// Set forwardness bonuses.
 	mg[White] = fwdBonus[fwdCount[White]] * fwdWeight[White]
@@ -136,13 +125,16 @@ func flairForward(p *Pos) int {
 	var result = (mgScore*phase + egScore*(24-phase)) / 24
 
 	// Return score from the perspective of the side to move.
-	if p.side == White {
-		return result
-	}
-	return -result
-
+	return scoreFromPerspective(result, p.side)
 }
 
 func distBonus(s1, s2 int) int {
 	return 7 - chebyshev(s1, s2)
+}
+
+func scoreFromPerspective(score, side int) int {
+	if side == White {
+		return score
+	}
+	return -score
 }

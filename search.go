@@ -147,14 +147,7 @@ func initLMRTable() {
 			// linear component
 			reduction := int(raw + lmrLinear)
 
-			// limit lmr size
-			if reduction < 1 {
-				reduction = 1
-			} else if reduction > lmrMax {
-				reduction = lmrMax
-			}
-
-			lmr[depth][moveCount] = reduction
+			lmr[depth][moveCount] = limitValue(reduction, 1, lmrMax)
 		}
 	}
 }
