@@ -47,6 +47,7 @@ type SearchState struct {
 
 	// ---- MultiPV State ----
 	multiPVIdx        int   // current multipv index (1-based)
+	multiPVCount      int   // number of pv lines requested this think() call
 	excludedRootMoves []int // slice of root moves to skip
 
 	// ---- Per-ply context (indexed by ply, reset each think) ----
@@ -122,6 +123,7 @@ func (ss *SearchState) resetForSearch(p *Pos) {
 	ss.killerMoves = [maxPly][2]int{}
 
 	ss.multiPVIdx = 1
+	ss.multiPVCount = 1
 	ss.excludedRootMoves = ss.excludedRootMoves[:0]
 
 	ss.isUsingNNUE = nnue.Loaded && singleOptionValue[NnuePerc] > 0
